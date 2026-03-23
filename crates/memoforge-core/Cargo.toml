@@ -11,3 +11,14 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+pulldown-cmark = "0.12"
+git2 = "0.19"
+notify = "6.1"
+fs2 = "0.4"
+lru = "0.12"
+uuid = { version = "1.0", features = ["v4"] }
+regex = "1.10"
+
+[dev-dependencies]
+tempfile = "3.10"
