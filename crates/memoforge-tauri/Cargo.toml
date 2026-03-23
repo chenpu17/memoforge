@@ -1,0 +1,13 @@
+[package]
+name = "memoforge-tauri"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+memoforge-core = { path = "../memoforge-core" }
+tauri = { version = "2.0", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

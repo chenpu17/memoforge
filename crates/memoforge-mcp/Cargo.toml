@@ -1,0 +1,17 @@
+[package]
+name = "memoforge-mcp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "memoforge"
+path = "src/main.rs"
+
+[dependencies]
+memoforge-core = { path = "../memoforge-core" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap = { version = "4.0", features = ["derive"] }

@@ -1,0 +1,33 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Node
+node_modules/
+dist/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Tauri
+src-tauri/target/
+
+# Local
+.env
+.env.local
+*.log
+
+# 讨论文档（不纳入版本控制）
+docs/discussion/
+
+# Claude 工作目录
+.claude/
