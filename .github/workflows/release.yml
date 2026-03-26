@@ -5,6 +5,14 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build and publish'
+        required: true
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -32,12 +40,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
+
+      - name: Install OpenSSL (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install openssl@3
+          echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,8 +87,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'MemoForge ${{ github.ref_name }}'
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: 'MemoForge ${{ github.event.inputs.tag || github.ref_name }}'
           releaseBody: 'See the assets to download and install this version.'
           releaseDraft: true
           prerelease: false
@@ -87,32 +105,47 @@ jobs:
             os: macos-latest
             artifact_name: memoforge
             asset_name: memoforge-darwin-arm64
+            asset_file: memoforge-darwin-arm64
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact_name: memoforge
             asset_name: memoforge-darwin-x64
+            asset_file: memoforge-darwin-x64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact_name: memoforge.exe
             asset_name: memoforge-windows-x64
+            asset_file: memoforge-windows-x64.exe
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
             artifact_name: memoforge
             asset_name: memoforge-linux-x64
+            asset_file: memoforge-linux-x64
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm
             artifact_name: memoforge
             asset_name: memoforge-linux-arm64
+            asset_file: memoforge-linux-arm64
 
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install OpenSSL (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install openssl@3
+          echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib" >> $GITHUB_ENV
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -120,16 +153,22 @@ jobs:
       - name: Build MCP Server
         run: cargo build --release -p memoforge-mcp --target ${{ matrix.target }}
 
+      - name: Prepare release asset
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "dist/${{ matrix.asset_file }}"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          path: dist/${{ matrix.asset_file }}
 
   release-mcp:
-    needs: build-mcp
+    needs: [build, build-mcp]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -139,6 +178,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: artifacts/**/*
           draft: true
           generate_release_notes: true

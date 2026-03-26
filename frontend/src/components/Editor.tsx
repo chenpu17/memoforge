@@ -49,7 +49,7 @@ export const Editor: React.FC<EditorProps> = ({
 }) => {
   const { updateSelection, clearSelection } = useEditorStatePublisher()
   const lastSelectionRef = useRef<{ startLine: number; endLine: number } | null>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 处理选区变化（带防抖，避免频繁写入）
   // 注意：选区仅在编辑模式下发布（阅读模式下没有编辑器选区）
