@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from 'react'
-import { Search, Plus, Save, ArrowUpDown, ChevronRight, MoreHorizontal, Trash2, GitBranch, FolderOpen } from 'lucide-react'
+import { Search, Plus, Save, ArrowUpDown, ChevronRight, MoreHorizontal, Trash2, GitBranch, FolderOpen, X, Minus, Square } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
 import { SearchPanel } from './components/SearchPanel'
@@ -14,6 +14,33 @@ import { KbSwitcher } from './components/KbSwitcher'
 import { RightPanel } from './components/RightPanel'
 import { useAppStore } from './stores/appStore'
 import { tauriService, DeletePreview } from './services/tauri'
+
+// 窗口控制函数
+async function closeWindow() {
+  if (typeof window !== 'undefined' && '__TAURI__' in window) {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().close()
+  }
+}
+
+async function minimizeWindow() {
+  if (typeof window !== 'undefined' && '__TAURI__' in window) {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().minimize()
+  }
+}
+
+async function maximizeWindow() {
+  if (typeof window !== 'undefined' && '__TAURI__' in window) {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const win = getCurrentWindow()
+    if (await win.isMaximized()) {
+      await win.unmaximize()
+    } else {
+      await win.maximize()
+    }
+  }
+}
 
 const getTagColors = (tag: string) => {
   const colors: Record<string, { bg: string; text: string }> = {
@@ -425,9 +452,30 @@ function App() {
       >
         <div className="flex items-center gap-2" data-tauri-drag-region>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FF5F57' }} />
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FFBD2E' }} />
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#28C840' }} />
+            <button
+              onClick={closeWindow}
+              className="w-3 h-3 rounded-full flex items-center justify-center hover:brightness-90 transition-all group"
+              style={{ backgroundColor: '#FF5F57' }}
+              title="关闭"
+            >
+              <X className="h-2 w-2 opacity-0 group-hover:opacity-100 text-black/60" />
+            </button>
+            <button
+              onClick={minimizeWindow}
+              className="w-3 h-3 rounded-full flex items-center justify-center hover:brightness-90 transition-all group"
+              style={{ backgroundColor: '#FFBD2E' }}
+              title="最小化"
+            >
+              <Minus className="h-2 w-2 opacity-0 group-hover:opacity-100 text-black/60" />
+            </button>
+            <button
+              onClick={maximizeWindow}
+              className="w-3 h-3 rounded-full flex items-center justify-center hover:brightness-90 transition-all group"
+              style={{ backgroundColor: '#28C840' }}
+              title="最大化"
+            >
+              <Square className="h-1.5 w-1.5 opacity-0 group-hover:opacity-100 text-black/60" />
+            </button>
           </div>
         </div>
         <span className="text-[13px] font-medium select-none" style={{ color: '#737373' }} data-tauri-drag-region>
