@@ -31,8 +31,8 @@ fn main() {
 
     let list = list_knowledge(&kb_path, LoadLevel::L0, None, None, None, None)
         .expect("Failed to list");
-    println!("   Found {} knowledge items", list.len());
-    if list.is_empty() {
+    println!("   Found {} knowledge items", list.items.len());
+    if list.items.is_empty() {
         println!("   Warning: No knowledge found, skipping assertion");
     } else {
         println!("   ✓ Knowledge list OK");
@@ -54,7 +54,7 @@ fn main() {
     println!("4. Reading knowledge...");
     let list = list_knowledge(&kb_path, LoadLevel::L2, None, None, None, None)
         .expect("Failed to list");
-    let k = list.iter().find(|k| k.id == id).expect("Knowledge not found");
+    let k = list.items.iter().find(|k| k.id == id).expect("Knowledge not found");
     assert_eq!(k.title, "Test Knowledge");
     assert!(k.content.is_some());
     println!("   ✓ Read knowledge OK");
@@ -65,6 +65,7 @@ fn main() {
         &kb_path,
         &id,
         Some("Updated Title"),
+        None,
         None,
         None,
         None,

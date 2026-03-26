@@ -1,0 +1,16 @@
+[package]
+name = "memoforge-http"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+memoforge-core = { path = "../memoforge-core" }
+
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+tracing = "0.1"

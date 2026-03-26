@@ -60,6 +60,7 @@ pub fn git_commit(path: &Path, message: &str) -> Result<(), MemoError> {
     // 添加所有更改
     let mut index = repo.index().map_err(git_error)?;
     index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None).map_err(git_error)?;
+    unstage_runtime_files(path, &mut index)?;
     index.write().map_err(git_error)?;
 
     // 创建提交
@@ -73,6 +74,42 @@ pub fn git_commit(path: &Path, message: &str) -> Result<(), MemoError> {
         repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent]).map_err(git_error)?;
     } else {
         repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[]).map_err(git_error)?;
+    }
+
+    Ok(())
+}
+
+fn unstage_runtime_files(repo_path: &Path, index: &mut git2::Index) -> Result<(), MemoError> {
+    let runtime_dir = repo_path.join(".memoforge");
+    if !runtime_dir.exists() {
+        return Ok(());
+    }
+
+    let tracked_runtime_files = [
+        ".memoforge/serve.pid",
+        ".memoforge/http.token",
+        ".memoforge/events.jsonl",
+        ".memoforge/git.lock",
+        ".memoforge/write.lock",
+    ];
+
+    for relative in tracked_runtime_files {
+        let _ = index.remove_path(Path::new(relative));
+    }
+
+    if let Ok(entries) = std::fs::read_dir(&runtime_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name = match path.file_name().and_then(|value| value.to_str()) {
+                Some(value) => value,
+                None => continue,
+            };
+
+            if file_name.ends_with(".lock") {
+                let relative = format!(".memoforge/{}", file_name);
+                let _ = index.remove_path(Path::new(&relative));
+            }
+        }
     }
 
     Ok(())
@@ -233,6 +270,11 @@ fn open_repo(path: &Path) -> Result<Repository, MemoError> {
         retry_after_ms: None,
         context: None,
     })
+}
+
+/// 检查是否是 Git 仓库
+pub fn is_git_repo(path: &Path) -> bool {
+    Repository::open(path).is_ok()
 }
 
 fn is_clean(repo: &Repository) -> Result<bool, MemoError> {

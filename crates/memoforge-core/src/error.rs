@@ -26,6 +26,8 @@ pub enum ErrorCode {
     // 参数错误
     InvalidPath,
     InvalidFrontmatter,
+    InvalidArgument,
+    InvalidData,
     // 并发冲突
     ConflictFileLocked,
     ConflictGitMerge,

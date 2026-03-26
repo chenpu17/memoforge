@@ -34,10 +34,17 @@ categories: []
     // 初始化 Git
     crate::git::git_init(path)?;
 
-    // 创建 .gitignore
-    let gitignore = r#".memoforge/serve.pid
-.memoforge/events.jsonl
-.DS_Store
+    // 创建 .memoforge/.gitignore，排除运行时文件
+    let memoforge_gitignore = r#"serve.pid
+http.token
+events.jsonl
+git.lock
+*.lock
+"#;
+    fs::write(path.join(".memoforge/.gitignore"), memoforge_gitignore).map_err(io_error)?;
+
+    // 创建仓库根 .gitignore
+    let gitignore = r#".DS_Store
 "#;
     fs::write(path.join(".gitignore"), gitignore).map_err(io_error)?;
 

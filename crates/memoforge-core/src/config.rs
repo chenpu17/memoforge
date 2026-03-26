@@ -15,7 +15,9 @@ pub struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategoryConfig {
+    #[serde(default)]
     pub id: String,
+    #[serde(default)]
     pub name: String,
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,12 +56,23 @@ pub fn load_config(kb_path: &Path) -> Result<Config, MemoError> {
         context: None,
     })?;
 
-    serde_yaml::from_str(&content).map_err(|e| MemoError {
+    let mut config: Config = serde_yaml::from_str(&content).map_err(|e| MemoError {
         code: ErrorCode::InvalidPath,
         message: format!("Failed to parse config: {}", e),
         retry_after_ms: None,
         context: None,
-    })
+    })?;
+
+    for category in &mut config.categories {
+        if category.id.is_empty() {
+            category.id = category.path.clone();
+        }
+        if category.name.is_empty() {
+            category.name = category.path.clone();
+        }
+    }
+
+    Ok(config)
 }
 
 pub fn save_config(kb_path: &Path, config: &Config) -> Result<(), MemoError> {
@@ -101,5 +114,7 @@ pub fn register_category(
 
 pub fn validate_category_path(kb_path: &Path, category_id: &str) -> Result<bool, MemoError> {
     let config = load_config(kb_path)?;
-    Ok(config.categories.iter().any(|c| c.id == category_id))
+    Ok(config.categories.iter().any(|c| {
+        c.id == category_id || c.path == category_id || c.name == category_id
+    }))
 }

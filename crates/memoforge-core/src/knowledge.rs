@@ -39,6 +39,7 @@ pub fn load_knowledge(path: &Path, level: LoadLevel) -> Result<Knowledge, MemoEr
         content,
         created_at: frontmatter.created_at,
         updated_at: frontmatter.updated_at,
+        summary_stale: None, // Will be calculated at API level if needed
     })
 }
 
@@ -86,11 +87,11 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::PathBuf;
+    use tempfile::TempDir;
 
-    fn create_test_file() -> PathBuf {
-        let dir = std::env::temp_dir().join("memoforge_test");
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("test.md");
+    fn create_test_file() -> (TempDir, PathBuf) {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.md");
 
         let content = r#"---
 id: test-001
@@ -105,12 +106,12 @@ updated_at: 2026-03-23T11:00:00Z
 Test content."#;
 
         fs::write(&path, content).unwrap();
-        path
+        (dir, path)
     }
 
     #[test]
     fn test_load_l0() {
-        let path = create_test_file();
+        let (_dir, path) = create_test_file();
         let k = load_knowledge(&path, LoadLevel::L0).unwrap();
         assert_eq!(k.id, "test-001");
         assert!(k.summary.is_none());
@@ -119,7 +120,7 @@ Test content."#;
 
     #[test]
     fn test_load_l1() {
-        let path = create_test_file();
+        let (_dir, path) = create_test_file();
         let k = load_knowledge(&path, LoadLevel::L1).unwrap();
         assert_eq!(k.summary, Some("Test summary".to_string()));
         assert!(k.content.is_none());
@@ -127,7 +128,7 @@ Test content."#;
 
     #[test]
     fn test_load_l2() {
-        let path = create_test_file();
+        let (_dir, path) = create_test_file();
         let k = load_knowledge(&path, LoadLevel::L2).unwrap();
         assert!(k.summary.is_some());
         assert!(k.content.is_some());

@@ -14,6 +14,10 @@ pub struct Frontmatter {
     pub category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    /// Hash of content when summary was last generated.
+    /// Used to detect if summary is stale (content changed since summary was written).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary_hash: Option<String>,
     #[serde(alias = "created")]
     pub created_at: DateTime<Utc>,
     #[serde(alias = "updated")]
@@ -30,6 +34,18 @@ pub struct Knowledge {
     pub content: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Indicates if the summary is stale (content has changed since summary was generated)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary_stale: Option<bool>,
+}
+
+/// Knowledge with extended metadata including staleness info
+#[derive(Debug, Clone, Serialize)]
+pub struct KnowledgeWithStale {
+    #[serde(flatten)]
+    pub knowledge: Knowledge,
+    /// Whether the summary is stale (content changed since summary was written)
+    pub summary_stale: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
