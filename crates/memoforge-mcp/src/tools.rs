@@ -125,72 +125,100 @@ pub fn list_tools() -> Vec<Value> {
     vec![
         tool(
             "get_editor_state",
-            "Get current editor state, including mode, desktop status, current knowledge base, current knowledge, selection info, active agents, and state validity.",
+            "Get current MemoForge desktop editor state including: mode (follow/bound), desktop app status, current knowledge base path, current knowledge being edited, text selection info, and list of active AI agents. Call this to understand the user's current context.",
             json!({
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "description": "Returns real-time state from the desktop application when connected via SSE mode"
             }),
         ),
         tool(
             "get_status",
-            "Get knowledge base status, category counts, Git availability, and current access mode.",
+            "Get knowledge base overview: total knowledge count, category count, Git initialization status, and current access mode (readonly/readwrite). Call this to verify KB accessibility.",
             json!({
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "description": "Returns KB statistics and connectivity status"
             }),
         ),
         tool(
             "get_config",
-            "Get knowledge base configuration and registered categories. Call this before creating new knowledge.",
+            "Get knowledge base configuration including KB name, version, and all registered categories with their paths and descriptions. IMPORTANT: Call this before creating new knowledge to understand the category structure.",
             json!({
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "description": "Returns configuration from .memoforge/config.yaml"
             }),
         ),
         tool(
             "list_knowledge",
-            "List knowledge entries with optional filtering. Use this as the first step to explore the knowledge base.",
+            "List knowledge entries with optional filtering. This is the primary discovery tool - call it first to explore the knowledge base before diving into specific content.",
             json!({
                 "type": "object",
                 "properties": {
                     "level": {
                         "type": "string",
                         "enum": ["L0", "L1"],
-                        "description": "L0: metadata only, L1: include summary"
+                        "description": "Detail level: L0 (default) = metadata only (fast), L1 = include AI-generated summaries"
                     },
                     "path": {
                         "type": "string",
-                        "description": "Optional category or directory prefix filter"
+                        "description": "Filter by category path prefix, e.g., '技术/Rust'"
                     },
-                    "category_id": { "type": "string" },
-                    "tags": { "type": "array", "items": { "type": "string" } },
-                    "limit": { "type": "integer" },
-                    "offset": { "type": "integer" }
+                    "category_id": {
+                        "type": "string",
+                        "description": "Filter by exact category ID"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Filter by tags (AND logic)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (default: 50)"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Pagination offset"
+                    }
                 }
             }),
         ),
         tool(
             "get_summary",
-            "Get summary-level knowledge data (L1), including summary staleness information.",
+            "Get knowledge summary (L1 level) with metadata. Summary is AI-generated and may be stale if content was recently modified (check summary_stale flag).",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" }
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path relative to KB root, e.g., '技术/Rust异步编程.md'"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    }
                 },
                 "required": ["path"]
             }),
         ),
         tool(
             "get_content",
-            "Get full knowledge content (L2). Supports an optional section index or section title.",
+            "Get full knowledge content (L2) with markdown body. Optionally retrieve a specific section by index (0-based) or exact title. Use section parameter to avoid loading large documents entirely.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" },
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path relative to KB root"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    },
                     "section": {
-                        "description": "Optional section index (integer) or exact section title (string)",
+                        "description": "Optional: section index (integer, 0-based) or exact section title (string) to retrieve only that section",
                         "oneOf": [
                             { "type": "integer" },
                             { "type": "string" }
@@ -202,114 +230,167 @@ pub fn list_tools() -> Vec<Value> {
         ),
         tool(
             "get_knowledge_with_stale",
-            "Get full knowledge data together with a boolean that indicates whether the summary is stale.",
+            "Get full knowledge data (L2) including content, metadata, and a boolean flag indicating whether the AI-generated summary needs regeneration due to recent content changes.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" }
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path relative to KB root"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    }
                 },
                 "required": ["path"]
             }),
         ),
         tool(
             "grep",
-            "Search knowledge content by regex or substring. Supports tag and category filtering.",
+            "Search knowledge content by regex pattern or substring. Returns matching knowledge entries with highlighted context. Supports filtering by tags and category.",
             json!({
                 "type": "object",
                 "properties": {
-                    "pattern": { "type": "string" },
-                    "query": { "type": "string" },
-                    "tags": { "type": "array", "items": { "type": "string" } },
-                    "path": { "type": "string" },
-                    "category_id": { "type": "string" },
-                    "limit": { "type": "integer" },
-                    "options": {
-                        "type": "object",
-                        "properties": {
-                            "max_results": { "type": "integer" }
-                        }
+                    "pattern": {
+                        "type": "string",
+                        "description": "Regex pattern or substring to search for"
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Alias for pattern"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Filter results to entries with these tags (AND logic)"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Filter to entries under this category path prefix"
+                    },
+                    "category_id": {
+                        "type": "string",
+                        "description": "Filter to entries in this exact category ID"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results (default: 20)"
+                    }
+                },
+                "required": ["pattern"]
+            }),
+        ),
+        tool(
+            "get_tags",
+            "List all tags used across the knowledge base with their usage counts. Use prefix parameter to filter tags starting with a specific string.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "prefix": {
+                        "type": "string",
+                        "description": "Filter tags starting with this prefix, e.g., 'rust' matches 'rust', 'rust-async', 'rust-patterns'"
                     }
                 }
             }),
         ),
         tool(
-            "get_tags",
-            "List all tags used in the knowledge base, with optional prefix filtering.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "prefix": { "type": "string" }
-                }
-            }),
-        ),
-        tool(
             "get_backlinks",
-            "Get all knowledge entries that reference the specified knowledge entry.",
+            "Get all knowledge entries that link TO the specified knowledge (reverse links). Essential for understanding what references this piece of knowledge. Returns list of source paths and link context.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" }
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path to find backlinks for"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    }
                 },
                 "required": ["path"]
             }),
         ),
         tool(
             "get_related",
-            "Get related knowledge based on outgoing links, backlinks, and shared tags.",
+            "Get knowledge entries related to the specified knowledge through: (1) outgoing wiki links, (2) backlinks from other entries, (3) shared tags. Returns a relevance-scored list.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" }
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path to find related entries for"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    }
                 },
                 "required": ["path"]
             }),
         ),
         tool(
             "get_knowledge_graph",
-            "Get the knowledge graph with nodes and edges representing relationships between knowledge entries.",
+            "Get the complete knowledge graph structure with nodes (knowledge entries) and edges (links between entries). Use this to visualize relationships or find clusters of related content.",
             json!({
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "description": "Returns graph suitable for visualization tools like ReactFlow or D3.js"
             }),
         ),
         tool(
             "create_knowledge",
-            "Create a new knowledge entry. Supports either docs-style path metadata input or legacy title/category input.",
+            "Create a new knowledge entry. IMPORTANT: For a single request with multiple topics (e.g., 'analyze X and save'), merge all content into ONE document with ## section headings instead of creating multiple entries. Supports docs-style path input (recommended) or legacy title/category input.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "content": { "type": "string" },
+                    "path": {
+                        "type": "string",
+                        "description": "Relative file path from KB root, e.g., '技术/Rust异步编程.md'. Must end with .md"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Full markdown content. For multi-topic content, use ## headings to organize sections within one document"
+                    },
                     "metadata": {
                         "type": "object",
+                        "description": "Optional metadata object for docs-style input",
                         "properties": {
-                            "title": { "type": "string" },
-                            "tags": { "type": "array", "items": { "type": "string" } },
-                            "summary": { "type": "string" }
+                            "title": { "type": "string", "description": "Display title" },
+                            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tags for categorization" },
+                            "summary": { "type": "string", "description": "Brief summary (auto-generated if omitted)" }
                         }
                     },
-                    "title": { "type": "string" },
-                    "tags": { "type": "array", "items": { "type": "string" } },
-                    "category_id": { "type": "string" },
-                    "summary": { "type": "string" }
+                    "title": { "type": "string", "description": "Legacy: Knowledge title" },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "Legacy: Tags array" },
+                    "category_id": { "type": "string", "description": "Legacy: Category ID or path" },
+                    "summary": { "type": "string", "description": "Legacy: Summary text" }
                 },
                 "required": ["content"]
             }),
         ),
         tool(
             "update_knowledge",
-            "Update knowledge content and/or metadata. Supports both docs-style path input and legacy id input.",
+            "Update existing knowledge content and/or metadata. For content changes, this replaces the entire body. Use update_metadata for metadata-only updates to preserve content.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" },
-                    "content": { "type": "string" },
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path to update"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "New markdown content (replaces entire body)"
+                    },
                     "metadata": {
                         "type": "object",
+                        "description": "Metadata to update",
                         "properties": {
                             "title": { "type": "string" },
                             "tags": { "type": "array", "items": { "type": "string" } },
@@ -317,153 +398,238 @@ pub fn list_tools() -> Vec<Value> {
                             "category": { "type": "string" }
                         }
                     },
-                    "title": { "type": "string" },
-                    "tags": { "type": "array", "items": { "type": "string" } },
-                    "summary": { "type": "string" },
-                    "category_id": { "type": "string" }
+                    "title": { "type": "string", "description": "Legacy: Update title" },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "Legacy: Update tags" },
+                    "summary": { "type": "string", "description": "Legacy: Update summary" },
+                    "category_id": { "type": "string", "description": "Legacy: Move to category" }
                 }
             }),
         ),
         tool(
             "update_metadata",
-            "Update knowledge frontmatter only. Suitable for summary, tags, and title updates.",
+            "Update ONLY the frontmatter metadata (title, tags, summary) without modifying content. Use this for quick metadata fixes. For content + metadata updates, use update_knowledge instead.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" },
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path to update metadata for"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    },
                     "metadata": {
                         "type": "object",
+                        "description": "Metadata object to merge",
                         "properties": {
-                            "title": { "type": "string" },
-                            "tags": { "type": "array", "items": { "type": "string" } },
-                            "summary": { "type": "string" }
+                            "title": { "type": "string", "description": "New title" },
+                            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags array" },
+                            "summary": { "type": "string", "description": "New summary (will be marked stale if content unchanged)" }
                         }
                     },
-                    "title": { "type": "string" },
-                    "tags": { "type": "array", "items": { "type": "string" } },
-                    "summary": { "type": "string" }
+                    "title": { "type": "string", "description": "Legacy: Update title directly" },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "Legacy: Update tags directly" },
+                    "summary": { "type": "string", "description": "Legacy: Update summary directly" }
                 }
             }),
         ),
         tool(
             "delete_knowledge",
-            "Delete a knowledge entry. Docs-style path calls default to dry-run preview; set dry_run=false to actually delete.",
+            "Delete a knowledge entry. IMPORTANT: This is a safety-first tool - docs-style path calls default to dry_run=true (preview mode). Set dry_run=false ONLY after user confirmation. Returns affected files that reference this knowledge.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "id": { "type": "string" },
-                    "dry_run": { "type": "boolean" }
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path to delete"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Knowledge ID (use path instead)"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "If true (default for path), returns preview without deleting. Set false to actually delete."
+                    }
                 }
             }),
         ),
         tool(
             "move_knowledge",
-            "Move a knowledge entry to another category. Docs-style from/to calls default to dry-run preview.",
+            "Move/rename a knowledge entry to a new path or category. IMPORTANT: This is a safety-first tool - docs-style from/to calls default to dry_run=true. Set dry_run=false ONLY after user confirmation. Updates all wiki links referencing the old path.",
             json!({
                 "type": "object",
                 "properties": {
-                    "from": { "type": "string" },
-                    "to": { "type": "string" },
-                    "path": { "type": "string" },
-                    "id": { "type": "string" },
-                    "new_category_id": { "type": "string" },
-                    "dry_run": { "type": "boolean" }
+                    "from": {
+                        "type": "string",
+                        "description": "Source path (docs-style)"
+                    },
+                    "to": {
+                        "type": "string",
+                        "description": "Destination path (docs-style)"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Legacy: Source path (use from instead)"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Legacy: Source ID (use from instead)"
+                    },
+                    "new_category_id": {
+                        "type": "string",
+                        "description": "Legacy: Move to this category ID"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "If true (default), preview the move without executing. Set false to actually move."
+                    }
                 }
             }),
         ),
         tool(
             "create_category",
-            "Create a category. Supports docs-style path/label input and legacy name input.",
+            "Create a new category (folder) in the knowledge base. Supports docs-style path/label input (recommended) or legacy name/parent_id input.",
             json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string" },
-                    "label": { "type": "string" },
-                    "name": { "type": "string" },
-                    "parent_id": { "type": "string" },
-                    "description": { "type": "string" }
+                    "path": {
+                        "type": "string",
+                        "description": "Category path relative to KB root, e.g., '技术/编程语言'. Creates nested folders if needed."
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "Human-readable display name, e.g., 'Programming Languages'. Defaults to last path segment if omitted."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Legacy: Category name (use path/label instead)"
+                    },
+                    "parent_id": {
+                        "type": "string",
+                        "description": "Legacy: Parent category ID"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Category description for display"
+                    }
                 }
             }),
         ),
         tool(
             "list_categories",
-            "List all registered categories.",
+            "List all registered categories with their paths, labels, and descriptions. Use this to understand the knowledge base structure before creating content.",
             json!({
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "description": "Returns all categories from .memoforge/config.yaml"
             }),
         ),
         tool(
             "update_category",
-            "Update category display name or description.",
+            "Update category display label or description. Does not affect the folder structure or knowledge content.",
             json!({
                 "type": "object",
                 "properties": {
-                    "id": { "type": "string" },
-                    "path": { "type": "string" },
-                    "name": { "type": "string" },
-                    "label": { "type": "string" },
-                    "description": { "type": "string" }
+                    "id": {
+                        "type": "string",
+                        "description": "Category ID to update"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Category path (alternative to ID)"
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "New display label/name"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Legacy: New name (use label instead)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "New category description"
+                    }
                 }
             }),
         ),
         tool(
             "delete_category",
-            "Delete a category registration.",
+            "Delete a category registration from config. WARNING: Does NOT delete knowledge files in the category. Use force=true to delete category even if it contains knowledge entries.",
             json!({
                 "type": "object",
                 "properties": {
-                    "id": { "type": "string" },
-                    "path": { "type": "string" },
-                    "force": { "type": "boolean" }
+                    "id": {
+                        "type": "string",
+                        "description": "Category ID to delete"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Category path (alternative to ID)"
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "description": "Force deletion even if category contains knowledge entries (default: false)"
+                    }
                 }
             }),
         ),
         tool(
             "git_status",
-            "Get the current Git status for the knowledge base repository.",
+            "Get the current Git working tree status for the knowledge base. Returns staged, unstaged, and untracked files. Use this to review changes before committing.",
             json!({
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "description": "Returns file status from git status command"
             }),
         ),
         tool(
             "git_commit",
-            "Commit current repository changes with an optional commit message.",
+            "Stage all changes and commit to the knowledge base repository. A meaningful commit message is recommended but optional (auto-generated if omitted).",
             json!({
                 "type": "object",
                 "properties": {
-                    "message": { "type": "string" }
+                    "message": {
+                        "type": "string",
+                        "description": "Commit message. Describe what changed and why. Auto-generated if omitted."
+                    }
                 }
             }),
         ),
         tool(
             "git_pull",
-            "Pull remote changes into the local repository.",
+            "Pull (fetch + merge) remote changes from the configured Git remote into the local repository. Handles merge conflicts if any.",
             json!({
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "description": "Requires remote to be configured. Safe operation - won't overwrite local changes."
             }),
         ),
         tool(
             "git_push",
-            "Push local commits to the configured remote. Defaults to dry-run preview.",
+            "Push local commits to the configured Git remote. IMPORTANT: Safety-first - defaults to dry_run=true (preview mode). Set dry_run=false ONLY after user confirms they want to push.",
             json!({
                 "type": "object",
                 "properties": {
-                    "dry_run": { "type": "boolean" }
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "If true (default), preview what would be pushed without actually pushing. Set false to execute push."
+                    }
                 }
             }),
         ),
         tool(
             "git_log",
-            "Get recent Git commit history for the repository.",
+            "Get recent Git commit history for the repository. Use this to understand recent changes and find specific commits.",
             json!({
                 "type": "object",
                 "properties": {
-                    "limit": { "type": "integer" }
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of commits to return (default: 10, max: 100)"
+                    }
                 }
             }),
         ),
