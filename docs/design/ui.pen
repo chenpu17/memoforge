@@ -11467,6 +11467,1136 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "VDUfl",
+      "x": 4593,
+      "y": -384,
+      "name": "MemoForge - 知识图谱",
+      "width": 800,
+      "height": 656,
+      "fill": "#FFFFFF",
+      "cornerRadius": 8,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#E5E7EB"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "Qkfod",
+          "name": "graphHeader",
+          "width": "fill_container",
+          "height": 48,
+          "stroke": {
+            "align": "inside",
+            "thickness": {
+              "bottom": 1
+            },
+            "fill": "#E5E7EB"
+          },
+          "padding": [
+            12,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "msZ4y",
+              "name": "graphTitle",
+              "fill": "#111827",
+              "content": "知识图谱",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "RddMg",
+              "name": "closeBtn",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "iw1o8",
+                  "name": "closeIcon",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "X",
+                  "iconFontFamily": "lucide",
+                  "fill": "#6B7280"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "QYydf",
+          "name": "graphToolbar",
+          "width": "fill_container",
+          "height": 44,
+          "stroke": {
+            "align": "inside",
+            "thickness": {
+              "bottom": 1
+            },
+            "fill": "#E5E7EB"
+          },
+          "gap": 12,
+          "padding": [
+            8,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "hHW38",
+              "name": "searchInput",
+              "width": 240,
+              "height": 28,
+              "fill": "#F9FAFB",
+              "cornerRadius": 4,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "gap": 8,
+              "padding": [
+                0,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "pDlBU",
+                  "name": "searchIcon",
+                  "width": 14,
+                  "height": 14,
+                  "iconFontName": "Search",
+                  "iconFontFamily": "lucide",
+                  "fill": "#9CA3AF"
+                },
+                {
+                  "type": "text",
+                  "id": "e3Ye7",
+                  "name": "searchText",
+                  "fill": "#9CA3AF",
+                  "content": "搜索知识...",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "mz8zJ",
+              "name": "statsText",
+              "fill": "#6B7280",
+              "content": "12 个节点 · 18 条边",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ALpL0",
+          "name": "graphContent",
+          "width": "fill_container",
+          "height": "fill_container",
+          "children": [
+            {
+              "type": "frame",
+              "id": "SOHZK",
+              "name": "graphCanvas",
+              "width": 600,
+              "height": "fill_container",
+              "fill": "#FAFAFA",
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "8Rxvq",
+                  "x": 100,
+                  "y": 150,
+                  "name": "node1",
+                  "width": 120,
+                  "height": 40,
+                  "fill": "#3B82F6",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#2563EB"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "G48md",
+                      "name": "node1Text",
+                      "fill": "#FFFFFF",
+                      "content": "Rust 基础",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "q7YyV",
+                  "x": 280,
+                  "y": 100,
+                  "name": "node2",
+                  "width": 120,
+                  "height": 40,
+                  "fill": "#10B981",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#059669"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "DrwQV",
+                      "name": "node2Text",
+                      "fill": "#FFFFFF",
+                      "content": "异步编程",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "tcqey",
+                  "x": 280,
+                  "y": 220,
+                  "name": "node3",
+                  "width": 120,
+                  "height": 40,
+                  "fill": "#8B5CF6",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#7C3AED"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "fDfy2",
+                      "name": "node3Text",
+                      "fill": "#FFFFFF",
+                      "content": "Tokio 框架",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "mWAf2",
+                  "x": 450,
+                  "y": 150,
+                  "name": "node4",
+                  "width": 100,
+                  "height": 40,
+                  "fill": "#F59E0B",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#D97706"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "2ahuS",
+                      "name": "node4Text",
+                      "fill": "#FFFFFF",
+                      "content": "Web 开发",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "qlGoM",
+      "x": 4593,
+      "y": -384,
+      "name": "MemoForge - 知识图谱",
+      "width": 800,
+      "height": 656,
+      "fill": "#FFFFFF",
+      "cornerRadius": 8,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#E5E7EB"
+      },
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "WQ8Wj",
+          "name": "graphHeader",
+          "width": "fill_container",
+          "height": 48,
+          "stroke": {
+            "align": "inside",
+            "thickness": {
+              "bottom": 1
+            },
+            "fill": "#E5E7EB"
+          },
+          "padding": [
+            12,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "cB5C9",
+              "name": "graphTitle",
+              "fill": "#111827",
+              "content": "知识图谱",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "cJcA2",
+              "name": "closeBtn",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "WVxKe",
+                  "name": "closeIcon",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "X",
+                  "iconFontFamily": "lucide",
+                  "fill": "#6B7280"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "54pzD",
+          "name": "graphToolbar",
+          "width": "fill_container",
+          "height": 44,
+          "stroke": {
+            "align": "inside",
+            "thickness": {
+              "bottom": 1
+            },
+            "fill": "#E5E7EB"
+          },
+          "gap": 12,
+          "padding": [
+            8,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "hQkXA",
+              "name": "searchInput",
+              "width": 240,
+              "height": 28,
+              "fill": "#F9FAFB",
+              "cornerRadius": 4,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "gap": 8,
+              "padding": [
+                0,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "QQ69m",
+                  "name": "searchIcon",
+                  "width": 14,
+                  "height": 14,
+                  "iconFontName": "Search",
+                  "iconFontFamily": "lucide",
+                  "fill": "#9CA3AF"
+                },
+                {
+                  "type": "text",
+                  "id": "FxxJl",
+                  "name": "searchText",
+                  "fill": "#9CA3AF",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "搜索知识...",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "lUQRB",
+              "name": "statsText",
+              "fill": "#6B7280",
+              "content": "12 个节点 · 18 条边",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "qRYle",
+          "name": "graphContent",
+          "width": "fill_container",
+          "height": "fill_container",
+          "children": [
+            {
+              "type": "frame",
+              "id": "LdvDu",
+              "name": "graphCanvas",
+              "width": 600,
+              "height": "fill_container",
+              "fill": "#FAFAFA",
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Ksffs",
+                  "x": 100,
+                  "y": 150,
+                  "name": "node1",
+                  "width": 120,
+                  "height": 40,
+                  "fill": "#3B82F6",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#2563EB"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "t23AX",
+                      "name": "node1Text",
+                      "fill": "#FFFFFF",
+                      "content": "Rust 基础",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrotV",
+                  "x": 280,
+                  "y": 100,
+                  "name": "node2",
+                  "width": 120,
+                  "height": 40,
+                  "fill": "#10B981",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#059669"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "YQFts",
+                      "name": "node2Text",
+                      "fill": "#FFFFFF",
+                      "content": "异步编程",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "hYK9Q",
+                  "x": 280,
+                  "y": 220,
+                  "name": "node3",
+                  "width": 120,
+                  "height": 40,
+                  "fill": "#8B5CF6",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#7C3AED"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "0MU4v",
+                      "name": "node3Text",
+                      "fill": "#FFFFFF",
+                      "content": "Tokio 框架",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "oZvjE",
+                  "x": 450,
+                  "y": 150,
+                  "name": "node4",
+                  "width": 100,
+                  "height": 40,
+                  "fill": "#F59E0B",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "outside",
+                    "thickness": 2,
+                    "fill": "#D97706"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "LcoTA",
+                      "name": "node4Text",
+                      "fill": "#FFFFFF",
+                      "content": "Web 开发",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "z3fUv",
+      "x": 5593,
+      "y": 600,
+      "name": "MemoForge - Toast通知",
+      "width": 320,
+      "fill": "#FFFFFF",
+      "cornerRadius": 6,
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 12,
+      "children": [
+        {
+          "type": "frame",
+          "id": "4ke9U",
+          "name": "toastHeader",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            12,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "WFs7x",
+              "name": "closeBtn",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "1PpBY",
+                  "name": "closeIcon",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "X",
+                  "iconFontFamily": "lucide",
+                  "fill": "#6B7280"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "pParp",
+              "name": "toastTitle",
+              "fill": "#111827",
+              "content": "Toast通知",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "8P1Db",
+          "name": "toastItem1",
+          "width": "fill_container",
+          "height": 48,
+          "fill": "#10B981",
+          "cornerRadius": 6,
+          "gap": 8,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "4ZQkM",
+              "name": "toastIcon1",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "check-circle",
+              "iconFontFamily": "lucide",
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "text",
+              "id": "lvqyF",
+              "name": "toastText1",
+              "fill": "#FFFFFF",
+              "content": "知识创建成功",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "zGh9e",
+          "name": "toastItem2",
+          "width": "fill_container",
+          "height": 48,
+          "fill": "#F59E0B",
+          "cornerRadius": 6,
+          "gap": 8,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "XrSfe",
+              "name": "toastIcon2",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "alert-circle",
+              "iconFontFamily": "lucide",
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "text",
+              "id": "dhURp",
+              "name": "toastText2",
+              "fill": "#FFFFFF",
+              "content": "摘要已过期，请重新生成",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "B2ZT1",
+          "name": "toastItem3",
+          "width": "fill_container",
+          "height": 48,
+          "fill": "#EF4444",
+          "cornerRadius": 6,
+          "gap": 8,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "SlSty",
+              "name": "toastIcon3",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "x-circle",
+              "iconFontFamily": "lucide",
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "text",
+              "id": "PuXlA",
+              "name": "toastText3",
+              "fill": "#FFFFFF",
+              "content": "Git推送失败",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "P92XI",
+      "x": 5593,
+      "y": 150,
+      "name": "MemoForge - 反向链接",
+      "width": 280,
+      "fill": "#FFFFFF",
+      "cornerRadius": 6,
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 12,
+      "children": [
+        {
+          "type": "frame",
+          "id": "cx68C",
+          "name": "backlinksHeader",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            12,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "w0PNv",
+              "name": "closeBtn",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "DuxoK",
+                  "name": "closeIcon",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "X",
+                  "iconFontFamily": "lucide",
+                  "fill": "#6B7280"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "wJMvo",
+              "name": "backlinksTitle",
+              "fill": "#111827",
+              "content": "反向链接",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "aUcDd",
+          "name": "statsText",
+          "fill": "#6B7280",
+          "content": "2 个反向链接",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "3gcmA",
+          "name": "backlinksList",
+          "width": "fill_container",
+          "height": 192,
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 4,
+          "padding": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "9w4L6",
+              "name": "backlinksItem1",
+              "width": "fill_container",
+              "height": 36,
+              "fill": "#F3F4F6",
+              "gap": 8,
+              "padding": [
+                0,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "04zSd",
+                  "name": "backlinksIcon1",
+                  "width": 14,
+                  "height": 14,
+                  "iconFontName": "book-open",
+                  "iconFontFamily": "lucide",
+                  "fill": "#6B7280"
+                },
+                {
+                  "type": "text",
+                  "id": "MjmJj",
+                  "name": "backlinksText1",
+                  "fill": "#374151",
+                  "content": "Rust 基础学习笔记",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "rSMWz",
+              "name": "backlinksItem2",
+              "width": "fill_container",
+              "height": 36,
+              "fill": "#F3F4F6",
+              "gap": 8,
+              "padding": [
+                0,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "4lJJV",
+                  "name": "backlinksIcon2",
+                  "width": 14,
+                  "height": 14,
+                  "iconFontName": "book-open",
+                  "iconFontFamily": "lucide",
+                  "fill": "#6B7280"
+                },
+                {
+                  "type": "text",
+                  "id": "Xvf71",
+                  "name": "backlinksText2",
+                  "fill": "#374151",
+                  "content": "Tokio 异步实践",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "42feV",
+      "x": 5593,
+      "y": 400,
+      "name": "MemoForge - 多知识库切换器",
+      "width": 320,
+      "fill": "#FFFFFF",
+      "cornerRadius": 6,
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 12,
+      "children": [
+        {
+          "type": "frame",
+          "id": "xEYlI",
+          "name": "switcherHeader",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            12,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "0tsCO",
+              "name": "closeBtn",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "uOSGq",
+                  "name": "closeIcon",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "X",
+                  "iconFontFamily": "lucide",
+                  "fill": "#6B7280"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "lLI92",
+              "name": "switcherTitle",
+              "fill": "#111827",
+              "content": "知识库切换器",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "DY9BV",
+          "name": "currentKbItem",
+          "width": "fill_container",
+          "height": 36,
+          "fill": "#F3F4F6",
+          "gap": 8,
+          "padding": [
+            0,
+            8
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "5eLzV",
+              "name": "currentIcon",
+              "width": 14,
+              "height": 14,
+              "iconFontName": "check",
+              "iconFontFamily": "lucide",
+              "fill": "#3B82F6"
+            },
+            {
+              "type": "text",
+              "id": "lnO7m",
+              "name": "currentKbName",
+              "fill": "#374151",
+              "content": "Rust 学习笔记",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AuDR5",
+          "name": "kbList",
+          "width": "fill_container",
+          "height": 192,
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 4,
+          "padding": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "3SPFW",
+              "name": "kbItem1",
+              "width": "fill_container",
+              "height": 36,
+              "fill": "#FFFFFF",
+              "gap": 8,
+              "padding": [
+                0,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "o8YGU",
+                  "name": "kbIcon1",
+                  "width": 14,
+                  "height": 14,
+                  "iconFontName": "folder",
+                  "iconFontFamily": "lucide",
+                  "fill": "#F59E0B"
+                },
+                {
+                  "type": "text",
+                  "id": "IwvTV",
+                  "name": "kbText1",
+                  "fill": "#374151",
+                  "content": "Web 开发笔记",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "wwChY",
+              "name": "kbItem2",
+              "width": "fill_container",
+              "height": 36,
+              "fill": "#FFFFFF",
+              "gap": 8,
+              "padding": [
+                0,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "YEso5",
+                  "name": "kbIcon2",
+                  "width": 14,
+                  "height": 14,
+                  "iconFontName": "folder",
+                  "iconFontFamily": "lucide",
+                  "fill": "#F59E0B"
+                },
+                {
+                  "type": "text",
+                  "id": "JnXZh",
+                  "name": "kbText2",
+                  "fill": "#374151",
+                  "content": "Tokio 异步实践",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "1dtP0",
+              "name": "kbItem3",
+              "width": "fill_container",
+              "height": 36,
+              "fill": "#FFFFFF",
+              "gap": 8,
+              "padding": [
+                0,
+                8
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "fMJqc",
+                  "name": "kbIcon3",
+                  "width": 14,
+                  "height": 14,
+                  "iconFontName": "folder",
+                  "iconFontFamily": "lucide",
+                  "fill": "#F59E0B"
+                },
+                {
+                  "type": "text",
+                  "id": "6D6Dp",
+                  "name": "kbText3",
+                  "fill": "#374151",
+                  "content": "Python 数据分析",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {
