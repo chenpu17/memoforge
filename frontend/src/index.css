@@ -24,6 +24,11 @@
   box-shadow: 0 22px 70px 4px rgba(0, 0, 0, 0.15);
 }
 
+.app-container[data-platform="macos"] {
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .titlebar-drag {
   -webkit-app-region: drag;
   app-region: drag;

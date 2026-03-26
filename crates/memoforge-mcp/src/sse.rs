@@ -208,7 +208,6 @@ pub struct Selection {
 struct JsonRpcRequest {
     #[allow(dead_code)]
     jsonrpc: String,
-    #[serde(skip)]
     id: Option<Value>,
     method: String,
     params: Option<Value>,
@@ -388,7 +387,7 @@ fn handle_initialize(id: Option<Value>) -> JsonRpcResponse {
     json_rpc_success(
         id,
         json!({
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-03-26",
             "capabilities": {
                 "tools": {}
             },
@@ -485,12 +484,35 @@ fn json_rpc_error(id: Option<Value>, code: i32, message: &str) -> JsonRpcRespons
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_default_config() {
         let config = McpServerConfig::default();
         assert_eq!(config.port, 31415);
         assert_eq!(config.host, "127.0.0.1");
+    }
+
+    #[test]
+    fn test_json_rpc_request_deserializes_id() {
+        let request: JsonRpcRequest = serde_json::from_value(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {}
+        }))
+        .expect("request should deserialize");
+
+        assert_eq!(request.id, Some(json!(1)));
+    }
+
+    #[test]
+    fn test_initialize_response_contains_id_and_current_protocol() {
+        let response = handle_initialize(Some(json!(1)));
+        let value = serde_json::to_value(response).expect("response should serialize");
+
+        assert_eq!(value["id"], json!(1));
+        assert_eq!(value["result"]["protocolVersion"], json!("2025-03-26"));
     }
 
     #[test]

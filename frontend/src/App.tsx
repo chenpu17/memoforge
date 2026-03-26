@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
-import { Search, Plus, Save, ArrowUpDown, ChevronRight, MoreHorizontal, Trash2, GitBranch, FolderOpen, X, Minus, Square } from 'lucide-react'
+import { Search, Plus, Save, ArrowUpDown, ChevronRight, MoreHorizontal, Trash2, GitBranch, FolderOpen } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
 import { SearchPanel } from './components/SearchPanel'
@@ -15,32 +15,7 @@ import { RightPanel } from './components/RightPanel'
 import { useAppStore } from './stores/appStore'
 import { tauriService, DeletePreview } from './services/tauri'
 
-// 窗口控制函数
-async function closeWindow() {
-  if (typeof window !== 'undefined' && '__TAURI__' in window) {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    await getCurrentWindow().close()
-  }
-}
-
-async function minimizeWindow() {
-  if (typeof window !== 'undefined' && '__TAURI__' in window) {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    await getCurrentWindow().minimize()
-  }
-}
-
-async function maximizeWindow() {
-  if (typeof window !== 'undefined' && '__TAURI__' in window) {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const win = getCurrentWindow()
-    if (await win.isMaximized()) {
-      await win.unmaximize()
-    } else {
-      await win.maximize()
-    }
-  }
-}
+const isMacOS = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')
 
 const getTagColors = (tag: string) => {
   const colors: Record<string, { bg: string; text: string }> = {
@@ -477,46 +452,28 @@ function App() {
   }
 
   return (
-    <div className="app-container flex flex-col">
+    <div className="app-container flex flex-col" data-platform={isMacOS ? 'macos' : 'other'}>
       {readonly && <ReadOnlyBanner />}
 
       <div
-        className="titlebar-drag h-[38px] flex items-center justify-between px-3 border-b"
+        className={`${isMacOS ? 'titlebar-drag' : ''} h-[38px] flex items-center justify-between px-3 border-b`}
         style={{ backgroundColor: '#FAFAFA', borderColor: '#E5E5E5' }}
-        data-tauri-drag-region
-        onMouseDown={handleTitlebarMouseDown}
+        data-macos-native-titlebar={isMacOS ? 'true' : 'false'}
+        data-tauri-drag-region={isMacOS ? true : undefined}
+        onMouseDown={isMacOS ? handleTitlebarMouseDown : undefined}
       >
-        <div className="flex items-center gap-2" data-tauri-drag-region>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={closeWindow}
-              className="w-3 h-3 rounded-full flex items-center justify-center hover:brightness-90 transition-all group"
-              style={{ backgroundColor: '#FF5F57' }}
-              title="关闭"
-            >
-              <X className="h-2 w-2 opacity-0 group-hover:opacity-100 text-black/60" />
-            </button>
-            <button
-              onClick={minimizeWindow}
-              className="w-3 h-3 rounded-full flex items-center justify-center hover:brightness-90 transition-all group"
-              style={{ backgroundColor: '#FFBD2E' }}
-              title="最小化"
-            >
-              <Minus className="h-2 w-2 opacity-0 group-hover:opacity-100 text-black/60" />
-            </button>
-            <button
-              onClick={maximizeWindow}
-              className="w-3 h-3 rounded-full flex items-center justify-center hover:brightness-90 transition-all group"
-              style={{ backgroundColor: '#28C840' }}
-              title="最大化"
-            >
-              <Square className="h-1.5 w-1.5 opacity-0 group-hover:opacity-100 text-black/60" />
-            </button>
-          </div>
-        </div>
-        <span className="text-[13px] font-medium select-none" style={{ color: '#737373' }} data-tauri-drag-region>
-          MemoForge
-        </span>
+        <div
+          className="flex items-center gap-2"
+          data-tauri-drag-region={isMacOS ? true : undefined}
+          style={{ minWidth: isMacOS ? 72 : 0 }}
+        />
+        {isMacOS ? (
+          <span className="text-[13px] font-medium select-none" style={{ color: '#737373' }} data-tauri-drag-region>
+            MemoForge
+          </span>
+        ) : (
+          <div className="flex-1" />
+        )}
         <div className="titlebar-no-drag flex items-center gap-1">
           <button onClick={() => setShowKnowledgeGraph(true)} className="titlebar-no-drag p-1 hover:bg-gray-200 rounded" title="知识图谱">
             <GitBranch className="h-4 w-4" style={{ color: '#737373' }} />

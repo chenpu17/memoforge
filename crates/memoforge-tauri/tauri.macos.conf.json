@@ -1,0 +1,17 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "MemoForge",
+        "width": 1440,
+        "height": 900,
+        "decorations": true,
+        "transparent": false,
+        "shadow": true,
+        "visible": false,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay"
+      }
+    ]
+  }
+}
