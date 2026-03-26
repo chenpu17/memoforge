@@ -5,19 +5,26 @@
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:1420",
     "frontendDist": "../../frontend/dist"
   },
   "app": {
     "windows": [
       {
         "title": "MemoForge",
-        "width": 1200,
-        "height": 800
+        "width": 1440,
+        "height": 900,
+        "decorations": false,
+        "transparent": false
       }
     ],
     "security": {
       "csp": null
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
     }
   }
 }

@@ -5,6 +5,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[lib]
+name = "memoforge_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "memoforge"
 path = "src/main.rs"
@@ -15,3 +19,10 @@ tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 clap = { version = "4.0", features = ["derive"] }
+ctrlc = "3.4"
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tokio-stream = "0.1"
+futures = "0.3"
+async-stream = "0.3"
+chrono.workspace = true
