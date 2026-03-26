@@ -26,7 +26,7 @@ use memoforge_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tauri::Window;
+use tauri::{Manager, Window};
 
 // 全局状态：知识库路径
 static KB_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -729,6 +729,13 @@ fn main() {
         .manage(state_publisher)
         .manage(managed_memory_state)
         .manage(McpServer(server_state))
+        .setup(|app| {
+            // 显示主窗口（配置中 visible: false，需要手动显示）
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             init_kb_cmd,
             get_status_cmd,

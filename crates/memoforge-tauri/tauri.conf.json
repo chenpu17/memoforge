@@ -15,7 +15,10 @@
         "width": 1440,
         "height": 900,
         "decorations": false,
-        "transparent": false
+        "transparent": true,
+        "shadow": true,
+        "visible": false,
+        "hiddenTitle": true
       }
     ],
     "security": {

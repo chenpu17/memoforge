@@ -6,9 +6,22 @@
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground;
+  html, body, #root {
+    @apply bg-transparent h-screen w-screen overflow-hidden;
   }
+  body {
+    @apply text-foreground;
+  }
+}
+
+/* Mac-style rounded window */
+.app-container {
+  height: 100vh;
+  width: 100vw;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: #FAFAFA;
+  box-shadow: 0 22px 70px 4px rgba(0, 0, 0, 0.15);
 }
 
 .titlebar-drag {

@@ -368,8 +368,8 @@ function App() {
 
   if (!initialized) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="w-96 p-6 border rounded-lg">
+      <div className="app-container flex items-center justify-center">
+        <div className="w-96 p-6 border rounded-lg bg-white" style={{ borderColor: '#E5E5E5' }}>
           <h2 className="text-xl font-bold mb-4">初始化知识库</h2>
           <div className="flex gap-2 mb-4">
             <Input
@@ -414,7 +414,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col" style={{ backgroundColor: '#FAFAFA' }}>
+    <div className="app-container flex flex-col">
       {readonly && <ReadOnlyBanner />}
 
       <div
