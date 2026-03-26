@@ -20,6 +20,7 @@ jobs:
     outputs:
       checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}
       tag_name: ${{ steps.resolve.outputs.tag_name }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
     steps:
       - name: Resolve release ref
         id: resolve
@@ -56,8 +57,14 @@ jobs:
             exit 1
           fi
 
+          prerelease="false"
+          if [[ "$tag" == *-* ]]; then
+            prerelease="true"
+          fi
+
           echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
           echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: prepare-release
@@ -72,8 +79,10 @@ jobs:
             args: '--target x86_64-apple-darwin'
             target: 'x86_64-apple-darwin'
           - platform: 'windows-latest'
-            args: ''
+            args: '--target x86_64-pc-windows-msvc'
             target: 'x86_64-pc-windows-msvc'
+            portable_asset_name: 'memoforge-windows-x64-portable'
+            portable_asset_file: 'MemoForge_x64_portable.exe'
           - platform: 'ubuntu-22.04'
             args: ''
             target: 'x86_64-unknown-linux-gnu'
@@ -135,10 +144,24 @@ jobs:
           tagName: ${{ needs.prepare-release.outputs.tag_name }}
           releaseName: 'MemoForge ${{ needs.prepare-release.outputs.tag_name }}'
           releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
-          prerelease: false
+          releaseDraft: false
+          prerelease: ${{ needs.prepare-release.outputs.prerelease }}
           projectPath: './crates/memoforge-tauri'
           args: ${{ matrix.args }}
+
+      - name: Prepare portable Windows executable
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/memoforge-tauri.exe" "dist/${{ matrix.portable_asset_file }}"
+
+      - name: Upload portable Windows executable
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.portable_asset_name }}
+          path: dist/${{ matrix.portable_asset_file }}
 
   # Build MCP Server for multiple platforms
   build-mcp:
@@ -225,7 +248,8 @@ jobs:
         with:
           tag_name: ${{ needs.prepare-release.outputs.tag_name }}
           files: artifacts/**/*
-          draft: true
+          draft: false
+          prerelease: ${{ needs.prepare-release.outputs.prerelease }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

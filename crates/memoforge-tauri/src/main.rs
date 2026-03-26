@@ -8,6 +8,8 @@ use desktop_state_publisher::DesktopStatePublisher;
 use memory_state::StateManager;
 
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use memoforge_core::{
     init_store, close_store, MemoError, Knowledge, KnowledgeWithStale, Category, LoadLevel, GrepMatch, Event,
@@ -32,7 +34,7 @@ use tauri::{Manager, Window};
 static KB_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 // 全局状态发布器（兼容旧代码）
-pub struct StatePublisher(pub Mutex<DesktopStatePublisher>);
+pub struct StatePublisher(pub Arc<Mutex<DesktopStatePublisher>>);
 
 // 内存状态管理器（新架构）
 pub struct MemoryState(pub Arc<StateManager>);
@@ -672,7 +674,7 @@ fn clear_memory_knowledge_cmd(
 fn main() {
     bootstrap_kb_from_env();
 
-    let state_publisher = StatePublisher(Mutex::new(DesktopStatePublisher::new(false)));
+    let state_publisher = StatePublisher(Arc::new(Mutex::new(DesktopStatePublisher::new(false))));
 
     // 创建内存状态管理器
     let memory_state = Arc::new(StateManager::new());
@@ -681,6 +683,15 @@ fn main() {
     if let Some(kb_path) = KB_PATH.lock().unwrap().clone() {
         let _ = sync_kb_state(&state_publisher, &managed_memory_state, kb_path);
     }
+
+    // Follow 模式依赖全局 editor_state.yaml，定期刷新时间戳避免空闲超过 TTL 后退化为只读。
+    let heartbeat_publisher = Arc::clone(&state_publisher.0);
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(60));
+        if let Ok(mut publisher) = heartbeat_publisher.lock() {
+            publisher.heartbeat();
+        }
+    });
 
     let initial_snapshot = memory_state.to_sse_snapshot();
     let (sse_tx, sse_rx) = tokio::sync::watch::channel(initial_snapshot.clone());

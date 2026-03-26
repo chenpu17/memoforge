@@ -1,8 +1,8 @@
 //! 核心数据结构
 //! Task 1.4: Knowledge, Category, Frontmatter 定义
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Frontmatter {
@@ -53,6 +53,8 @@ pub struct Category {
     pub id: String,
     pub name: String,
     pub parent_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }

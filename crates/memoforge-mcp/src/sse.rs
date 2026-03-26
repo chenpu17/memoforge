@@ -3,11 +3,12 @@
 
 use axum::{
     extract::State,
-    response::{sse::Event, Sse, IntoResponse},
-    routing::{get, post},
-    Router,
     http::StatusCode,
+    response::{sse::Event, IntoResponse, Sse},
+    routing::{get, post},
+    Json, Router,
 };
+use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -15,14 +16,12 @@ use std::{
     convert::Infallible,
     net::SocketAddr,
     sync::{
-        Arc,
-        Mutex,
         atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
     },
 };
 use tokio::sync::watch;
-use tower_http::cors::{CorsLayer, Any};
-use futures::stream::Stream;
+use tower_http::cors::{Any, CorsLayer};
 
 /// MCP SSE Server 配置
 #[derive(Debug, Clone)]
@@ -134,9 +133,12 @@ impl McpServerState {
 
     pub fn register_connection(&self) -> u64 {
         let connection_id = self.next_connection_id.fetch_add(1, Ordering::Relaxed);
-        self.connections.lock().unwrap().insert(connection_id, SseConnection {
-            started_at: chrono::Utc::now().to_rfc3339(),
-        });
+        self.connections.lock().unwrap().insert(
+            connection_id,
+            SseConnection {
+                started_at: chrono::Utc::now().to_rfc3339(),
+            },
+        );
         connection_id
     }
 
@@ -145,7 +147,9 @@ impl McpServerState {
     }
 
     pub fn publish_snapshot(&self, snapshot: EditorStateSnapshot) {
-        let _ = self.editor_state_tx.send(self.snapshot_with_connections(&snapshot));
+        let _ = self
+            .editor_state_tx
+            .send(self.snapshot_with_connections(&snapshot));
     }
 
     pub fn current_snapshot(&self) -> EditorStateSnapshot {
@@ -154,7 +158,9 @@ impl McpServerState {
 
     fn snapshot_with_connections(&self, snapshot: &EditorStateSnapshot) -> EditorStateSnapshot {
         let mut merged = snapshot.clone();
-        merged.active_agents.retain(|agent| agent.name != "sse-client");
+        merged
+            .active_agents
+            .retain(|agent| agent.name != "sse-client");
         merged.active_agents.extend(self.sse_active_agents());
         merged
     }
@@ -254,7 +260,9 @@ impl JsonRpcResponse {
 }
 
 /// 启动 SSE MCP Server (Streamable HTTP transport - MCP 2025-03-26)
-pub async fn start_sse_server(state: Arc<McpServerState>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn start_sse_server(
+    state: Arc<McpServerState>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         // Streamable HTTP: 单一端点同时支持 POST 和 GET
         .route("/mcp", post(handle_mcp_request).get(handle_sse_connect))
@@ -290,7 +298,7 @@ async fn handle_health() -> impl IntoResponse {
 async fn handle_mcp_request(
     State(state): State<Arc<McpServerState>>,
     body: String,
-) -> Result<String, StatusCode> {
+) -> Result<Json<JsonRpcResponse>, StatusCode> {
     let request: JsonRpcRequest = match serde_json::from_str(&body) {
         Ok(r) => r,
         Err(e) => {
@@ -300,13 +308,18 @@ async fn handle_mcp_request(
     };
 
     let response = match request.method.as_str() {
-        "initialize" => handle_initialize(request.id),
-        "tools/list" => handle_tools_list(request.id),
-        "tools/call" => handle_tools_call(request.id, request.params, &state),
-        _ => json_rpc_error(request.id, -32601, "Method not found"),
+        "initialize" => Some(handle_initialize(request.id)),
+        "ping" => Some(json_rpc_success(request.id, json!({}))),
+        "notifications/initialized" => None,
+        "tools/list" => Some(handle_tools_list(request.id)),
+        "tools/call" => Some(handle_tools_call(request.id, request.params, &state)),
+        _ => Some(json_rpc_error(request.id, -32601, "Method not found")),
     };
 
-    Ok(serde_json::to_string(&response).unwrap())
+    match response {
+        Some(response) => Ok(Json(response)),
+        None => Err(StatusCode::ACCEPTED),
+    }
 }
 
 /// 处理 SSE 连接
@@ -372,10 +385,9 @@ async fn handle_sse_connect(
 
 /// 处理 initialize 请求
 fn handle_initialize(id: Option<Value>) -> JsonRpcResponse {
-    JsonRpcResponse {
-        jsonrpc: "2.0".to_string(),
+    json_rpc_success(
         id,
-        result: Some(json!({
+        json!({
             "protocolVersion": "2024-11-05",
             "capabilities": {
                 "tools": {}
@@ -384,23 +396,20 @@ fn handle_initialize(id: Option<Value>) -> JsonRpcResponse {
                 "name": "memoforge",
                 "version": env!("CARGO_PKG_VERSION")
             }
-        })),
-        error: None,
-    }
+        }),
+    )
 }
 
 /// 处理 tools/list 请求
 fn handle_tools_list(id: Option<Value>) -> JsonRpcResponse {
     // 复用 tools.rs 的工具列表
     let tools = crate::tools::list_tools();
-    JsonRpcResponse {
-        jsonrpc: "2.0".to_string(),
+    json_rpc_success(
         id,
-        result: Some(json!({
+        json!({
             "tools": tools
-        })),
-        error: None,
-    }
+        }),
+    )
 }
 
 /// 处理 tools/call 请求
@@ -420,27 +429,23 @@ fn handle_tools_call(
     // SSE 模式下，get_editor_state 直接返回内存状态（不读文件）
     if tool_name == "get_editor_state" {
         let snapshot = state.current_snapshot();
-        return JsonRpcResponse {
-            jsonrpc: "2.0".to_string(),
+        return json_rpc_success(
             id,
-            result: Some(json!({
+            json!({
                 "content": [{ "type": "text", "text": serde_json::to_string(&snapshot).unwrap_or_default() }]
-            })),
-            error: None,
-        };
+            }),
+        );
     }
 
     // 其他工具复用 tools.rs 的实现
     // 注意：SSE 模式嵌入在 Tauri 进程中，tools::set_kb_path 已由 Tauri 设置
     match crate::tools::call_tool(Some(params), false) {
-        Ok(result) => JsonRpcResponse {
-            jsonrpc: "2.0".to_string(),
+        Ok(result) => json_rpc_success(
             id,
-            result: Some(json!({
+            json!({
                 "content": [{ "type": "text", "text": result }]
-            })),
-            error: None,
-        },
+            }),
+        ),
         Err(e) => JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id,
@@ -451,6 +456,15 @@ fn handle_tools_call(
                 data: Some(json!({ "code": e.code })),
             }),
         },
+    }
+}
+
+fn json_rpc_success(id: Option<Value>, result: Value) -> JsonRpcResponse {
+    JsonRpcResponse {
+        jsonrpc: "2.0".to_string(),
+        id,
+        result: Some(result),
+        error: None,
     }
 }
 

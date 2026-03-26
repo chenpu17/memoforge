@@ -10,7 +10,16 @@ describe('ToastNotifications Real-time Refresh Logic', () => {
     ]
 
     const shouldRefresh = events.some(
-      e => (e.action === 'create' || e.action === 'delete') && e.source !== 'gui'
+      e => (
+        e.source !== 'gui' &&
+        (
+          e.action === 'create' ||
+          e.action === 'delete' ||
+          e.action === 'update' ||
+          e.action === 'update_metadata' ||
+          e.action === 'move'
+        )
+      )
     )
 
     expect(shouldRefresh).toBe(true)
@@ -23,23 +32,41 @@ describe('ToastNotifications Real-time Refresh Logic', () => {
     ]
 
     const shouldRefresh = events.some(
-      e => (e.action === 'create' || e.action === 'delete') && e.source !== 'gui'
+      e => (
+        e.source !== 'gui' &&
+        (
+          e.action === 'create' ||
+          e.action === 'delete' ||
+          e.action === 'update' ||
+          e.action === 'update_metadata' ||
+          e.action === 'move'
+        )
+      )
     )
 
     expect(shouldRefresh).toBe(false)
   })
 
-  it('should NOT trigger refresh for update events', () => {
+  it('should trigger refresh for update events from MCP', () => {
     const events = [
       { action: 'update', source: 'mcp:claude-code' },
       { action: 'update_metadata', source: 'mcp:claude-code' },
     ]
 
     const shouldRefresh = events.some(
-      e => (e.action === 'create' || e.action === 'delete') && e.source !== 'gui'
+      e => (
+        e.source !== 'gui' &&
+        (
+          e.action === 'create' ||
+          e.action === 'delete' ||
+          e.action === 'update' ||
+          e.action === 'update_metadata' ||
+          e.action === 'move'
+        )
+      )
     )
 
-    expect(shouldRefresh).toBe(false)
+    expect(shouldRefresh).toBe(true)
   })
 
   it('should filter out GUI events from toast display', () => {

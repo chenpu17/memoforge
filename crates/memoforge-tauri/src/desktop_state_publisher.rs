@@ -136,6 +136,11 @@ impl DesktopStatePublisher {
         self.publish();
     }
 
+    /// Refresh the shared state timestamp without changing the current payload.
+    pub fn heartbeat(&mut self) {
+        self.publish();
+    }
+
     /// Immediately publish (for important state changes)
     fn publish(&mut self) {
         self.last_publish = Some(Instant::now());

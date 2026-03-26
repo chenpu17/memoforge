@@ -106,6 +106,33 @@ describe('Sidebar Category Filtering', () => {
     expect(countValues).toContain(2)
     expect(screen.getByText('MCP: 2 个连接')).toBeInTheDocument()
   })
+
+  it('should keep category counts when current knowledge list is filtered', () => {
+    ;(useAppStore as any).mockReturnValue({
+      categories: [
+        { id: 'uuid-1', name: 'IT资讯', count: 5 },
+        { id: 'uuid-2', name: '技术文档', count: 3 },
+        { id: 'uuid-3', name: '读书笔记', count: 2 },
+      ],
+      knowledgeList: mockKnowledgeList.filter((item) => item.category === 'IT资讯'),
+    })
+
+    render(
+      <Sidebar
+        selectedCategory="IT资讯"
+        onSelectCategory={mockOnSelectCategory}
+        onOpenSearch={() => {}}
+        onImport={() => {}}
+      />
+    )
+
+    const counts = screen.getAllByText(/^[0-9]+$/)
+    const countValues = counts.map(el => parseInt(el.textContent || '0'))
+
+    expect(countValues).toContain(5)
+    expect(countValues).toContain(3)
+    expect(countValues).toContain(2)
+  })
 })
 
 describe('Category Filter Integration', () => {

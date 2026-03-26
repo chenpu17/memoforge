@@ -106,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     color: isSelected ? '#FFFFFF' : '#737373'
                   }}
                 >
-                  {getCategoryCount(cat.id, cat.name)}
+                  {cat.count ?? getCategoryCount(cat.id, cat.name)}
                 </span>
               </div>
             </div>

@@ -9,8 +9,19 @@ interface Toast {
 }
 
 interface ToastNotificationsProps {
-  onKnowledgeChange?: () => void
+  onKnowledgeChange?: (events: Event[]) => void
 }
+
+const shouldRefreshForEvent = (event: Event) => (
+  event.source !== 'gui' &&
+  (
+    event.action === 'create' ||
+    event.action === 'delete' ||
+    event.action === 'update' ||
+    event.action === 'update_metadata' ||
+    event.action === 'move'
+  )
+)
 
 const getActionIcon = (action: Event['action']) => {
   switch (action) {
@@ -69,11 +80,9 @@ export const ToastNotifications: React.FC<ToastNotificationsProps> = ({ onKnowle
       }
 
       // Check if we need to refresh knowledge list (create/delete from non-GUI source)
-      const shouldRefresh = newEvents.some(e =>
-        (e.action === 'create' || e.action === 'delete') && e.source !== 'gui'
-      )
+      const shouldRefresh = newEvents.some(shouldRefreshForEvent)
       if (shouldRefresh && onKnowledgeChange) {
-        onKnowledgeChange()
+        onKnowledgeChange(newEvents)
       }
 
       // Add new toasts (only for non-GUI events to avoid duplicate notifications)

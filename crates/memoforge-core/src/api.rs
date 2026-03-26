@@ -1,15 +1,15 @@
 //! High-level API for MCP integration
 //! 参考: 技术实现文档 §4
 
-use crate::*;
-use crate::config::{load_config, save_config, register_category, validate_category_path};
-use crate::knowledge::split_sections;
+use crate::config::{load_config, register_category, save_config, validate_category_path};
+use crate::events::{log_create, log_delete, log_update, EventSource};
 use crate::fs::write_knowledge_file;
-use crate::events::{log_create, log_update, log_delete, EventSource};
+use crate::knowledge::split_sections;
 use crate::models::KnowledgeWithStale;
+use crate::*;
 use regex::Regex;
 use serde::Serialize;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -228,9 +228,7 @@ fn knowledge_matches_category(knowledge: &Knowledge, category_id: &str) -> bool 
         }
     }
 
-    knowledge
-        .id
-        .starts_with(&format!("{}/", category_id))
+    knowledge.id.starts_with(&format!("{}/", category_id))
 }
 
 fn slugify_title(title: &str) -> String {
@@ -264,7 +262,9 @@ fn slugify_title(title: &str) -> String {
 fn find_references(kb_path: &Path, target_id: &str) -> Result<Vec<ReferenceInfo>, MemoError> {
     let mut references = Vec::new();
     let target_relative = normalize_key(target_id);
-    let target_no_ext = target_relative.strip_suffix(".md").unwrap_or(&target_relative);
+    let target_no_ext = target_relative
+        .strip_suffix(".md")
+        .unwrap_or(&target_relative);
     let target_file_name = Path::new(&target_relative)
         .file_name()
         .and_then(|s| s.to_str())
@@ -323,7 +323,10 @@ fn unique_relative_path(kb_path: &Path, desired_relative: &str) -> String {
         .file_stem()
         .and_then(|value| value.to_str())
         .unwrap_or("untitled");
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("md");
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("md");
     let parent = path
         .parent()
         .map(|value| value.to_string_lossy().replace('\\', "/"))
@@ -348,7 +351,10 @@ fn unique_relative_path(kb_path: &Path, desired_relative: &str) -> String {
     }
 }
 
-fn registered_category_prefix(kb_path: &Path, relative_path: &str) -> Result<Option<String>, MemoError> {
+fn registered_category_prefix(
+    kb_path: &Path,
+    relative_path: &str,
+) -> Result<Option<String>, MemoError> {
     let normalized = normalize_key(relative_path);
     if normalized.is_empty() {
         return Ok(None);
@@ -364,7 +370,8 @@ fn registered_category_prefix(kb_path: &Path, relative_path: &str) -> Result<Opt
                 return None;
             }
 
-            let is_match = normalized == category_path || normalized.starts_with(&format!("{}/", category_path));
+            let is_match = normalized == category_path
+                || normalized.starts_with(&format!("{}/", category_path));
             if is_match {
                 Some(category_path)
             } else {
@@ -376,7 +383,10 @@ fn registered_category_prefix(kb_path: &Path, relative_path: &str) -> Result<Opt
     Ok(matched)
 }
 
-fn validate_target_relative_path(kb_path: &Path, target_relative: &str) -> Result<String, MemoError> {
+fn validate_target_relative_path(
+    kb_path: &Path,
+    target_relative: &str,
+) -> Result<String, MemoError> {
     let normalized = normalize_key(target_relative);
     if normalized.is_empty() {
         return Err(MemoError {
@@ -404,16 +414,24 @@ fn validate_target_relative_path(kb_path: &Path, target_relative: &str) -> Resul
                 if matches!(part.as_ref(), ".git" | ".memoforge") {
                     return Err(MemoError {
                         code: ErrorCode::InvalidPath,
-                        message: format!("Target path cannot contain reserved directory '{}'", part),
+                        message: format!(
+                            "Target path cannot contain reserved directory '{}'",
+                            part
+                        ),
                         retry_after_ms: None,
                         context: None,
                     });
                 }
             }
-            Component::CurDir | Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => {
                 return Err(MemoError {
                     code: ErrorCode::InvalidPath,
-                    message: "Target path must be a normalized relative path inside the knowledge base".to_string(),
+                    message:
+                        "Target path must be a normalized relative path inside the knowledge base"
+                            .to_string(),
                     retry_after_ms: None,
                     context: None,
                 });
@@ -424,7 +442,10 @@ fn validate_target_relative_path(kb_path: &Path, target_relative: &str) -> Resul
     if registered_category_prefix(kb_path, &normalized)?.is_none() {
         return Err(MemoError {
             code: ErrorCode::InvalidPath,
-            message: format!("Target path '{}' must start with a registered category", normalized),
+            message: format!(
+                "Target path '{}' must start with a registered category",
+                normalized
+            ),
             retry_after_ms: None,
             context: None,
         });
@@ -590,7 +611,8 @@ pub fn get_knowledge_by_id(
                 })?;
                 if let Ok((fm, _)) = parse_frontmatter(&file_content) {
                     knowledge.summary_stale = Some(
-                        fm.summary_hash.map_or(true, |stored_hash| stored_hash != current_hash)
+                        fm.summary_hash
+                            .map_or(true, |stored_hash| stored_hash != current_hash),
                     );
                 }
             }
@@ -601,10 +623,7 @@ pub fn get_knowledge_by_id(
 }
 
 /// Get single knowledge with full staleness info
-pub fn get_knowledge_with_stale(
-    kb_path: &Path,
-    id: &str,
-) -> Result<KnowledgeWithStale, MemoError> {
+pub fn get_knowledge_with_stale(kb_path: &Path, id: &str) -> Result<KnowledgeWithStale, MemoError> {
     let knowledge = get_knowledge_by_id(kb_path, id, LoadLevel::L2)?;
     let summary_stale = knowledge.summary_stale.unwrap_or(false);
 
@@ -620,11 +639,7 @@ pub fn get_summary(kb_path: &Path, id: &str) -> Result<Knowledge, MemoError> {
 }
 
 /// Get content with optional section filtering
-pub fn get_content(
-    kb_path: &Path,
-    id: &str,
-    section: Option<&str>,
-) -> Result<String, MemoError> {
+pub fn get_content(kb_path: &Path, id: &str, section: Option<&str>) -> Result<String, MemoError> {
     let path = resolve_knowledge_path(kb_path, id)?;
     let k = hydrate_knowledge(kb_path, &path, LoadLevel::L2)?;
 
@@ -637,7 +652,8 @@ pub fn get_content(
 
     if let Some(section_title) = section {
         let sections = split_sections(&content);
-        sections.into_iter()
+        sections
+            .into_iter()
             .find(|s| s.title == section_title)
             .map(|s| s.content)
             .ok_or_else(|| MemoError {
@@ -738,12 +754,6 @@ pub fn update_knowledge(
 
     let (mut fm, body) = parse_frontmatter(&file_content)?;
 
-    if let Some(t) = title {
-        fm.title = t.to_string();
-    }
-    if let Some(t) = tags {
-        fm.tags = t;
-    }
     let desired_category = normalize_category(category.map(|value| value.to_string()));
     if let Some(ref target_category) = desired_category {
         if !validate_category_path(kb_path, target_category)? {
@@ -754,6 +764,25 @@ pub fn update_knowledge(
                 context: None,
             });
         }
+    }
+
+    let title_changed = title.is_some_and(|value| fm.title != value);
+    let tags_changed = tags.as_ref().is_some_and(|value| fm.tags != *value);
+    let content_changed = content.is_some_and(|value| body != value);
+    let summary_changed = summary.is_some_and(|value| fm.summary.as_deref() != Some(value));
+    let category_changed = desired_category.is_some()
+        && (fm.category != desired_category || current_category != desired_category);
+
+    if !title_changed && !tags_changed && !content_changed && !summary_changed && !category_changed
+    {
+        return Ok(());
+    }
+
+    if let Some(t) = title {
+        fm.title = t.to_string();
+    }
+    if let Some(t) = tags {
+        fm.tags = t;
     }
     if desired_category.is_some() {
         fm.category = desired_category.clone();
@@ -801,7 +830,8 @@ pub fn update_knowledge(
             target_path = kb_path.join(&final_relative_path);
 
             if let Some(parent) = target_path.parent() {
-                fs::create_dir_all(parent).map_err(|e| io_error("Failed to create category directory", e))?;
+                fs::create_dir_all(parent)
+                    .map_err(|e| io_error("Failed to create category directory", e))?;
             }
 
             fs::rename(&path, &target_path).map_err(|e| io_error("Failed to move knowledge", e))?;
@@ -882,11 +912,7 @@ pub fn preview_delete_knowledge(kb_path: &Path, id: &str) -> Result<DeletePrevie
 }
 
 /// Move knowledge to different category
-pub fn move_knowledge(
-    kb_path: &Path,
-    id: &str,
-    new_category_id: &str,
-) -> Result<(), MemoError> {
+pub fn move_knowledge(kb_path: &Path, id: &str, new_category_id: &str) -> Result<(), MemoError> {
     if !validate_category_path(kb_path, new_category_id)? {
         return Err(MemoError {
             code: ErrorCode::NotFoundCategory,
@@ -902,7 +928,11 @@ pub fn move_knowledge(
         retry_after_ms: None,
         context: None,
     })?;
-    let target_relative = format!("{}/{}", normalize_key(new_category_id), file_name.to_string_lossy());
+    let target_relative = format!(
+        "{}/{}",
+        normalize_key(new_category_id),
+        file_name.to_string_lossy()
+    );
     move_knowledge_to_relative_path_internal(kb_path, id, &target_relative, false)?;
     Ok(())
 }
@@ -928,7 +958,11 @@ pub fn preview_move_knowledge(
         retry_after_ms: None,
         context: None,
     })?;
-    let target_relative = format!("{}/{}", normalize_key(new_category_id), file_name.to_string_lossy());
+    let target_relative = format!(
+        "{}/{}",
+        normalize_key(new_category_id),
+        file_name.to_string_lossy()
+    );
     move_knowledge_to_relative_path_internal(kb_path, id, &target_relative, true)
 }
 
@@ -962,10 +996,14 @@ pub fn search_knowledge(
     let paginated = list_knowledge(kb_path, LoadLevel::L2, category_id, tags, None, None)?;
     let query_lower = query.to_lowercase();
 
-    let mut results: Vec<_> = paginated.items.into_iter()
+    let mut results: Vec<_> = paginated
+        .items
+        .into_iter()
         .filter(|k| {
-            k.title.to_lowercase().contains(&query_lower) ||
-            k.content.as_ref().map_or(false, |c| c.to_lowercase().contains(&query_lower))
+            k.title.to_lowercase().contains(&query_lower)
+                || k.content
+                    .as_ref()
+                    .map_or(false, |c| c.to_lowercase().contains(&query_lower))
         })
         .collect();
 
@@ -990,14 +1028,25 @@ pub fn grep(
     let effective_tags: Option<Vec<String>> = if let Some(existing) = tags {
         let mut merged = existing.to_vec();
         merged.extend(parsed_tags.clone());
-        if merged.is_empty() { None } else { Some(merged) }
+        if merged.is_empty() {
+            None
+        } else {
+            Some(merged)
+        }
     } else if parsed_tags.is_empty() {
         None
     } else {
         Some(parsed_tags.clone())
     };
 
-    let paginated = list_knowledge(kb_path, LoadLevel::L2, category_id, effective_tags.as_deref(), None, None)?;
+    let paginated = list_knowledge(
+        kb_path,
+        LoadLevel::L2,
+        category_id,
+        effective_tags.as_deref(),
+        None,
+        None,
+    )?;
     if clean_query.is_empty() {
         let mut matches = Vec::new();
         for knowledge in paginated.items {
@@ -1069,12 +1118,32 @@ fn parse_tags_from_query(query: &str) -> (Vec<String>, String) {
 /// Load categories from config
 pub fn list_categories(kb_path: &Path) -> Result<Vec<Category>, MemoError> {
     let config = load_config(kb_path)?;
-    Ok(config.categories.iter().map(|c| Category {
-        id: c.id.clone(),
-        name: c.name.clone(),
-        parent_id: c.parent_id.clone(),
-        description: c.description.clone(),
-    }).collect())
+    let knowledge = list_knowledge(kb_path, LoadLevel::L0, None, None, None, None)?;
+
+    Ok(config
+        .categories
+        .iter()
+        .map(|c| {
+            let count = knowledge
+                .items
+                .iter()
+                .filter(|entry| {
+                    let category = entry.category.as_deref().unwrap_or_default();
+                    category == c.name
+                        || category == c.id
+                        || entry.id.starts_with(&format!("{}/", c.name))
+                })
+                .count();
+
+            Category {
+                id: c.id.clone(),
+                name: c.name.clone(),
+                parent_id: c.parent_id.clone(),
+                count: Some(count),
+                description: c.description.clone(),
+            }
+        })
+        .collect())
 }
 
 /// Create category
@@ -1089,7 +1158,8 @@ pub fn create_category(
         id: id.clone(),
         name: name.to_string(),
         parent_id: parent_id.clone(),
-        description: description.clone()
+        count: None,
+        description: description.clone(),
     };
 
     // Register in config.yaml
@@ -1111,7 +1181,10 @@ pub fn update_category(
     description: Option<&str>,
 ) -> Result<(), MemoError> {
     let mut config = load_config(kb_path)?;
-    let cat = config.categories.iter_mut().find(|c| c.id == id)
+    let cat = config
+        .categories
+        .iter_mut()
+        .find(|c| c.id == id)
         .ok_or_else(|| MemoError {
             code: ErrorCode::NotFoundCategory,
             message: "Category not found".to_string(),
@@ -1145,10 +1218,7 @@ pub fn get_status(kb_path: &Path) -> Result<(usize, usize, bool), MemoError> {
 }
 
 /// Get all tags from knowledge base
-pub fn get_tags(
-    kb_path: &Path,
-    prefix: Option<&str>,
-) -> Result<Vec<String>, MemoError> {
+pub fn get_tags(kb_path: &Path, prefix: Option<&str>) -> Result<Vec<String>, MemoError> {
     use std::collections::HashSet;
 
     let mut tags = HashSet::new();
@@ -1258,7 +1328,8 @@ Content 2"#;
                 ],
                 metadata: None,
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let id = create_knowledge(
             kb_path,
@@ -1267,7 +1338,8 @@ Content 2"#;
             vec![],
             Some("programming".to_string()),
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         update_knowledge(
             kb_path,
@@ -1277,7 +1349,8 @@ Content 2"#;
             None,
             Some("tools"),
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(!kb_path.join("programming/move-me.md").exists());
         assert!(kb_path.join("tools/move-me.md").exists());
@@ -1285,6 +1358,56 @@ Content 2"#;
         let knowledge = get_knowledge_by_id(kb_path, "tools/move-me.md", LoadLevel::L2).unwrap();
         assert_eq!(knowledge.category.as_deref(), Some("tools"));
         assert_eq!(knowledge.content.as_deref(), Some("# Updated"));
+    }
+
+    #[test]
+    fn test_update_knowledge_noop_does_not_rewrite_file() {
+        let temp = tempfile::tempdir().unwrap();
+        let kb_path = temp.path();
+
+        crate::init::init_new(kb_path, false).unwrap();
+        crate::config::save_config(
+            kb_path,
+            &crate::config::Config {
+                version: "1.0".to_string(),
+                categories: vec![crate::config::CategoryConfig {
+                    id: "programming".to_string(),
+                    name: "编程技术".to_string(),
+                    path: "programming".to_string(),
+                    parent_id: None,
+                    description: None,
+                }],
+                metadata: None,
+            },
+        )
+        .unwrap();
+
+        let id = create_knowledge(
+            kb_path,
+            "Stable Note",
+            "# Stable",
+            vec!["Rust".to_string()],
+            Some("programming".to_string()),
+            Some("summary".to_string()),
+        )
+        .unwrap();
+
+        let path = kb_path.join(&id);
+        let before = fs::read_to_string(&path).unwrap();
+
+        update_knowledge(
+            kb_path,
+            &id,
+            Some("Stable Note"),
+            Some("# Stable"),
+            Some(vec!["Rust".to_string()]),
+            Some("programming"),
+            Some("summary"),
+        )
+        .unwrap();
+
+        let after = fs::read_to_string(&path).unwrap();
+        assert_eq!(before, after);
     }
 
     #[test]
@@ -1353,14 +1476,18 @@ See [[programming/source.md]] and [[source]]."#,
         )
         .unwrap();
 
-        let preview =
-            preview_move_knowledge_to_path(kb_path, "programming/source.md", "tools/source-renamed.md")
-                .unwrap();
+        let preview = preview_move_knowledge_to_path(
+            kb_path,
+            "programming/source.md",
+            "tools/source-renamed.md",
+        )
+        .unwrap();
         assert_eq!(preview.old_path, "programming/source.md");
         assert_eq!(preview.new_path, "tools/source-renamed.md");
         assert_eq!(preview.references.len(), 1);
 
-        move_knowledge_to_path(kb_path, "programming/source.md", "tools/source-renamed.md").unwrap();
+        move_knowledge_to_path(kb_path, "programming/source.md", "tools/source-renamed.md")
+            .unwrap();
 
         assert!(!kb_path.join("programming/source.md").exists());
         assert!(kb_path.join("tools/source-renamed.md").exists());

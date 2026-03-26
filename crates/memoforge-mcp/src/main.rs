@@ -1,8 +1,8 @@
 //! MemoForge MCP Server
 //! 参考: 技术实现文档 §4
 
-mod tools;
 mod sse;
+mod tools;
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,11 @@ use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
 
 #[derive(Parser)]
-#[command(name = "memoforge", version, about = "MemoForge - AI-driven knowledge management")]
+#[command(
+    name = "memoforge",
+    version,
+    about = "MemoForge - AI-driven knowledge management"
+)]
 enum Cli {
     Serve {
         /// 运行模式：follow(跟随当前编辑器) 或 bound(绑定指定知识库)
@@ -62,7 +66,12 @@ fn main() {
     let cli = Cli::parse();
 
     match cli {
-        Cli::Serve { mode, knowledge_path, allow_stale_kb, agent_name } => {
+        Cli::Serve {
+            mode,
+            knowledge_path,
+            allow_stale_kb,
+            agent_name,
+        } => {
             match mode.as_str() {
                 "follow" => {
                     // follow 模式：启动时不验证 KB，延迟到工具调用时
@@ -137,11 +146,11 @@ fn run_server_follow_mode(allow_stale_kb: bool, agent_name: &str) {
             Err(_) => continue,
         };
 
-        let response = handle_request(request, "follow");
-
-        if let Ok(json) = serde_json::to_string(&response) {
-            let _ = writeln!(stdout, "{}", json);
-            let _ = stdout.flush();
+        if let Some(response) = handle_request(request, "follow") {
+            if let Ok(json) = serde_json::to_string(&response) {
+                let _ = writeln!(stdout, "{}", json);
+                let _ = stdout.flush();
+            }
         }
     }
 }
@@ -164,7 +173,8 @@ fn run_server_bound_mode(knowledge_path: std::path::PathBuf, agent_name: &str) {
     ctrlc::set_handler(move || {
         memoforge_core::unregister_agent(&kb_path);
         std::process::exit(0);
-    }).ok();
+    })
+    .ok();
 
     tools::set_kb_path(knowledge_path.clone());
     tools::set_mode("bound".to_string());
@@ -184,11 +194,11 @@ fn run_server_bound_mode(knowledge_path: std::path::PathBuf, agent_name: &str) {
             Err(_) => continue,
         };
 
-        let response = handle_request(request, "bound");
-
-        if let Ok(json) = serde_json::to_string(&response) {
-            let _ = writeln!(stdout, "{}", json);
-            let _ = stdout.flush();
+        if let Some(response) = handle_request(request, "bound") {
+            if let Ok(json) = serde_json::to_string(&response) {
+                let _ = writeln!(stdout, "{}", json);
+                let _ = stdout.flush();
+            }
         }
     }
 
@@ -196,9 +206,9 @@ fn run_server_bound_mode(knowledge_path: std::path::PathBuf, agent_name: &str) {
     memoforge_core::unregister_agent(&knowledge_path);
 }
 
-fn handle_request(req: JsonRpcRequest, mode: &str) -> JsonRpcResponse {
+fn handle_request(req: JsonRpcRequest, mode: &str) -> Option<JsonRpcResponse> {
     match req.method.as_str() {
-        "initialize" => JsonRpcResponse {
+        "initialize" => Some(JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id: req.id,
             result: Some(json!({
@@ -212,23 +222,30 @@ fn handle_request(req: JsonRpcRequest, mode: &str) -> JsonRpcResponse {
                 }
             })),
             error: None,
-        },
+        }),
+        "ping" => Some(JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id: req.id,
+            result: Some(json!({})),
+            error: None,
+        }),
+        "notifications/initialized" => None,
         "tools/list" => {
             let tools = tools::list_tools();
-            JsonRpcResponse {
+            Some(JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
                 id: req.id,
                 result: Some(json!({ "tools": tools })),
                 error: None,
-            }
-        },
+            })
+        }
         "tools/call" => {
             // follow 模式下，检查状态有效性来决定是否只读
             let readonly = if mode == "follow" {
                 // 检查编辑器状态是否有效
                 match memoforge_core::editor_state::EditorState::load_global() {
                     Ok(Some(state)) if state.state_valid => false, // 状态有效，允许写入
-                    _ => true, // 状态无效，只读
+                    _ => true,                                     // 状态无效，只读
                 }
             } else {
                 false // bound 模式始终可写
@@ -236,13 +253,13 @@ fn handle_request(req: JsonRpcRequest, mode: &str) -> JsonRpcResponse {
 
             let result = tools::call_tool(req.params, readonly);
             match result {
-                Ok(content) => JsonRpcResponse {
+                Ok(content) => Some(JsonRpcResponse {
                     jsonrpc: "2.0".to_string(),
                     id: req.id,
                     result: Some(json!({ "content": [{ "type": "text", "text": content }] })),
                     error: None,
-                },
-                Err(e) => JsonRpcResponse {
+                }),
+                Err(e) => Some(JsonRpcResponse {
                     jsonrpc: "2.0".to_string(),
                     id: req.id,
                     result: None,
@@ -251,10 +268,10 @@ fn handle_request(req: JsonRpcRequest, mode: &str) -> JsonRpcResponse {
                         message: e.message,
                         data: Some(json!({ "code": e.code })),
                     }),
-                }
+                }),
             }
-        },
-        _ => JsonRpcResponse {
+        }
+        _ => Some(JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id: req.id,
             result: None,
@@ -263,6 +280,6 @@ fn handle_request(req: JsonRpcRequest, mode: &str) -> JsonRpcResponse {
                 message: "Method not found".to_string(),
                 data: None,
             }),
-        },
+        }),
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { Search, Plus, Save, ArrowUpDown, ChevronRight, MoreHorizontal, Trash2, GitBranch, FolderOpen, X, Minus, Square } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
@@ -135,16 +135,25 @@ function App() {
 
     const handleFocus = async () => {
       try {
+        await loadData()
+
+        const latestKnowledge = useAppStore.getState().currentKnowledge
+        const latestEditorMode = useAppStore.getState().editorMode
+        if (latestKnowledge?.id && (readonly || latestEditorMode === 'read')) {
+          const refreshed = await tauriService.getKnowledgeWithStale(latestKnowledge.id)
+          setCurrentKnowledge(refreshed)
+        }
+
         const count = await tauriService.getMcpConnectionCount()
         setMcpConnectionCount(count)
       } catch (error) {
-        console.error('Failed to refresh MCP connection count on focus:', error)
+        console.error('Failed to refresh data on focus:', error)
       }
     }
 
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [initialized])
+  }, [initialized, readonly])
 
   // 分类或标签变化时重新加载数据
   useEffect(() => {
@@ -315,6 +324,33 @@ function App() {
     }
     return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime()
   })
+
+  const handleExternalKnowledgeChange = useCallback(async (events: import('./services/tauri').Event[]) => {
+    await loadData()
+
+    const latestKnowledge = useAppStore.getState().currentKnowledge
+    const latestEditorMode = useAppStore.getState().editorMode
+    if (!latestKnowledge?.id || (!readonly && latestEditorMode !== 'read')) {
+      return
+    }
+
+    const touchesCurrentKnowledge = events.some((event) => (
+      event.path === latestKnowledge.id ||
+      event.path === null ||
+      (event.action === 'move' && event.path === latestKnowledge.id)
+    ))
+
+    if (!touchesCurrentKnowledge) {
+      return
+    }
+
+    try {
+      const refreshed = await tauriService.getKnowledgeWithStale(latestKnowledge.id)
+      setCurrentKnowledge(refreshed)
+    } catch (error) {
+      console.error('Failed to refresh current knowledge after external update:', error)
+    }
+  }, [readonly, selectedCategory, selectedTags, offset])
 
   const handleTitlebarMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
@@ -763,7 +799,7 @@ function App() {
           }}
         />
       )}
-      <ToastNotifications onKnowledgeChange={loadData} />
+      <ToastNotifications onKnowledgeChange={handleExternalKnowledgeChange} />
 
       {showKnowledgeGraph && (
         <KnowledgeGraphPanel
