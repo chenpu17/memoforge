@@ -13,6 +13,7 @@ from playwright.sync_api import expect, sync_playwright
 from frontend_e2e import (
     REPO_ROOT,
     find_free_port,
+    get_http_server_command,
     make_test_env,
     seed_knowledge_base,
     start_process,
@@ -143,26 +144,12 @@ def run_readonly_smoke(web_port: int) -> None:
 
 
 def start_http(paths: dict[str, str], env: dict[str, str], http_port: int, web_port: int, readonly: bool = False):
-    cmd = [
-        "cargo",
-        "run",
-        "-p",
-        "memoforge-http",
-        "--",
-        "--kb-path",
-        paths["kb1"],
-        "--bind",
-        "127.0.0.1",
-        "--port",
-        str(http_port),
-        "--cors-origin",
-        f"http://127.0.0.1:{web_port}",
-    ]
+    cmd = get_http_server_command(paths, http_port, web_port)
     if readonly:
         cmd.append("--readonly")
 
     process = start_process(cmd, cwd=REPO_ROOT, env=env)
-    wait_for_url(f"http://127.0.0.1:{http_port}/api/status")
+    wait_for_url(f"http://127.0.0.1:{http_port}/api/status", timeout=60.0)
     return process
 
 
@@ -186,7 +173,7 @@ def main() -> None:
             cwd=REPO_ROOT / "frontend",
             env=web_env,
         )
-        wait_for_url(f"http://127.0.0.1:{web_port}")
+        wait_for_url(f"http://127.0.0.1:{web_port}", timeout=60.0)
 
         run_frontend_ops_e2e(paths, web_port)
 
