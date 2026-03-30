@@ -73,6 +73,9 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
+      - name: Prebuild workspace binaries
+        run: cargo build --workspace
+
       - name: Run frontend E2E
         run: python3 tests/frontend_e2e.py
 
