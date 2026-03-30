@@ -40,6 +40,12 @@ EXPECTED_TOOLS = {
 
 
 def build_binary(env: dict[str, str]) -> Path:
+    prebuilt_binary = env.get("MEMOFORGE_MCP_BIN")
+    if prebuilt_binary:
+        binary = Path(prebuilt_binary)
+        if binary.exists():
+            return binary
+
     subprocess.run(
         ["cargo", "build", "-q", "-p", "memoforge-mcp"],
         check=True,

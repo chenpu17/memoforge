@@ -172,6 +172,40 @@ def wait_for_url(url: str, timeout: float = 30.0) -> None:
     raise RuntimeError(f"Timed out waiting for {url}")
 
 
+def get_http_server_command(paths: dict[str, str], http_port: int, web_port: int) -> list[str]:
+    prebuilt_binary = os.environ.get("MEMOFORGE_HTTP_BIN")
+    if prebuilt_binary:
+        binary_path = Path(prebuilt_binary)
+        if binary_path.exists():
+            return [
+                str(binary_path),
+                "--kb-path",
+                paths["kb1"],
+                "--bind",
+                "127.0.0.1",
+                "--port",
+                str(http_port),
+                "--cors-origin",
+                f"http://127.0.0.1:{web_port}",
+            ]
+
+    return [
+        "cargo",
+        "run",
+        "-p",
+        "memoforge-http",
+        "--",
+        "--kb-path",
+        paths["kb1"],
+        "--bind",
+        "127.0.0.1",
+        "--port",
+        str(http_port),
+        "--cors-origin",
+        f"http://127.0.0.1:{web_port}",
+    ]
+
+
 def make_test_env(base_dir: Path) -> dict[str, str]:
     env = os.environ.copy()
     original_home = Path(os.environ.get("HOME", str(base_dir)))
@@ -380,25 +414,11 @@ def main() -> None:
         web_port = find_free_port()
 
         http_process = start_process(
-            [
-                "cargo",
-                "run",
-                "-p",
-                "memoforge-http",
-                "--",
-                "--kb-path",
-                paths["kb1"],
-                "--bind",
-                "127.0.0.1",
-                "--port",
-                str(http_port),
-                "--cors-origin",
-                f"http://127.0.0.1:{web_port}",
-            ],
+            get_http_server_command(paths, http_port, web_port),
             cwd=REPO_ROOT,
             env=test_env,
         )
-        wait_for_url(f"http://127.0.0.1:{http_port}/api/status")
+        wait_for_url(f"http://127.0.0.1:{http_port}/api/status", timeout=60.0)
 
         web_env = test_env.copy()
         web_env["VITE_MEMOFORGE_API_BASE"] = f"http://127.0.0.1:{http_port}"
@@ -407,7 +427,7 @@ def main() -> None:
             cwd=REPO_ROOT / "frontend",
             env=web_env,
         )
-        wait_for_url(f"http://127.0.0.1:{web_port}")
+        wait_for_url(f"http://127.0.0.1:{web_port}", timeout=60.0)
 
         run_frontend_e2e(paths, web_port)
         print(json.dumps({"status": "ok", "paths": paths}, ensure_ascii=False))

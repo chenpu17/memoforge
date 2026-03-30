@@ -39,6 +39,9 @@ jobs:
   integration:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    env:
+      MEMOFORGE_HTTP_BIN: ${{ github.workspace }}/target/debug/memoforge-http
+      MEMOFORGE_MCP_BIN: ${{ github.workspace }}/target/debug/memoforge
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
