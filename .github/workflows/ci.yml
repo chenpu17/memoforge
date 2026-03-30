@@ -11,6 +11,37 @@ permissions:
   contents: read
 
 jobs:
+  container-smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build memoforge-http container
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.http
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          tags: memoforge-http:ci
+
+      - name: Build memoforge-mcp container
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.mcp
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          tags: memoforge-mcp:ci
+
   frontend:
     runs-on: ubuntu-22.04
     steps:

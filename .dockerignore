@@ -1,0 +1,13 @@
+.git
+.github
+target
+frontend/node_modules
+frontend/dist
+tests/__pycache__
+frontend/tmp-screenshots
+docs
+demo_sse_server.py
+test_*.py
+test_*.sh
+CLAUDE.md
+.DS_Store
