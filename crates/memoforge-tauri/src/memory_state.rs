@@ -12,13 +12,11 @@
 //!
 //! 参考: 技术实现文档 §2.5
 
-use memoforge_core::editor_state::{
-    EditorState, CurrentKb, CurrentKnowledge, Selection,
-};
+use chrono::{DateTime, Utc};
+use memoforge_core::editor_state::{CurrentKb, CurrentKnowledge, EditorState, Selection};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
-use chrono::{DateTime, Utc};
 
 /// 内存中的编辑器状态
 #[derive(Debug, Clone, Default, Serialize)]
@@ -124,7 +122,13 @@ impl StateManager {
     }
 
     /// 更新选区
-    pub fn set_selection(&self, start_line: usize, end_line: usize, text_length: usize, text: Option<String>) {
+    pub fn set_selection(
+        &self,
+        start_line: usize,
+        end_line: usize,
+        text_length: usize,
+        text: Option<String>,
+    ) {
         let mut state = self.state.lock().unwrap();
         let has_text = text_length > 0 || text.is_some();
 
@@ -196,11 +200,13 @@ impl StateManager {
                 name: kb.name,
                 knowledge_count: kb.knowledge_count,
             }),
-            current_knowledge: state.current_knowledge.map(|k| memoforge_mcp::CurrentKnowledge {
-                path: k.path,
-                title: k.title,
-                category: k.category,
-            }),
+            current_knowledge: state
+                .current_knowledge
+                .map(|k| memoforge_mcp::CurrentKnowledge {
+                    path: k.path,
+                    title: k.title,
+                    category: k.category,
+                }),
             selection: state.selection.map(|s| memoforge_mcp::Selection {
                 start_line: s.start_line,
                 end_line: s.end_line,
@@ -256,7 +262,11 @@ mod tests {
     fn test_set_knowledge() {
         let manager = StateManager::new();
 
-        manager.set_knowledge("test.md".to_string(), "Test Title".to_string(), Some("Category".to_string()));
+        manager.set_knowledge(
+            "test.md".to_string(),
+            "Test Title".to_string(),
+            Some("Category".to_string()),
+        );
 
         let state = manager.get_state();
         assert!(state.current_knowledge.is_some());

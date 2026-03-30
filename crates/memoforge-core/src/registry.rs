@@ -1,11 +1,11 @@
 //! 知识库注册表 - 管理多个知识库
 //! 参考: PRD §5.1.6 多知识库管理
 
-use crate::{MemoError, ErrorCode};
+use crate::{ErrorCode, MemoError};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use std::fs;
 use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// 知识库信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,7 +115,11 @@ impl KnowledgeBaseRegistry {
         let canonical_str = canonical_path.to_string_lossy().to_string();
 
         // 如果已存在，更新访问时间
-        if let Some(kb) = self.knowledge_bases.iter_mut().find(|kb| kb.path == canonical_str) {
+        if let Some(kb) = self
+            .knowledge_bases
+            .iter_mut()
+            .find(|kb| kb.path == canonical_str)
+        {
             kb.last_accessed = chrono::Utc::now().to_rfc3339();
             kb.name = name.unwrap_or(&kb.name).to_string();
             self.current = Some(canonical_str);
@@ -123,11 +127,13 @@ impl KnowledgeBaseRegistry {
         }
 
         // 否则添加新的
-        let kb_name = name.unwrap_or_else(|| {
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("未命名知识库")
-        }).to_string();
+        let kb_name = name
+            .unwrap_or_else(|| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("未命名知识库")
+            })
+            .to_string();
 
         let is_default = self.knowledge_bases.is_empty();
 
@@ -158,7 +164,11 @@ impl KnowledgeBaseRegistry {
     pub fn set_current(&mut self, path: &str) -> Result<(), MemoError> {
         let normalized_path = Self::normalize_path_str(path);
 
-        if !self.knowledge_bases.iter().any(|kb| kb.path == normalized_path) {
+        if !self
+            .knowledge_bases
+            .iter()
+            .any(|kb| kb.path == normalized_path)
+        {
             return Err(MemoError {
                 code: ErrorCode::InvalidPath,
                 message: format!("Knowledge base not found: {}", normalized_path),
@@ -168,7 +178,11 @@ impl KnowledgeBaseRegistry {
         }
 
         // 更新访问时间
-        if let Some(kb) = self.knowledge_bases.iter_mut().find(|kb| kb.path == normalized_path) {
+        if let Some(kb) = self
+            .knowledge_bases
+            .iter_mut()
+            .find(|kb| kb.path == normalized_path)
+        {
             kb.last_accessed = chrono::Utc::now().to_rfc3339();
         }
 
@@ -189,7 +203,9 @@ impl KnowledgeBaseRegistry {
     /// 获取知识库信息
     pub fn get(&self, path: &str) -> Option<&KnowledgeBaseInfo> {
         let normalized_path = Self::normalize_path_str(path);
-        self.knowledge_bases.iter().find(|kb| kb.path == normalized_path)
+        self.knowledge_bases
+            .iter()
+            .find(|kb| kb.path == normalized_path)
     }
 
     fn normalize(&mut self) -> bool {
@@ -202,7 +218,10 @@ impl KnowledgeBaseRegistry {
                 changed = true;
             }
 
-            if let Some(existing) = deduped.iter_mut().find(|existing| existing.path == normalized_path) {
+            if let Some(existing) = deduped
+                .iter_mut()
+                .find(|existing| existing.path == normalized_path)
+            {
                 changed = true;
                 if kb.last_accessed > existing.last_accessed {
                     existing.last_accessed = kb.last_accessed.clone();
@@ -219,7 +238,10 @@ impl KnowledgeBaseRegistry {
             }
         }
 
-        let normalized_current = self.current.as_ref().map(|path| Self::normalize_path_str(path));
+        let normalized_current = self
+            .current
+            .as_ref()
+            .map(|path| Self::normalize_path_str(path));
         if normalized_current != self.current {
             changed = true;
         }
@@ -340,7 +362,10 @@ mod tests {
         fs::create_dir_all(real_kb.join(".memoforge")).unwrap();
         symlink(&real_kb, &alias_kb).unwrap();
 
-        let canonical = fs::canonicalize(&real_kb).unwrap().to_string_lossy().to_string();
+        let canonical = fs::canonicalize(&real_kb)
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
 
         let mut registry = KnowledgeBaseRegistry {
             knowledge_bases: vec![

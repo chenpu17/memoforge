@@ -1,10 +1,10 @@
 //! Git 操作模块
 //! 参考: 技术实现文档 §2.1, PRD §6.2
 
-use crate::{MemoError, ErrorCode};
-use git2::{Repository, Signature, IndexAddOption, StatusOptions, DiffOptions};
+use crate::{ErrorCode, MemoError};
+use git2::{DiffOptions, IndexAddOption, Repository, Signature, StatusOptions};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GitCommit {
@@ -59,7 +59,9 @@ pub fn git_commit(path: &Path, message: &str) -> Result<(), MemoError> {
 
     // 添加所有更改
     let mut index = repo.index().map_err(git_error)?;
-    index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None).map_err(git_error)?;
+    index
+        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
+        .map_err(git_error)?;
     unstage_runtime_files(path, &mut index)?;
     index.write().map_err(git_error)?;
 
@@ -71,9 +73,11 @@ pub fn git_commit(path: &Path, message: &str) -> Result<(), MemoError> {
     let parent_commit = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
 
     if let Some(parent) = parent_commit {
-        repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent]).map_err(git_error)?;
+        repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent])
+            .map_err(git_error)?;
     } else {
-        repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[]).map_err(git_error)?;
+        repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
+            .map_err(git_error)?;
     }
 
     Ok(())
@@ -148,7 +152,9 @@ pub fn git_pull(path: &Path) -> Result<(), MemoError> {
 
     // Merge
     let fetch_head = repo.find_reference("FETCH_HEAD").map_err(git_error)?;
-    let fetch_commit = repo.reference_to_annotated_commit(&fetch_head).map_err(git_error)?;
+    let fetch_commit = repo
+        .reference_to_annotated_commit(&fetch_head)
+        .map_err(git_error)?;
 
     let analysis = repo.merge_analysis(&[&fetch_commit]).map_err(git_error)?;
 
@@ -159,9 +165,12 @@ pub fn git_pull(path: &Path) -> Result<(), MemoError> {
     if analysis.0.is_fast_forward() {
         let refname = "refs/heads/main";
         let mut reference = repo.find_reference(refname).map_err(git_error)?;
-        reference.set_target(fetch_commit.id(), "Fast-forward").map_err(git_error)?;
+        reference
+            .set_target(fetch_commit.id(), "Fast-forward")
+            .map_err(git_error)?;
         repo.set_head(refname).map_err(git_error)?;
-        repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force())).map_err(git_error)?;
+        repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))
+            .map_err(git_error)?;
         return Ok(());
     }
 
@@ -185,30 +194,32 @@ pub fn git_push(path: &Path) -> Result<(), MemoError> {
         context: None,
     })?;
 
-    remote.push(&["refs/heads/main:refs/heads/main"], None).map_err(|e| {
-        if e.message().contains("authentication") || e.message().contains("credentials") {
-            MemoError {
-                code: ErrorCode::GitAuthFailed,
-                message: format!("Authentication failed: {}", e),
-                retry_after_ms: None,
-                context: None,
+    remote
+        .push(&["refs/heads/main:refs/heads/main"], None)
+        .map_err(|e| {
+            if e.message().contains("authentication") || e.message().contains("credentials") {
+                MemoError {
+                    code: ErrorCode::GitAuthFailed,
+                    message: format!("Authentication failed: {}", e),
+                    retry_after_ms: None,
+                    context: None,
+                }
+            } else if e.message().contains("rejected") || e.message().contains("non-fast-forward") {
+                MemoError {
+                    code: ErrorCode::GitPushRejected,
+                    message: format!("Push rejected: {}", e),
+                    retry_after_ms: None,
+                    context: None,
+                }
+            } else {
+                MemoError {
+                    code: ErrorCode::GitRemoteUnreachable,
+                    message: format!("Push failed: {}", e),
+                    retry_after_ms: None,
+                    context: None,
+                }
             }
-        } else if e.message().contains("rejected") || e.message().contains("non-fast-forward") {
-            MemoError {
-                code: ErrorCode::GitPushRejected,
-                message: format!("Push rejected: {}", e),
-                retry_after_ms: None,
-                context: None,
-            }
-        } else {
-            MemoError {
-                code: ErrorCode::GitRemoteUnreachable,
-                message: format!("Push failed: {}", e),
-                retry_after_ms: None,
-                context: None,
-            }
-        }
-    })?;
+        })?;
 
     Ok(())
 }
@@ -248,16 +259,19 @@ pub fn git_diff(path: &Path) -> Result<String, MemoError> {
     let mut opts = DiffOptions::new();
 
     let diff = if let Some(tree) = head {
-        repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts)).map_err(git_error)?
+        repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+            .map_err(git_error)?
     } else {
-        repo.diff_tree_to_workdir_with_index(None, Some(&mut opts)).map_err(git_error)?
+        repo.diff_tree_to_workdir_with_index(None, Some(&mut opts))
+            .map_err(git_error)?
     };
 
     let mut diff_text = String::new();
     diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
         diff_text.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
         true
-    }).map_err(git_error)?;
+    })
+    .map_err(git_error)?;
 
     Ok(diff_text)
 }

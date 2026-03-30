@@ -65,9 +65,12 @@ pub async fn serve(config: HttpConfig) -> Result<()> {
 
     tracing::info!("HTTP server listening on {}", addr);
 
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .map_err(|e| HttpError::Internal(e.to_string()))?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .map_err(|e| HttpError::Internal(e.to_string()))?;
 
     Ok(())
 }

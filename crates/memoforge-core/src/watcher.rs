@@ -1,7 +1,7 @@
 //! 文件监听模块
 //! 参考: PRD §7, 技术实现 §2
 
-use notify::{Watcher, RecursiveMode, Event};
+use notify::{Event, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::mpsc::channel;
 

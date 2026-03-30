@@ -29,8 +29,8 @@ fn main() {
         }
     }
 
-    let list = list_knowledge(&kb_path, LoadLevel::L0, None, None, None, None)
-        .expect("Failed to list");
+    let list =
+        list_knowledge(&kb_path, LoadLevel::L0, None, None, None, None).expect("Failed to list");
     println!("   Found {} knowledge items", list.items.len());
     if list.items.is_empty() {
         println!("   Warning: No knowledge found, skipping assertion");
@@ -47,35 +47,32 @@ fn main() {
         vec!["test".to_string()],
         None,
         Some("Test summary".to_string()),
-    ).expect("Failed to create");
+    )
+    .expect("Failed to create");
     println!("   ✓ Created knowledge: {}", id);
 
     // 4. 读取知识 (使用 list 过滤)
     println!("4. Reading knowledge...");
-    let list = list_knowledge(&kb_path, LoadLevel::L2, None, None, None, None)
-        .expect("Failed to list");
-    let k = list.items.iter().find(|k| k.id == id).expect("Knowledge not found");
+    let list =
+        list_knowledge(&kb_path, LoadLevel::L2, None, None, None, None).expect("Failed to list");
+    let k = list
+        .items
+        .iter()
+        .find(|k| k.id == id)
+        .expect("Knowledge not found");
     assert_eq!(k.title, "Test Knowledge");
     assert!(k.content.is_some());
     println!("   ✓ Read knowledge OK");
 
     // 5. 更新知识
     println!("5. Updating knowledge...");
-    update_knowledge(
-        &kb_path,
-        &id,
-        Some("Updated Title"),
-        None,
-        None,
-        None,
-        None,
-    ).expect("Failed to update");
+    update_knowledge(&kb_path, &id, Some("Updated Title"), None, None, None, None)
+        .expect("Failed to update");
     println!("   ✓ Updated knowledge");
 
     // 6. 搜索知识
     println!("6. Searching knowledge...");
-    let results = search_knowledge(&kb_path, "test", None, None, None)
-        .expect("Failed to search");
+    let results = search_knowledge(&kb_path, "test", None, None, None).expect("Failed to search");
     assert!(!results.is_empty());
     println!("   ✓ Found {} results", results.len());
 

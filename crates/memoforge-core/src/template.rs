@@ -1,14 +1,17 @@
 //! 模板知识库模块
 //! 参考: PRD §5.1.6, 技术实现 §6.5
 
-use crate::{MemoError, ErrorCode};
-use std::path::Path;
+use crate::{ErrorCode, MemoError};
 use std::fs;
+use std::path::Path;
 
 const TEMPLATES: &[(&str, &str)] = &[
     ("welcome.md", include_str!("../templates/welcome.md")),
     ("rust-async.md", include_str!("../templates/rust-async.md")),
-    ("git-workflow.md", include_str!("../templates/git-workflow.md")),
+    (
+        "git-workflow.md",
+        include_str!("../templates/git-workflow.md"),
+    ),
 ];
 
 /// 复制模板知识库到目标目录

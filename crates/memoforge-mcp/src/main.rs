@@ -18,17 +18,21 @@ use std::io::{self, BufRead, Write};
 enum Cli {
     Serve {
         /// 运行模式：follow(跟随当前编辑器) 或 bound(绑定指定知识库)
-        /// 注意：SSE 模式仅限 Tauri 内嵌使用，不支持独立 CLI 启动
-        #[arg(long, default_value = "follow", value_parser = ["follow", "bound"])]
-        mode: String,
+        /// 未显式指定时：提供 --knowledge-path 则推断为 bound，否则为 follow
+        #[arg(long, value_parser = ["follow", "bound"])]
+        mode: Option<String>,
 
-        /// 知识库路径（bound 模式必填）
-        #[arg(long, required_if_eq("mode", "bound"))]
+        /// 知识库路径（提供后默认进入 bound 模式）
+        #[arg(long)]
         knowledge_path: Option<std::path::PathBuf>,
 
         /// [follow 模式] 允许在状态无效时回退到最近使用的知识库（仅只读操作）
         #[arg(long, default_value = "false")]
         allow_stale_kb: bool,
+
+        /// 强制只读模式（无论 follow/bound）
+        #[arg(long, default_value = "false")]
+        readonly: bool,
 
         /// Agent 名称
         #[arg(long, default_value = "unknown")]
@@ -70,13 +74,22 @@ fn main() {
             mode,
             knowledge_path,
             allow_stale_kb,
+            readonly,
             agent_name,
         } => {
-            match mode.as_str() {
+            let effective_mode = mode.unwrap_or_else(|| {
+                if knowledge_path.is_some() {
+                    "bound".to_string()
+                } else {
+                    "follow".to_string()
+                }
+            });
+
+            match effective_mode.as_str() {
                 "follow" => {
                     // follow 模式：启动时不验证 KB，延迟到工具调用时
                     // 这样即使没有全局状态文件，get_editor_state 也可用于诊断
-                    run_server_follow_mode(allow_stale_kb, &agent_name);
+                    run_server_follow_mode(allow_stale_kb, readonly, &agent_name);
                 }
                 "bound" => {
                     // bound 模式：必须有显式路径，启动时验证
@@ -88,7 +101,7 @@ fn main() {
                         Ok(kb_path) => {
                             // 验证并初始化知识库
                             match validate_and_init_kb(&kb_path) {
-                                Ok(()) => run_server_bound_mode(kb_path, &agent_name),
+                                Ok(()) => run_server_bound_mode(kb_path, readonly, &agent_name),
                                 Err(e) => {
                                     eprintln!("Failed to initialize knowledge base: {}", e.message);
                                     std::process::exit(1);
@@ -124,7 +137,7 @@ fn validate_and_init_kb(kb_path: &std::path::PathBuf) -> Result<(), memoforge_co
 }
 
 /// follow 模式服务器：延迟验证 KB
-fn run_server_follow_mode(allow_stale_kb: bool, agent_name: &str) {
+fn run_server_follow_mode(allow_stale_kb: bool, readonly: bool, agent_name: &str) {
     // 不初始化 KB，只设置模式和配置
     tools::set_mode("follow".to_string());
     tools::set_allow_stale_kb(allow_stale_kb);
@@ -146,7 +159,7 @@ fn run_server_follow_mode(allow_stale_kb: bool, agent_name: &str) {
             Err(_) => continue,
         };
 
-        if let Some(response) = handle_request(request, "follow") {
+        if let Some(response) = handle_request(request, "follow", readonly) {
             if let Ok(json) = serde_json::to_string(&response) {
                 let _ = writeln!(stdout, "{}", json);
                 let _ = stdout.flush();
@@ -156,7 +169,7 @@ fn run_server_follow_mode(allow_stale_kb: bool, agent_name: &str) {
 }
 
 /// bound 模式服务器：启动时绑定固定 KB
-fn run_server_bound_mode(knowledge_path: std::path::PathBuf, agent_name: &str) {
+fn run_server_bound_mode(knowledge_path: std::path::PathBuf, readonly: bool, agent_name: &str) {
     // 注册 Agent
     let agent_name = if agent_name == "unknown" {
         memoforge_core::infer_agent_name()
@@ -194,7 +207,7 @@ fn run_server_bound_mode(knowledge_path: std::path::PathBuf, agent_name: &str) {
             Err(_) => continue,
         };
 
-        if let Some(response) = handle_request(request, "bound") {
+        if let Some(response) = handle_request(request, "bound", readonly) {
             if let Ok(json) = serde_json::to_string(&response) {
                 let _ = writeln!(stdout, "{}", json);
                 let _ = stdout.flush();
@@ -206,7 +219,7 @@ fn run_server_bound_mode(knowledge_path: std::path::PathBuf, agent_name: &str) {
     memoforge_core::unregister_agent(&knowledge_path);
 }
 
-fn handle_request(req: JsonRpcRequest, mode: &str) -> Option<JsonRpcResponse> {
+fn handle_request(req: JsonRpcRequest, mode: &str, force_readonly: bool) -> Option<JsonRpcResponse> {
     match req.method.as_str() {
         "initialize" => Some(JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
@@ -241,7 +254,9 @@ fn handle_request(req: JsonRpcRequest, mode: &str) -> Option<JsonRpcResponse> {
         }
         "tools/call" => {
             // follow 模式下，检查状态有效性来决定是否只读
-            let readonly = if mode == "follow" {
+            let readonly = if force_readonly {
+                true
+            } else if mode == "follow" {
                 // 检查编辑器状态是否有效
                 match memoforge_core::editor_state::EditorState::load_global() {
                     Ok(Some(state)) if state.state_valid => false, // 状态有效，允许写入

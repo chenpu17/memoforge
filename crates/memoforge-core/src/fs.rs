@@ -1,9 +1,9 @@
 //! 文件系统操作模块
 //! Task 1.5: 文件读写和路径处理
 
-use std::path::Path;
+use crate::{ErrorCode, MemoError};
 use std::fs;
-use crate::{MemoError, ErrorCode};
+use std::path::Path;
 
 /// 读取知识文件
 pub fn read_knowledge_file(path: &Path) -> Result<String, MemoError> {

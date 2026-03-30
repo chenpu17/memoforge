@@ -1,14 +1,14 @@
 //! 共享编辑器状态管理
 //! 参考: 技术实现文档 §2.2, §2.3
 
-use crate::{MemoError, ErrorCode};
-use crate::agent::{AgentInfo, get_active_agents};
+use crate::agent::{get_active_agents, AgentInfo};
+use crate::{ErrorCode, MemoError};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use chrono::{DateTime, Utc};
 
 /// 状态文件路径
 const EDITOR_STATE_FILE: &str = ".memoforge/editor_state.yaml";
@@ -516,7 +516,10 @@ impl EditorState {
     }
 
     /// 获取当前知识库路径（严格模式，不做危险回退）
-    pub fn resolve_kb_path(mode: EditorMode, explicit_path: Option<&PathBuf>) -> Result<Option<PathBuf>, MemoError> {
+    pub fn resolve_kb_path(
+        mode: EditorMode,
+        explicit_path: Option<&PathBuf>,
+    ) -> Result<Option<PathBuf>, MemoError> {
         // 显式指定的路径优先级最高
         if let Some(path) = explicit_path {
             return Ok(Some(path.clone()));
@@ -537,26 +540,22 @@ impl EditorState {
             Some(state) if state.state_valid && state.current_kb.is_some() => {
                 Ok(Some(state.current_kb.unwrap().path))
             }
-            Some(state) if !state.state_valid => {
-                Err(MemoError {
-                    code: ErrorCode::NotInitialized,
-                    message: "编辑器状态已过期或无效，请确保桌面应用正在运行".into(),
-                    retry_after_ms: None,
-                    context: Some(serde_json::json!({
-                        "reason": state.error.unwrap_or_else(|| "状态过期".to_string()),
-                        "desktop_running": state.desktop.as_ref().map(|d| d.running).unwrap_or(false),
-                        "hint": "如需在无桌面应用时操作，请使用绑定模式: --mode bound --knowledge-path /path/to/kb"
-                    })),
-                })
-            }
-            _ => {
-                Err(MemoError {
-                    code: ErrorCode::NotInitialized,
-                    message: "没有有效的知识库状态，请先在桌面应用中打开知识库".into(),
-                    retry_after_ms: None,
-                    context: None,
-                })
-            }
+            Some(state) if !state.state_valid => Err(MemoError {
+                code: ErrorCode::NotInitialized,
+                message: "编辑器状态已过期或无效，请确保桌面应用正在运行".into(),
+                retry_after_ms: None,
+                context: Some(serde_json::json!({
+                    "reason": state.error.unwrap_or_else(|| "状态过期".to_string()),
+                    "desktop_running": state.desktop.as_ref().map(|d| d.running).unwrap_or(false),
+                    "hint": "如需在无桌面应用时操作，请使用绑定模式: --mode bound --knowledge-path /path/to/kb"
+                })),
+            }),
+            _ => Err(MemoError {
+                code: ErrorCode::NotInitialized,
+                message: "没有有效的知识库状态，请先在桌面应用中打开知识库".into(),
+                retry_after_ms: None,
+                context: None,
+            }),
         }
     }
 }
@@ -579,7 +578,7 @@ fn process_alive(pid: u32) -> bool {
             let handle = winapi::um::processthreadsapi::OpenProcess(
                 PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
                 0,
-                pid
+                pid,
             );
 
             if handle.is_null() {
@@ -652,7 +651,10 @@ mod tests {
         let deserialized: EditorState = serde_yaml::from_str(&yaml).unwrap();
 
         assert_eq!(state.mode, deserialized.mode);
-        assert_eq!(state.desktop.unwrap().pid, deserialized.desktop.unwrap().pid);
+        assert_eq!(
+            state.desktop.unwrap().pid,
+            deserialized.desktop.unwrap().pid
+        );
     }
 
     #[test]

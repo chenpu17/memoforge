@@ -1,26 +1,28 @@
 import React, { useState, useEffect } from 'react'
 import { tauriService, RelatedKnowledge } from '../services/tauri'
 import { useAppStore } from '../stores/appStore'
-import { Link2, ArrowRight, ArrowLeft, Tags, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Tags, ChevronDown, ChevronRight } from 'lucide-react'
+import { useKnowledgeNavigation } from '../hooks/useKnowledgeNavigation'
 
 export const BacklinksPanel: React.FC = () => {
-  const { currentKnowledge, setCurrentKnowledge } = useAppStore()
+  const currentKnowledgeId = useAppStore((state) => state.currentKnowledge?.id ?? null)
+  const { openKnowledgeWithStale } = useKnowledgeNavigation()
   const [related, setRelated] = useState<RelatedKnowledge[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['incoming', 'outgoing', 'shared']))
 
   useEffect(() => {
-    if (currentKnowledge?.id) {
+    if (currentKnowledgeId) {
       loadLinks()
     }
-  }, [currentKnowledge?.id])
+  }, [currentKnowledgeId])
 
   const loadLinks = async () => {
-    if (!currentKnowledge?.id) return
+    if (!currentKnowledgeId) return
 
     setIsLoading(true)
     try {
-      const relatedResult = await tauriService.getRelated(currentKnowledge.id)
+      const relatedResult = await tauriService.getRelated(currentKnowledgeId)
       setRelated(relatedResult.related)
     } catch (error) {
       console.error('Failed to load links:', error)
@@ -39,34 +41,69 @@ export const BacklinksPanel: React.FC = () => {
     setExpandedSections(newExpanded)
   }
 
+  const handleOpenKnowledge = async (knowledgeId: string) => {
+    try {
+      await openKnowledgeWithStale(knowledgeId)
+    } catch (error) {
+      console.error('Failed to load knowledge:', error)
+    }
+  }
+
   // 分类相关知识
   const outgoingLinks = related.filter(r => r.relation_type === 'Outgoing')
   const incomingLinks = related.filter(r => r.relation_type === 'Incoming')
   const sharedTagLinks = related.filter(r => r.relation_type === 'SharedTags')
 
-  if (!currentKnowledge) {
-    return null
+  if (!currentKnowledgeId) {
+    return (
+      <div className="side-panel-body">
+        <div className="side-panel-empty">
+          选择知识后查看链接关系
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="border-t" style={{ borderColor: '#E5E5E5' }}>
-      {/* 标题 */}
-      <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: '#FAFAFA', borderColor: '#E5E5E5' }}>
-        <Link2 className="h-4 w-4" style={{ color: '#6366F1' }} />
-        <span className="text-xs font-medium" style={{ color: '#0A0A0A' }}>链接关系</span>
-      </div>
+    <div className="side-panel-body">
+      <div className="side-panel-card overflow-hidden">
+        {isLoading ? (
+          <div className="px-3 py-4 text-center text-xs" style={{ color: '#A3A3A3' }}>
+            加载中...
+          </div>
+        ) : (
+          <div>
+            {related.length > 0 && (
+              <div className="side-panel-section">
+                <div className="side-panel-heading">关系概览</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-md bg-[#ECFDF5] px-2.5 py-2 text-center">
+                    <div className="text-[10px]" style={{ color: '#047857' }}>被引用</div>
+                    <div className="mt-1 text-sm font-semibold" style={{ color: '#065F46' }}>
+                      {incomingLinks.length}
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-[#EEF2FF] px-2.5 py-2 text-center">
+                    <div className="text-[10px]" style={{ color: '#4338CA' }}>链接到</div>
+                    <div className="mt-1 text-sm font-semibold" style={{ color: '#3730A3' }}>
+                      {outgoingLinks.length}
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-[#FFFBEB] px-2.5 py-2 text-center">
+                    <div className="text-[10px]" style={{ color: '#B45309' }}>共享标签</div>
+                    <div className="mt-1 text-sm font-semibold" style={{ color: '#92400E' }}>
+                      {sharedTagLinks.length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-      {isLoading ? (
-        <div className="px-3 py-4 text-center text-xs" style={{ color: '#A3A3A3' }}>
-          加载中...
-        </div>
-      ) : (
-        <div className="max-h-48 overflow-y-auto">
           {/* 被引用 (Incoming) */}
           {incomingLinks.length > 0 && (
-            <div>
+            <div className="side-panel-section">
               <div
-                className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50"
+                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 -mx-1 px-1 py-1 rounded-md"
                 onClick={() => toggleSection('incoming')}
               >
                 {expandedSections.has('incoming') ? (
@@ -81,19 +118,12 @@ export const BacklinksPanel: React.FC = () => {
                 </span>
               </div>
               {expandedSections.has('incoming') && (
-                <div className="px-3 pb-2">
+                <div className="pt-2">
                   {incomingLinks.map((link) => (
                     <div
                       key={link.id}
-                      className="py-1.5 px-2 mb-1 rounded cursor-pointer hover:bg-gray-100"
-                      onClick={async () => {
-                        try {
-                          const knowledge = await tauriService.getKnowledge(link.id, 2)
-                          setCurrentKnowledge(knowledge)
-                        } catch (error) {
-                          console.error('Failed to load knowledge:', error)
-                        }
-                      }}
+                      className="mb-1 rounded-md px-2 py-1.5 cursor-pointer hover:bg-gray-100"
+                      onClick={() => void handleOpenKnowledge(link.id)}
                     >
                       <span className="text-xs truncate block" style={{ color: '#374151' }}>{link.title}</span>
                     </div>
@@ -105,9 +135,9 @@ export const BacklinksPanel: React.FC = () => {
 
           {/* 链接到 (Outgoing) */}
           {outgoingLinks.length > 0 && (
-            <div>
+            <div className="side-panel-section">
               <div
-                className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50"
+                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 -mx-1 px-1 py-1 rounded-md"
                 onClick={() => toggleSection('outgoing')}
               >
                 {expandedSections.has('outgoing') ? (
@@ -122,19 +152,12 @@ export const BacklinksPanel: React.FC = () => {
                 </span>
               </div>
               {expandedSections.has('outgoing') && (
-                <div className="px-3 pb-2">
+                <div className="pt-2">
                   {outgoingLinks.map((link) => (
                     <div
                       key={link.id}
-                      className="py-1.5 px-2 mb-1 rounded cursor-pointer hover:bg-gray-100"
-                      onClick={async () => {
-                        try {
-                          const knowledge = await tauriService.getKnowledge(link.id, 2)
-                          setCurrentKnowledge(knowledge)
-                        } catch (error) {
-                          console.error('Failed to load knowledge:', error)
-                        }
-                      }}
+                      className="mb-1 rounded-md px-2 py-1.5 cursor-pointer hover:bg-gray-100"
+                      onClick={() => void handleOpenKnowledge(link.id)}
                     >
                       <span className="text-xs truncate block" style={{ color: '#374151' }}>{link.title}</span>
                     </div>
@@ -146,9 +169,9 @@ export const BacklinksPanel: React.FC = () => {
 
           {/* 共享标签 */}
           {sharedTagLinks.length > 0 && (
-            <div>
+            <div className="side-panel-section">
               <div
-                className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50"
+                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 -mx-1 px-1 py-1 rounded-md"
                 onClick={() => toggleSection('shared')}
               >
                 {expandedSections.has('shared') ? (
@@ -163,19 +186,12 @@ export const BacklinksPanel: React.FC = () => {
                 </span>
               </div>
               {expandedSections.has('shared') && (
-                <div className="px-3 pb-2">
+                <div className="pt-2">
                   {sharedTagLinks.map((link) => (
                     <div
                       key={link.id}
-                      className="py-1.5 px-2 mb-1 rounded cursor-pointer hover:bg-gray-100"
-                      onClick={async () => {
-                        try {
-                          const knowledge = await tauriService.getKnowledge(link.id, 2)
-                          setCurrentKnowledge(knowledge)
-                        } catch (error) {
-                          console.error('Failed to load knowledge:', error)
-                        }
-                      }}
+                      className="mb-1 rounded-md px-2 py-1.5 cursor-pointer hover:bg-gray-100"
+                      onClick={() => void handleOpenKnowledge(link.id)}
                     >
                       <span className="text-xs truncate block" style={{ color: '#374151' }}>{link.title}</span>
                     </div>
@@ -187,12 +203,15 @@ export const BacklinksPanel: React.FC = () => {
 
           {/* 无链接 */}
           {related.length === 0 && (
-            <div className="px-3 py-4 text-center text-xs" style={{ color: '#A3A3A3' }}>
-              暂无链接关系
+            <div className="side-panel-section">
+              <div className="side-panel-empty">
+                暂无链接关系
+              </div>
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

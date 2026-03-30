@@ -1,9 +1,9 @@
 //! Configuration management for .memoforge/config.yaml
 
-use crate::{MemoError, ErrorCode, Category};
+use crate::{Category, ErrorCode, MemoError};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -93,11 +93,7 @@ pub fn save_config(kb_path: &Path, config: &Config) -> Result<(), MemoError> {
     })
 }
 
-pub fn register_category(
-    kb_path: &Path,
-    category: &Category,
-    path: &str,
-) -> Result<(), MemoError> {
+pub fn register_category(kb_path: &Path, category: &Category, path: &str) -> Result<(), MemoError> {
     let mut config = load_config(kb_path)?;
 
     let category_config = CategoryConfig {
@@ -114,7 +110,8 @@ pub fn register_category(
 
 pub fn validate_category_path(kb_path: &Path, category_id: &str) -> Result<bool, MemoError> {
     let config = load_config(kb_path)?;
-    Ok(config.categories.iter().any(|c| {
-        c.id == category_id || c.path == category_id || c.name == category_id
-    }))
+    Ok(config
+        .categories
+        .iter()
+        .any(|c| c.id == category_id || c.path == category_id || c.name == category_id))
 }

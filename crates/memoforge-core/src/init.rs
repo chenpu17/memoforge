@@ -1,9 +1,9 @@
 //! 冷启动模块
 //! 参考: PRD §3 场景6, §5.1.6, 技术实现 §6.4
 
-use crate::{MemoError, ErrorCode};
-use std::path::Path;
+use crate::{ErrorCode, MemoError};
 use std::fs;
+use std::path::Path;
 
 /// 检测知识库是否已初始化
 pub fn is_initialized(path: &Path) -> bool {

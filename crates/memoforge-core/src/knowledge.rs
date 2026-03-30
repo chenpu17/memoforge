@@ -1,11 +1,14 @@
 //! 知识加载模块
 //! Task 1.6: L0/L1/L2 分层加载逻辑
 
-use std::path::Path;
-use crate::{MemoError, models::{Knowledge, LoadLevel}};
 use crate::frontmatter::parse_frontmatter;
 use crate::fs::read_knowledge_file;
+use crate::{
+    models::{Knowledge, LoadLevel},
+    MemoError,
+};
 use regex::Regex;
+use std::path::Path;
 
 /// 章节结构
 #[derive(Debug, Clone, PartialEq)]

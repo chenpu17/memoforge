@@ -11,9 +11,9 @@ vi.mock('../stores/appStore', () => ({
 describe('Sidebar Category Filtering', () => {
   const mockOnSelectCategory = vi.fn()
   const mockCategories = [
-    { id: 'uuid-1', name: 'IT资讯' },
-    { id: 'uuid-2', name: '技术文档' },
-    { id: 'uuid-3', name: '读书笔记' },
+    { id: 'IT资讯', name: 'IT资讯' },
+    { id: '技术文档', name: '技术文档' },
+    { id: '读书笔记', name: '读书笔记' },
   ]
 
   // Mock knowledge list with categories
@@ -35,6 +35,7 @@ describe('Sidebar Category Filtering', () => {
     ;(useAppStore as any).mockReturnValue({
       categories: mockCategories,
       knowledgeList: mockKnowledgeList,
+      allTags: [],
     })
   })
 
@@ -104,17 +105,18 @@ describe('Sidebar Category Filtering', () => {
     expect(countValues).toContain(5)
     expect(countValues).toContain(3)
     expect(countValues).toContain(2)
-    expect(screen.getByText('MCP: 2 个连接')).toBeInTheDocument()
+    expect(screen.getByText('MCP 2')).toBeInTheDocument()
   })
 
   it('should keep category counts when current knowledge list is filtered', () => {
     ;(useAppStore as any).mockReturnValue({
       categories: [
-        { id: 'uuid-1', name: 'IT资讯', count: 5 },
-        { id: 'uuid-2', name: '技术文档', count: 3 },
-        { id: 'uuid-3', name: '读书笔记', count: 2 },
+        { id: 'IT资讯', name: 'IT资讯', count: 5 },
+        { id: '技术文档', name: '技术文档', count: 3 },
+        { id: '读书笔记', name: '读书笔记', count: 2 },
       ],
       knowledgeList: mockKnowledgeList.filter((item) => item.category === 'IT资讯'),
+      allTags: [],
     })
 
     render(

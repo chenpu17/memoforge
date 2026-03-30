@@ -10,6 +10,7 @@ from frontend_e2e import REPO_ROOT, make_test_env, seed_knowledge_base
 
 
 EXPECTED_TOOLS = {
+    "get_editor_state",
     "get_status",
     "get_config",
     "list_knowledge",
@@ -54,7 +55,7 @@ class McpClient:
     def __init__(self, binary: Path, kb_path: str, env: dict[str, str], readonly: bool) -> None:
         cmd = [str(binary), "serve", "--knowledge-path", kb_path]
         if readonly:
-            cmd.extend(["--mode", "readonly"])
+            cmd.append("--readonly")
         self.process = subprocess.Popen(
             cmd,
             cwd=REPO_ROOT,
@@ -156,6 +157,14 @@ def run_readwrite_suite(binary: Path, env: dict[str, str], paths: dict[str, str]
         assert names == EXPECTED_TOOLS, names
         print("OK tools-list")
 
+        create_knowledge_tool = next(tool for tool in tools if tool["name"] == "create_knowledge")
+        create_schema = create_knowledge_tool["inputSchema"]
+        assert create_schema["required"] == ["content"]
+        assert {"required": ["path"]} in create_schema["oneOf"]
+        assert {"required": ["title"]} in create_schema["oneOf"]
+        assert "Preferred docs-style call" in create_knowledge_tool["description"]
+        print("OK create-knowledge-schema")
+
         status = client.call_tool("get_status")
         assert status["initialized"] is True
         assert status["mode"] == "readwrite"
@@ -166,7 +175,9 @@ def run_readwrite_suite(binary: Path, env: dict[str, str], paths: dict[str, str]
         print("OK get-config")
 
         categories = client.call_tool("list_categories")
-        assert {category["id"] for category in categories["categories"]} >= {"programming", "tools"}
+        category_paths = {category["path"] for category in categories["categories"]}
+        assert {"programming", "tools"} <= category_paths
+        assert all("label" in category for category in categories["categories"])
         print("OK list-categories")
 
         knowledge = client.call_tool("list_knowledge", {"level": "L1", "path": "programming"})
@@ -224,6 +235,25 @@ def run_readwrite_suite(binary: Path, env: dict[str, str], paths: dict[str, str]
         )
         assert created_category["created"] is True
         print("OK create-category")
+
+        created_by_category_id = client.call_tool(
+            "create_knowledge",
+            {
+                "title": "Category Id Write",
+                "content": "# Category Id Write\n\nLegacy write using category id.",
+                "category_id": created_category["id"],
+            },
+        )
+        assert created_by_category_id["path"].startswith("devops/"), created_by_category_id
+        assert not created_by_category_id["path"].startswith(f'{created_category["id"]}/'), created_by_category_id
+        print("OK create-knowledge-category-id")
+
+        missing_target = client.call_tool_expect_error(
+            "create_knowledge",
+            {"content": "# Missing target"},
+        )
+        assert "either 'path' or legacy 'title'" in missing_target["message"], missing_target
+        print("OK create-knowledge-error-guidance")
 
         created_main = client.call_tool(
             "create_knowledge",

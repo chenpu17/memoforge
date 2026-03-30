@@ -3,7 +3,7 @@
  * REST API client for web access
  */
 
-import type { Category, Knowledge, KnowledgeWithStale, GrepMatch } from '../types'
+import type { Category, Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, GrepMatch } from '../types'
 
 export interface HttpConfig {
   baseUrl: string
@@ -248,11 +248,19 @@ class HttpService {
     return response.items
   }
 
+  async completeKnowledgeLinks(query: string, limit?: number): Promise<KnowledgeLinkCompletion[]> {
+    const params = new URLSearchParams()
+    if (query) params.set('query', query)
+    if (limit) params.set('limit', String(limit))
+    return this.request<KnowledgeLinkCompletion[]>(`/api/knowledge/link-completions?${params}`)
+  }
+
   // Grep
-  async grep(query: string, tags?: string[], limit?: number): Promise<GrepMatch[]> {
+  async grep(query: string, tags?: string[], limit?: number, categoryId?: string): Promise<GrepMatch[]> {
     const params = new URLSearchParams()
     params.set('query', query)
     if (tags?.length) params.set('tags', tags.join(','))
+    if (categoryId) params.set('category_id', categoryId)
     if (limit) params.set('limit', String(limit))
     const response = await this.request<GrepResponse>(`/api/grep?${params}`)
     return response.results

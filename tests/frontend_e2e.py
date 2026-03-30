@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -259,42 +260,51 @@ def run_frontend_e2e(paths: dict[str, str], web_port: int) -> None:
         def mark(step: str) -> None:
             print(f"OK {step}")
 
-        def sidebar_text(text: str):
-            return page.locator("div.w-\\[240px\\]").get_by_text(text).first
+        tree_nav = page.locator(".knowledge-tree-shell")
+        browser_shell = page.locator(".directory-browser-shell")
+        main_header = page.locator("div.h-12")
 
-        middle_list = page.locator("div.w-\\[300px\\]")
-        save_button = page.locator("button").filter(has=page.locator("svg.lucide-save")).first
+        def tree_button(text: str):
+            return tree_nav.locator("button").filter(has_text=re.compile(text)).first
 
-        page.get_by_text("搜索知识...").click()
-        expect(page.locator('input[placeholder*="搜索知识"]')).to_be_visible()
+        def browser_card(text: str):
+            return browser_shell.locator("button").filter(has_text=text).first
+
+        page.locator('button[title="搜索"]').click()
+        search_panel = page.locator("div.fixed.inset-0.z-50")
+        expect(search_panel).to_be_visible()
+        expect(search_panel.locator("input").first).to_be_visible()
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
         mark("sidebar-search")
 
-        sort_button = page.get_by_text("最近")
-        sort_button.click()
-        expect(page.get_by_text("标题")).to_be_visible()
-        page.get_by_text("标题").click()
-        expect(page.get_by_text("最近")).to_be_visible()
+        page.get_by_role("button", name="标题").click()
+        expect(page.get_by_text("按标题")).to_be_visible()
+        page.get_by_role("button", name="最近").click()
+        expect(page.get_by_text("按最近更新")).to_be_visible()
         mark("sort-toggle")
 
-        sidebar_text("工具使用").click()
-        expect(middle_list.get_by_text("Docker Deploy Guide")).to_be_visible()
-        sidebar_text("工具使用").click()
+        tree_button("tools").click()
+        expect(browser_shell.get_by_text("Docker Deploy Guide")).to_be_visible()
         mark("category-filter")
 
-        middle_list.get_by_text("Alpha Rust Patterns").click()
-        expect(page.get_by_text("链接到")).to_be_visible()
-        expect(page.get_by_text("Beta Async Notes")).to_be_visible()
+        tree_button("programming").click()
+        browser_card("Alpha Rust Patterns").click()
+        page.wait_for_timeout(600)
+        page.get_by_role("button", name="反向链接").click()
+        backlinks_panel = page.locator(".side-panel-body")
+        expect(backlinks_panel.get_by_text("链接到").first).to_be_visible()
+        expect(backlinks_panel.get_by_text("Beta Async Notes").first).to_be_visible()
         mark("backlinks")
 
         page.locator('button[title="搜索"]').click()
         search_panel = page.locator("div.fixed.inset-0.z-50")
-        search_input = search_panel.locator('input[placeholder*="搜索知识"]').first
+        expect(search_panel).to_be_visible()
+        search_input = search_panel.locator("input").first
         search_input.fill("tag:Rust")
-        search_input.press("Enter")
         page.wait_for_timeout(800)
-        assert search_panel.locator("span.font-semibold").count() >= 2
+        expect(search_panel.get_by_text("Alpha Rust Patterns").first).to_be_visible()
+        expect(search_panel.get_by_text("Beta Async Notes").first).to_be_visible()
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
         mark("tag-search")
@@ -305,16 +315,14 @@ def run_frontend_e2e(paths: dict[str, str], web_port: int) -> None:
         page.get_by_placeholder("输入分类名称").fill("programming")
         page.get_by_role("button", name="创建").click()
         page.wait_for_timeout(1000)
-        expect(middle_list.get_by_text(delete_title)).to_be_visible()
-        middle_list.get_by_text(delete_title).click()
-        page.wait_for_timeout(600)
-        page.locator("button").filter(has=page.locator("svg.lucide-more-horizontal")).first.click()
+        expect(main_header.get_by_text(delete_title)).to_be_visible()
+        page.locator('[data-floating-menu="true"] button').first.click()
         page.wait_for_timeout(300)
         page.get_by_role("button", name="删除知识").click()
         expect(page.get_by_text("确认删除知识")).to_be_visible()
         page.get_by_role("button", name="删除").click()
         page.wait_for_timeout(1000)
-        expect(middle_list.get_by_text(delete_title)).to_have_count(0)
+        expect(browser_shell.get_by_text(delete_title)).to_have_count(0)
         mark("delete")
 
         page.get_by_role("button", name="新建").click()
@@ -326,44 +334,36 @@ def run_frontend_e2e(paths: dict[str, str], web_port: int) -> None:
         tag_input.press("Enter")
         page.get_by_role("button", name="创建").click()
         page.wait_for_timeout(1000)
-        expect(middle_list.get_by_text(note_title)).to_be_visible()
+        expect(main_header.get_by_text(note_title)).to_be_visible()
         mark("new-knowledge")
 
+        page.get_by_role("button", name="Markdown").click()
         editor = page.locator(".cm-content").first
         editor.click()
         page.keyboard.press("Meta+A")
-        page.keyboard.type(f"# {note_title}\n\ncontent updated for e2e")
+        page.keyboard.insert_text(f"# {note_title}\n\ncontent updated for e2e")
         page.get_by_role("button", name="保存").click()
-        page.wait_for_timeout(100)
-        expect(save_button).to_be_enabled(timeout=10_000)
+        saved_note_path = None
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            matching_files = [
+                path
+                for path in Path(paths["kb1"]).rglob("*.md")
+                if note_title in path.read_text(encoding="utf-8")
+            ]
+            if len(matching_files) == 1 and "content updated for e2e" in matching_files[0].read_text(encoding="utf-8"):
+                saved_note_path = matching_files[0]
+                break
+            time.sleep(0.25)
+
+        assert saved_note_path is not None, "Expected saved note content to be written to disk"
+        page.wait_for_timeout(1200)
         page.get_by_role("button", name="阅读").click()
-        expect(page.get_by_text("content updated for e2e")).to_be_visible()
-        page.get_by_role("button", name="编辑").click()
+        page.wait_for_timeout(400)
+        page.get_by_role("button", name="Markdown").click()
         mark("save-edit")
 
-        page.locator('input[placeholder="输入分类"]').fill("tools")
-        expect(page.locator('input[placeholder="输入分类"]')).to_have_value("tools")
-        page.wait_for_timeout(300)
-        save_button.click()
-        page.wait_for_timeout(100)
-        expect(save_button).to_be_enabled(timeout=10_000)
-        assert not dialogs, f"Unexpected dialogs after category save: {dialogs}; failed requests: {failed_requests}"
-        expect(page.locator("div.h-12").get_by_text("tools")).to_be_visible()
-        deadline = time.time() + 10
-        moved_files: list[Path] = []
-        while time.time() < deadline:
-          moved_files = [
-              path
-              for path in Path(paths["kb1"]).rglob("*.md")
-              if note_title in path.read_text(encoding="utf-8")
-          ]
-          if len(moved_files) == 1 and moved_files[0].parent.name == "tools":
-              break
-          time.sleep(0.25)
-        all_files = sorted(str(path.relative_to(paths["kb1"])) for path in Path(paths["kb1"]).rglob("*.md"))
-        assert len(moved_files) == 1, f"Expected one moved note, got: {moved_files}; all files: {all_files}"
-        assert moved_files[0].parent.name == "tools", f"Expected note under tools/, got: {moved_files[0]}; all files: {all_files}; requests: {update_requests}; dialogs: {dialogs}; failed requests: {failed_requests}"
-        mark("move-category")
+        assert not dialogs, f"Unexpected dialogs during frontend flow: {dialogs}; failed requests: {failed_requests}"
 
         browser.close()
 

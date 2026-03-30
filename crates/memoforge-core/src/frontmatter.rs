@@ -1,8 +1,8 @@
 //! Frontmatter 解析模块
 //! Task 1.3: 解析 YAML frontmatter 和 Markdown body
 
-use crate::{MemoError, ErrorCode};
 use crate::models::Frontmatter;
+use crate::{ErrorCode, MemoError};
 
 /// 解析包含 frontmatter 的 Markdown 文件
 /// 格式: ---\nYAML\n---\nMarkdown body
@@ -19,7 +19,8 @@ pub fn parse_frontmatter(content: &str) -> Result<(Frontmatter, String), MemoErr
     }
 
     let after_first = &content[3..];
-    let end_pos = after_first.find("\n---\n")
+    let end_pos = after_first
+        .find("\n---\n")
         .or_else(|| after_first.find("\n---\r\n"))
         .ok_or_else(|| MemoError {
             code: ErrorCode::InvalidFrontmatter,
@@ -32,13 +33,12 @@ pub fn parse_frontmatter(content: &str) -> Result<(Frontmatter, String), MemoErr
     let body_start = end_pos + 5; // "\n---\n".len()
     let body = after_first[body_start..].trim_start().to_string();
 
-    let frontmatter: Frontmatter = serde_yaml::from_str(yaml_str)
-        .map_err(|e| MemoError {
-            code: ErrorCode::InvalidFrontmatter,
-            message: format!("Failed to parse YAML: {}", e),
-            retry_after_ms: None,
-            context: None,
-        })?;
+    let frontmatter: Frontmatter = serde_yaml::from_str(yaml_str).map_err(|e| MemoError {
+        code: ErrorCode::InvalidFrontmatter,
+        message: format!("Failed to parse YAML: {}", e),
+        retry_after_ms: None,
+        context: None,
+    })?;
 
     Ok((frontmatter, body))
 }

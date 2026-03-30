@@ -122,12 +122,12 @@ export const api = {
   },
 
   // Grep
-  async grep(query: string, tags?: string[], limit?: number): Promise<GrepMatch[]> {
+  async grep(query: string, tags?: string[], limit?: number, categoryId?: string): Promise<GrepMatch[]> {
     if (isTauri) {
-      return tauriService.grep(query, tags, limit)
+      return tauriService.grep(query, tags, limit, categoryId)
     }
     const http = getHttpService()
-    return http.grep(query, tags, limit)
+    return http.grep(query, tags, limit, categoryId)
   },
 
   // Git operations (Tauri only)

@@ -1,10 +1,10 @@
 //! Agent 连接状态管理
 //! 参考: PRD §6.1.3 MCP 服务状态检测
 
-use crate::{MemoError, ErrorCode};
+use crate::{ErrorCode, MemoError};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// Agent 信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,7 +86,7 @@ fn process_alive(pid: u32) -> bool {
             let handle = winapi::um::processthreadsapi::OpenProcess(
                 PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
                 0,
-                pid
+                pid,
             );
 
             if handle.is_null() {

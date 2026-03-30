@@ -4,11 +4,11 @@
 //! - Cross-process notifications (MCP → GUI)
 //! - Audit trail
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
-use chrono::{DateTime, Utc};
 
 /// Event types for logging
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,91 +84,140 @@ pub fn log_event(kb_path: &Path, event: Event) -> std::io::Result<()> {
 }
 
 /// Convenience function to log a create event
-pub fn log_create(kb_path: &Path, source: EventSource, path: &str, title: &str) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::Create,
-        path: Some(path.to_string()),
-        detail: format!("创建了新知识: {}", title),
-    })
+pub fn log_create(
+    kb_path: &Path,
+    source: EventSource,
+    path: &str,
+    title: &str,
+) -> std::io::Result<()> {
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::Create,
+            path: Some(path.to_string()),
+            detail: format!("创建了新知识: {}", title),
+        },
+    )
 }
 
 /// Convenience function to log an update event
-pub fn log_update(kb_path: &Path, source: EventSource, path: &str, title: &str) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::Update,
-        path: Some(path.to_string()),
-        detail: format!("更新了知识: {}", title),
-    })
+pub fn log_update(
+    kb_path: &Path,
+    source: EventSource,
+    path: &str,
+    title: &str,
+) -> std::io::Result<()> {
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::Update,
+            path: Some(path.to_string()),
+            detail: format!("更新了知识: {}", title),
+        },
+    )
 }
 
 /// Convenience function to log an update metadata event
-pub fn log_update_metadata(kb_path: &Path, source: EventSource, path: &str, title: &str) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::UpdateMetadata,
-        path: Some(path.to_string()),
-        detail: format!("更新了知识元数据: {}", title),
-    })
+pub fn log_update_metadata(
+    kb_path: &Path,
+    source: EventSource,
+    path: &str,
+    title: &str,
+) -> std::io::Result<()> {
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::UpdateMetadata,
+            path: Some(path.to_string()),
+            detail: format!("更新了知识元数据: {}", title),
+        },
+    )
 }
 
 /// Convenience function to log a delete event
-pub fn log_delete(kb_path: &Path, source: EventSource, path: &str, title: &str) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::Delete,
-        path: Some(path.to_string()),
-        detail: format!("删除了知识: {}", title),
-    })
+pub fn log_delete(
+    kb_path: &Path,
+    source: EventSource,
+    path: &str,
+    title: &str,
+) -> std::io::Result<()> {
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::Delete,
+            path: Some(path.to_string()),
+            detail: format!("删除了知识: {}", title),
+        },
+    )
 }
 
 /// Convenience function to log a move event
 pub fn log_move(kb_path: &Path, source: EventSource, from: &str, to: &str) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::Move,
-        path: Some(from.to_string()),
-        detail: format!("移动知识: {} → {}", from, to),
-    })
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::Move,
+            path: Some(from.to_string()),
+            detail: format!("移动知识: {} → {}", from, to),
+        },
+    )
 }
 
 /// Convenience function to log a git commit event
-pub fn log_git_commit(kb_path: &Path, source: EventSource, message: &str, file_count: usize) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::GitCommit,
-        path: None,
-        detail: format!("提交了 {} 个文件的修改: {}", file_count, message),
-    })
+pub fn log_git_commit(
+    kb_path: &Path,
+    source: EventSource,
+    message: &str,
+    file_count: usize,
+) -> std::io::Result<()> {
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::GitCommit,
+            path: None,
+            detail: format!("提交了 {} 个文件的修改: {}", file_count, message),
+        },
+    )
 }
 
 /// Convenience function to log a git pull event
 pub fn log_git_pull(kb_path: &Path, source: EventSource) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::GitPull,
-        path: None,
-        detail: "拉取了远程变更".to_string(),
-    })
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::GitPull,
+            path: None,
+            detail: "拉取了远程变更".to_string(),
+        },
+    )
 }
 
 /// Convenience function to log a git push event
 pub fn log_git_push(kb_path: &Path, source: EventSource) -> std::io::Result<()> {
-    log_event(kb_path, Event {
-        time: Utc::now(),
-        source,
-        action: EventAction::GitPush,
-        path: None,
-        detail: "推送了本地提交".to_string(),
-    })
+    log_event(
+        kb_path,
+        Event {
+            time: Utc::now(),
+            source,
+            action: EventAction::GitPush,
+            path: None,
+            detail: "推送了本地提交".to_string(),
+        },
+    )
 }
 
 /// Read recent events from the log file

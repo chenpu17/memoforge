@@ -30,6 +30,14 @@ pub struct PaginatedKnowledge {
     pub has_more: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct KnowledgeLinkCompletion {
+    pub id: String,
+    pub title: String,
+    pub summary: Option<String>,
+    pub category: Option<String>,
+}
+
 /// Preview result for delete operation
 #[derive(Debug, Clone, Serialize)]
 pub struct DeletePreview {
@@ -1013,6 +1021,61 @@ pub fn search_knowledge(
     Ok(results)
 }
 
+pub fn complete_knowledge_links(
+    kb_path: &Path,
+    query: &str,
+    limit: Option<usize>,
+) -> Result<Vec<KnowledgeLinkCompletion>, MemoError> {
+    let paginated = list_knowledge(kb_path, LoadLevel::L1, None, None, None, None)?;
+    let query = query.trim().to_lowercase();
+    let limit = limit.unwrap_or(20);
+
+    let mut matches: Vec<(i32, KnowledgeLinkCompletion)> = paginated
+        .items
+        .into_iter()
+        .filter_map(|knowledge| {
+            let id_lower = knowledge.id.to_lowercase();
+            let title_lower = knowledge.title.to_lowercase();
+
+            let score = if query.is_empty() {
+                Some(0)
+            } else if id_lower.starts_with(&query) {
+                Some(400)
+            } else if title_lower.starts_with(&query) {
+                Some(300)
+            } else if id_lower.contains(&query) {
+                Some(200)
+            } else if title_lower.contains(&query) {
+                Some(100)
+            } else {
+                None
+            }?;
+
+            Some((
+                score,
+                KnowledgeLinkCompletion {
+                    id: knowledge.id,
+                    title: knowledge.title,
+                    summary: knowledge.summary,
+                    category: knowledge.category,
+                },
+            ))
+        })
+        .collect();
+
+    matches.sort_by(|left, right| {
+        right
+            .0
+            .cmp(&left.0)
+            .then_with(|| left.1.id.cmp(&right.1.id))
+            .then_with(|| left.1.title.cmp(&right.1.title))
+    });
+
+    matches.truncate(limit);
+
+    Ok(matches.into_iter().map(|(_, item)| item).collect())
+}
+
 /// Regex or substring grep over knowledge content
 pub fn grep(
     kb_path: &Path,
@@ -1499,5 +1562,66 @@ See [[programming/source.md]] and [[source]]."#,
         assert!(referrer.contains("[[tools/source-renamed.md]]"));
         assert!(referrer.contains("[[source-renamed]]"));
         assert!(!referrer.contains("[[programming/source.md]]"));
+    }
+
+    #[test]
+    fn test_complete_knowledge_links_prioritizes_path_prefix() {
+        let temp = tempfile::tempdir().unwrap();
+        let kb_path = temp.path();
+
+        crate::init::init_new(kb_path, false).unwrap();
+        crate::config::save_config(
+            kb_path,
+            &crate::config::Config {
+                version: "1.0".to_string(),
+                categories: vec![
+                    crate::config::CategoryConfig {
+                        id: "programming/rust".to_string(),
+                        name: "Rust".to_string(),
+                        path: "programming/rust".to_string(),
+                        parent_id: None,
+                        description: None,
+                    },
+                    crate::config::CategoryConfig {
+                        id: "notes".to_string(),
+                        name: "Notes".to_string(),
+                        path: "notes".to_string(),
+                        parent_id: None,
+                        description: None,
+                    },
+                ],
+                metadata: None,
+            },
+        )
+        .unwrap();
+
+        fs::create_dir_all(kb_path.join("programming/rust")).unwrap();
+        fs::create_dir_all(kb_path.join("notes")).unwrap();
+
+        create_knowledge(
+            kb_path,
+            "Async Patterns",
+            "# Async",
+            vec![],
+            Some("programming/rust".to_string()),
+            Some("Rust async patterns".to_string()),
+        )
+        .unwrap();
+
+        create_knowledge(
+            kb_path,
+            "Patterns Overview",
+            "# Patterns",
+            vec![],
+            Some("notes".to_string()),
+            Some("General patterns".to_string()),
+        )
+        .unwrap();
+
+        let results =
+            complete_knowledge_links(kb_path, "programming/rust/async", Some(10)).unwrap();
+
+        assert!(!results.is_empty());
+        assert!(results[0].id.contains("programming/rust/async-patterns"));
     }
 }

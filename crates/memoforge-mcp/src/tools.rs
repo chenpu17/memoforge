@@ -37,7 +37,9 @@ fn get_allow_stale_kb() -> bool {
 }
 
 fn get_agent_name() -> String {
-    AGENT_NAME.lock().unwrap()
+    AGENT_NAME
+        .lock()
+        .unwrap()
         .clone()
         .unwrap_or_else(|| memoforge_core::infer_agent_name())
 }
@@ -110,7 +112,10 @@ fn ensure_agent_registered(kb_path: &PathBuf) {
 }
 
 fn get_mode() -> String {
-    MODE.lock().unwrap().clone().unwrap_or_else(|| "bound".to_string())
+    MODE.lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_else(|| "bound".to_string())
 }
 
 fn tool(name: &str, description: &str, input_schema: Value) -> Value {
@@ -163,11 +168,11 @@ pub fn list_tools() -> Vec<Value> {
                     },
                     "path": {
                         "type": "string",
-                        "description": "Filter by category path prefix, e.g., '技术/Rust'"
+                        "description": "Filter by category path prefix, e.g., '技术/Rust'. Prefer category path over opaque category id."
                     },
                     "category_id": {
                         "type": "string",
-                        "description": "Filter by exact category ID"
+                        "description": "Legacy: Filter by category id. Prefer 'path' when available."
                     },
                     "tags": {
                         "type": "array",
@@ -341,13 +346,13 @@ pub fn list_tools() -> Vec<Value> {
         ),
         tool(
             "create_knowledge",
-            "Create a new knowledge entry. IMPORTANT: For a single request with multiple topics (e.g., 'analyze X and save'), merge all content into ONE document with ## section headings instead of creating multiple entries. Supports docs-style path input (recommended) or legacy title/category input.",
+            "Create a new knowledge entry. IMPORTANT: For a single request with multiple topics (e.g., 'analyze X and save'), merge all content into ONE document with ## section headings instead of creating multiple entries. Preferred docs-style call: provide 'path' + 'content'; 'metadata.title' is optional and defaults to the filename stem. Legacy fallback: provide 'title' + 'content' (optionally 'category_id').",
             json!({
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Relative file path from KB root, e.g., '技术/Rust异步编程.md'. Must end with .md"
+                        "description": "Preferred: relative file path from KB root, e.g., '技术/Rust异步编程.md'. Must end with .md. If provided, title can be omitted and defaults to the file stem."
                     },
                     "content": {
                         "type": "string",
@@ -362,12 +367,16 @@ pub fn list_tools() -> Vec<Value> {
                             "summary": { "type": "string", "description": "Brief summary (auto-generated if omitted)" }
                         }
                     },
-                    "title": { "type": "string", "description": "Legacy: Knowledge title" },
+                    "title": { "type": "string", "description": "Legacy fallback: required only when 'path' is omitted" },
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "Legacy: Tags array" },
-                    "category_id": { "type": "string", "description": "Legacy: Category ID or path" },
+                    "category_id": { "type": "string", "description": "Legacy: Category path or opaque category id. Prefer category path when available." },
                     "summary": { "type": "string", "description": "Legacy: Summary text" }
                 },
-                "required": ["content"]
+                "required": ["content"],
+                "oneOf": [
+                    { "required": ["path"] },
+                    { "required": ["title"] }
+                ]
             }),
         ),
         tool(
@@ -401,7 +410,7 @@ pub fn list_tools() -> Vec<Value> {
                     "title": { "type": "string", "description": "Legacy: Update title" },
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "Legacy: Update tags" },
                     "summary": { "type": "string", "description": "Legacy: Update summary" },
-                    "category_id": { "type": "string", "description": "Legacy: Move to category" }
+                    "category_id": { "type": "string", "description": "Legacy: Move to category path or opaque category id. Prefer category path when available." }
                 }
             }),
         ),
@@ -519,7 +528,7 @@ pub fn list_tools() -> Vec<Value> {
         ),
         tool(
             "list_categories",
-            "List all registered categories with their paths, labels, and descriptions. Use this to understand the knowledge base structure before creating content.",
+            "List all registered categories with their paths, labels, and descriptions. Use the returned 'path' field when creating or moving knowledge; 'id' is an opaque legacy identifier.",
             json!({
                 "type": "object",
                 "properties": {},
@@ -775,7 +784,9 @@ fn metadata_object(args: &Value) -> Option<&Value> {
 }
 
 fn metadata_str_arg<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
-    metadata_object(args).and_then(|metadata| metadata.get(key)).and_then(Value::as_str)
+    metadata_object(args)
+        .and_then(|metadata| metadata.get(key))
+        .and_then(Value::as_str)
 }
 
 fn metadata_string_array_arg(args: &Value, key: &str) -> Option<Vec<String>> {
@@ -842,6 +853,25 @@ fn resolve_category_identifier(kb_path: &Path, value: &str) -> Result<String, Me
         })
 }
 
+fn canonicalize_category_reference(kb_path: &Path, value: &str) -> Result<String, MemoError> {
+    let config = load_config(kb_path)?;
+    Ok(config
+        .categories
+        .into_iter()
+        .find(|category| category.id == value || category.path == value || category.name == value)
+        .map(|category| category.path)
+        .unwrap_or_else(|| value.trim().trim_matches('/').replace('\\', "/")))
+}
+
+fn create_knowledge_target_error() -> MemoError {
+    MemoError {
+        code: ErrorCode::InvalidArgument,
+        message: "create_knowledge requires either 'path' or legacy 'title'. Recommended: use docs-style input with 'path' + 'content'; 'metadata.title' is optional.".to_string(),
+        retry_after_ms: None,
+        context: None,
+    }
+}
+
 fn handle_get_editor_state(_args: Value) -> Result<String, MemoError> {
     use memoforge_core::editor_state::EditorState;
 
@@ -906,7 +936,9 @@ fn handle_list_knowledge(args: Value) -> Result<String, MemoError> {
         Some("L1") => LoadLevel::L1,
         _ => LoadLevel::L0,
     };
-    let category_id = optional_str_arg(&args, &["category_id", "path"]);
+    let category_id = optional_str_arg(&args, &["category_id", "path"])
+        .map(|value| canonicalize_category_reference(&kb_path, value))
+        .transpose()?;
     let tags = optional_string_array_arg(&args, &["tags"]);
     let limit = optional_usize_arg(&args, &["limit"]);
     let offset = optional_usize_arg(&args, &["offset"]);
@@ -914,7 +946,7 @@ fn handle_list_knowledge(args: Value) -> Result<String, MemoError> {
     let knowledge = memoforge_core::list_knowledge(
         &kb_path,
         level,
-        category_id,
+        category_id.as_deref(),
         tags.as_deref(),
         limit,
         offset,
@@ -951,14 +983,19 @@ fn handle_get_content(args: Value) -> Result<String, MemoError> {
     let id = required_str_arg(&args, &["path", "id"])?;
     let full_content = memoforge_core::get_content(&kb_path, id, None)?;
     let sections = split_sections(&full_content);
-    let section_titles = sections.iter().map(|section| section.title.clone()).collect::<Vec<_>>();
+    let section_titles = sections
+        .iter()
+        .map(|section| section.title.clone())
+        .collect::<Vec<_>>();
     let section_arg = extract_section_argument(&args);
     let content = if let Some(section_value) = section_arg {
         if let Ok(section_index) = section_value.parse::<usize>() {
             sections
                 .get(section_index)
                 .map(|section| section.content.clone())
-                .ok_or_else(|| invalid_arg(format!("Section index out of range: {}", section_index)))?
+                .ok_or_else(|| {
+                    invalid_arg(format!("Section index out of range: {}", section_index))
+                })?
         } else {
             memoforge_core::get_content(&kb_path, id, Some(&section_value))?
         }
@@ -1034,10 +1071,12 @@ fn handle_create_knowledge(args: Value) -> Result<String, MemoError> {
         .to_string());
     }
 
-    let title = required_str_arg(&args, &["title"])?;
+    let title = optional_str_arg(&args, &["title"]).ok_or_else(create_knowledge_target_error)?;
     let content = required_str_arg(&args, &["content"])?;
     let tags = optional_string_array_arg(&args, &["tags"]).unwrap_or_default();
-    let category = optional_str_arg(&args, &["category_id"]).map(String::from);
+    let category = optional_str_arg(&args, &["category_id"])
+        .map(|value| canonicalize_category_reference(&kb_path, value))
+        .transpose()?;
     let summary = optional_str_arg(&args, &["summary"]).map(String::from);
 
     let path = memoforge_core::create_knowledge(&kb_path, title, content, tags, category, summary)?;
@@ -1052,11 +1091,21 @@ fn handle_update_knowledge(args: Value) -> Result<String, MemoError> {
     let tags = metadata_string_array_arg(&args, "tags")
         .or_else(|| optional_string_array_arg(&args, &["tags"]));
     let category = metadata_str_arg(&args, "category")
-        .or_else(|| optional_str_arg(&args, &["category", "category_id"]));
+        .or_else(|| optional_str_arg(&args, &["category", "category_id"]))
+        .map(|value| canonicalize_category_reference(&kb_path, value))
+        .transpose()?;
     let summary =
         metadata_str_arg(&args, "summary").or_else(|| optional_str_arg(&args, &["summary"]));
 
-    memoforge_core::update_knowledge(&kb_path, id, title, content, tags, category, summary)?;
+    memoforge_core::update_knowledge(
+        &kb_path,
+        id,
+        title,
+        content,
+        tags,
+        category.as_deref(),
+        summary,
+    )?;
     Ok(json!({ "updated": true, "path": id }).to_string())
 }
 
@@ -1103,8 +1152,11 @@ fn handle_move_knowledge(args: Value) -> Result<String, MemoError> {
     let display_target = if let Some(target) = move_target {
         let normalized_target = normalize_relative_path(target);
         if dry_run {
-            let preview =
-                memoforge_core::preview_move_knowledge_to_path(&kb_path, source, &normalized_target)?;
+            let preview = memoforge_core::preview_move_knowledge_to_path(
+                &kb_path,
+                source,
+                &normalized_target,
+            )?;
             return Ok(json!({
                 "dry_run": true,
                 "from": preview.old_path,
@@ -1118,9 +1170,12 @@ fn handle_move_knowledge(args: Value) -> Result<String, MemoError> {
         memoforge_core::move_knowledge_to_path(&kb_path, source, &normalized_target)?;
         normalized_target
     } else {
-        let category = required_str_arg(&args, &["new_category_id"])?;
+        let category = canonicalize_category_reference(
+            &kb_path,
+            required_str_arg(&args, &["new_category_id"])?,
+        )?;
         if dry_run {
-            let preview = memoforge_core::preview_move_knowledge(&kb_path, source, category)?;
+            let preview = memoforge_core::preview_move_knowledge(&kb_path, source, &category)?;
             return Ok(json!({
                 "dry_run": true,
                 "from": preview.old_path,
@@ -1131,8 +1186,8 @@ fn handle_move_knowledge(args: Value) -> Result<String, MemoError> {
             .to_string());
         }
 
-        let preview = memoforge_core::preview_move_knowledge(&kb_path, source, category)?;
-        memoforge_core::move_knowledge(&kb_path, source, category)?;
+        let preview = memoforge_core::preview_move_knowledge(&kb_path, source, &category)?;
+        memoforge_core::move_knowledge(&kb_path, source, &category)?;
         preview.new_path
     };
 
@@ -1148,7 +1203,9 @@ fn handle_grep(args: Value) -> Result<String, MemoError> {
     let kb_path = get_kb_path()?;
     let query = required_str_arg(&args, &["pattern", "query"])?;
     let tags = optional_string_array_arg(&args, &["tags"]);
-    let category_id = optional_str_arg(&args, &["path", "category_id"]);
+    let category_id = optional_str_arg(&args, &["path", "category_id"])
+        .map(|value| canonicalize_category_reference(&kb_path, value))
+        .transpose()?;
     let limit = optional_usize_arg(&args, &["limit"]).or_else(|| {
         args.get("options")
             .and_then(|value| value.get("max_results"))
@@ -1156,13 +1213,34 @@ fn handle_grep(args: Value) -> Result<String, MemoError> {
             .map(|value| value as usize)
     });
 
-    let results = memoforge_core::grep(&kb_path, query, tags.as_deref(), category_id, limit)?;
+    let results =
+        memoforge_core::grep(&kb_path, query, tags.as_deref(), category_id.as_deref(), limit)?;
     Ok(json!({ "results": results, "total": results.len() }).to_string())
 }
 
 fn handle_list_categories(_args: Value) -> Result<String, MemoError> {
     let kb_path = get_kb_path()?;
-    let categories = memoforge_core::list_categories(&kb_path)?;
+    let counts = memoforge_core::list_categories(&kb_path)?
+        .into_iter()
+        .map(|category| (category.id, category.count.unwrap_or(0)))
+        .collect::<std::collections::HashMap<_, _>>();
+    let config = load_config(&kb_path)?;
+
+    let categories = config
+        .categories
+        .into_iter()
+        .map(|category| {
+            json!({
+                "id": category.id,
+                "name": category.name,
+                "label": category.name,
+                "path": category.path,
+                "parent_id": category.parent_id,
+                "description": category.description,
+                "count": counts.get(&category.id).copied().unwrap_or(0)
+            })
+        })
+        .collect::<Vec<_>>();
     Ok(json!({ "categories": categories }).to_string())
 }
 
@@ -1171,10 +1249,16 @@ fn handle_create_category(args: Value) -> Result<String, MemoError> {
     let description = optional_str_arg(&args, &["description"]).map(String::from);
 
     if let Some(path) = optional_str_arg(&args, &["path"]) {
-        let category_id = memoforge_core::create_category(&kb_path, path, None, description.clone())?;
+        let category_id =
+            memoforge_core::create_category(&kb_path, path, None, description.clone())?;
         if let Some(label) = optional_str_arg(&args, &["label"]) {
             if label != path {
-                memoforge_core::update_category(&kb_path, &category_id, Some(label), description.as_deref())?;
+                memoforge_core::update_category(
+                    &kb_path,
+                    &category_id,
+                    Some(label),
+                    description.as_deref(),
+                )?;
             }
         }
         return Ok(json!({ "created": true, "id": category_id, "path": path }).to_string());
@@ -1228,7 +1312,12 @@ fn handle_get_config(_args: Value) -> Result<String, MemoError> {
         .metadata
         .as_ref()
         .map(|metadata| metadata.name.clone())
-        .or_else(|| kb_path.file_name().and_then(|value| value.to_str()).map(String::from))
+        .or_else(|| {
+            kb_path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .map(String::from)
+        })
         .unwrap_or_else(|| "knowledge-base".to_string());
 
     let categories = config
@@ -1301,7 +1390,8 @@ fn handle_git_commit(args: Value) -> Result<String, MemoError> {
     let pending_files = memoforge_core::git::git_status(&kb_path).unwrap_or_default();
 
     memoforge_core::git::git_commit(&kb_path, message)?;
-    let _ = memoforge_core::log_git_commit(&kb_path, EventSource::Mcp, message, pending_files.len());
+    let _ =
+        memoforge_core::log_git_commit(&kb_path, EventSource::Mcp, message, pending_files.len());
     let latest_commit = memoforge_core::git::git_log(&kb_path, 1)?
         .into_iter()
         .next();
@@ -1340,4 +1430,77 @@ fn handle_git_log(args: Value) -> Result<String, MemoError> {
     let limit = optional_usize_arg(&args, &["limit"]).unwrap_or(10);
     let commits = memoforge_core::git::git_log(&kb_path, limit)?;
     Ok(json!({ "commits": commits }).to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_temp_kb<T>(test_fn: impl FnOnce(&TempDir) -> T) -> T {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let temp = TempDir::new().unwrap();
+        memoforge_core::init::init_new(temp.path(), false).unwrap();
+        set_mode("bound".to_string());
+        set_kb_path(temp.path().to_path_buf());
+        test_fn(&temp)
+    }
+
+    #[test]
+    fn create_knowledge_schema_requires_path_or_title() {
+        let tools = list_tools();
+        let create_tool = tools
+            .into_iter()
+            .find(|tool| tool.get("name") == Some(&Value::String("create_knowledge".to_string())))
+            .unwrap();
+
+        let description = create_tool
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap();
+        assert!(description.contains("Preferred docs-style call"));
+
+        let schema = create_tool.get("inputSchema").unwrap();
+        let one_of = schema
+            .get("oneOf")
+            .and_then(Value::as_array)
+            .unwrap();
+        assert!(one_of.contains(&json!({ "required": ["path"] })));
+        assert!(one_of.contains(&json!({ "required": ["title"] })));
+    }
+
+    #[test]
+    fn create_knowledge_returns_guidance_when_path_and_title_are_missing() {
+        with_temp_kb(|_| {
+            let error = handle_create_knowledge(json!({
+                "content": "# Missing target"
+            }))
+            .unwrap_err();
+
+            assert_eq!(error.code, ErrorCode::InvalidArgument);
+            assert!(error.message.contains("either 'path' or legacy 'title'"));
+        });
+    }
+
+    #[test]
+    fn create_knowledge_resolves_category_id_to_category_path() {
+        with_temp_kb(|temp| {
+            let category_id =
+                memoforge_core::create_category(temp.path(), "devops", None, None).unwrap();
+
+            let result = handle_create_knowledge(json!({
+                "title": "Category Id Write",
+                "content": "# Category Id Write\n\nLegacy write using category id.",
+                "category_id": category_id
+            }))
+            .unwrap();
+            let payload: Value = serde_json::from_str(&result).unwrap();
+            let path = payload.get("path").and_then(Value::as_str).unwrap();
+
+            assert!(path.starts_with("devops/"), "{path}");
+            assert!(!path.contains("/devops/devops"));
+        });
+    }
 }

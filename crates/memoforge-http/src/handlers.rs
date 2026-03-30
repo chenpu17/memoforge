@@ -14,9 +14,9 @@ use crate::AppState;
 /// Validate KB path to prevent path traversal attacks
 fn validate_kb_path(path: &std::path::Path) -> std::result::Result<(), HttpError> {
     // Get canonicalized path (resolves .. and symlinks)
-    let canonical = path.canonicalize().map_err(|e| {
-        HttpError::BadRequest(format!("Invalid path: {}", e))
-    })?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|e| HttpError::BadRequest(format!("Invalid path: {}", e)))?;
 
     let path_str = canonical.to_string_lossy();
 
@@ -24,7 +24,9 @@ fn validate_kb_path(path: &std::path::Path) -> std::result::Result<(), HttpError
     let blocked_prefixes = ["/etc", "/sys", "/proc", "/dev", "/root"];
     for prefix in blocked_prefixes {
         if path_str.starts_with(prefix) || path_str.contains(&format!("{}/", prefix)) {
-            return Err(HttpError::BadRequest("Access to system directories is not allowed".to_string()));
+            return Err(HttpError::BadRequest(
+                "Access to system directories is not allowed".to_string(),
+            ));
         }
     }
 
@@ -34,29 +36,30 @@ fn validate_kb_path(path: &std::path::Path) -> std::result::Result<(), HttpError
             && !path_str.starts_with("/tmp")
             && !path_str.starts_with("/var/folders")
             && !path_str.starts_with("/private/var/folders")
-            && !path_str.starts_with("/Users") {  // macOS home directories
+            && !path_str.starts_with("/Users")
+        {
+            // macOS home directories
             return Err(HttpError::BadRequest(
-                "Path must be within home directory or allowed temp directories".to_string()
+                "Path must be within home directory or allowed temp directories".to_string(),
             ));
         }
     }
 
     Ok(())
 }
-use memoforge_core::{
-    Category, Knowledge, KnowledgeWithStale, LoadLevel, GrepMatch, DeletePreview, MovePreview,
-    BacklinksResult, RelatedResult, KnowledgeGraph, ImportOptions, ImportStats, KnowledgeBaseInfo,
-    list_knowledge, get_knowledge_by_id, get_knowledge_with_stale,
-    create_knowledge, update_knowledge, delete_knowledge, move_knowledge,
-    list_categories, create_category, update_category, delete_category,
-    get_tags, get_tags_with_counts, get_status, search_knowledge, grep,
-    preview_delete_knowledge, preview_move_knowledge,
-    get_backlinks, get_related,
-    get_knowledge_graph,
-    import::{import_markdown_folder, preview_import},
-    registry::{list_knowledge_bases, get_current_kb, switch_kb, register_kb, unregister_kb},
-};
 use memoforge_core::git::{git_commit, git_pull, git_push, git_status};
+use memoforge_core::{
+    complete_knowledge_links, create_category, create_knowledge, delete_category, delete_knowledge,
+    get_backlinks, get_knowledge_by_id, get_knowledge_graph, get_knowledge_with_stale, get_related,
+    get_status, get_tags, get_tags_with_counts, grep,
+    import::{import_markdown_folder, preview_import},
+    list_categories, list_knowledge, move_knowledge, preview_delete_knowledge,
+    preview_move_knowledge,
+    registry::{get_current_kb, list_knowledge_bases, register_kb, switch_kb, unregister_kb},
+    search_knowledge, update_category, update_knowledge, BacklinksResult, Category, DeletePreview,
+    GrepMatch, ImportOptions, ImportStats, Knowledge, KnowledgeBaseInfo, KnowledgeGraph,
+    KnowledgeLinkCompletion, KnowledgeWithStale, LoadLevel, MovePreview, RelatedResult,
+};
 
 // ============================================================================
 // Query Parameters
@@ -92,20 +95,31 @@ pub struct SearchQuery {
 
 impl SearchQuery {
     fn get_tags(&self) -> Option<Vec<String>> {
-        self.tags.as_ref().map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+        self.tags
+            .as_ref()
+            .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KnowledgeLinkCompletionQuery {
+    pub query: Option<String>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct GrepQuery {
     pub query: String,
     pub tags: Option<String>, // Comma-separated
+    pub category_id: Option<String>,
     pub limit: Option<usize>,
 }
 
 impl GrepQuery {
     fn get_tags(&self) -> Option<Vec<String>> {
-        self.tags.as_ref().map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+        self.tags
+            .as_ref()
+            .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
     }
 }
 
@@ -253,9 +267,7 @@ pub struct SwitchKbBody {
 // ============================================================================
 
 /// GET /api/status - Get knowledge base status
-pub async fn get_status_handler(
-    State(state): State<AppState>,
-) -> Result<Json<StatusResponse>> {
+pub async fn get_status_handler(State(state): State<AppState>) -> Result<Json<StatusResponse>> {
     let Ok(kb_path) = state.get_kb_path().await else {
         return Ok(Json(StatusResponse {
             initialized: false,
@@ -266,8 +278,8 @@ pub async fn get_status_handler(
         }));
     };
 
-    let (knowledge_count, category_count, git_initialized) = get_status(&kb_path)
-        .map_err(HttpError::from)?;
+    let (knowledge_count, category_count, git_initialized) =
+        get_status(&kb_path).map_err(HttpError::from)?;
 
     Ok(Json(StatusResponse {
         initialized: true,
@@ -298,7 +310,8 @@ pub async fn list_knowledge_handler(
         query.get_tags().as_deref(),
         query.limit,
         query.offset,
-    ).map_err(HttpError::from)?;
+    )
+    .map_err(HttpError::from)?;
 
     Ok(Json(KnowledgeListResponse {
         items: knowledge.items,
@@ -313,8 +326,7 @@ pub async fn get_knowledge_handler(
 ) -> Result<Json<Knowledge>> {
     let kb_path = state.get_kb_path().await?;
 
-    let knowledge = get_knowledge_by_id(&kb_path, &id, LoadLevel::L2)
-        .map_err(HttpError::from)?;
+    let knowledge = get_knowledge_by_id(&kb_path, &id, LoadLevel::L2).map_err(HttpError::from)?;
 
     Ok(Json(knowledge))
 }
@@ -331,8 +343,7 @@ pub async fn get_knowledge_item_handler(
         _ => LoadLevel::L2,
     };
 
-    let knowledge = get_knowledge_by_id(&kb_path, &query.id, level)
-        .map_err(HttpError::from)?;
+    let knowledge = get_knowledge_by_id(&kb_path, &query.id, level).map_err(HttpError::from)?;
 
     Ok(Json(knowledge))
 }
@@ -344,8 +355,7 @@ pub async fn get_knowledge_with_stale_handler(
 ) -> Result<Json<KnowledgeWithStale>> {
     let kb_path = state.get_kb_path().await?;
 
-    let result = get_knowledge_with_stale(&kb_path, &id)
-        .map_err(HttpError::from)?;
+    let result = get_knowledge_with_stale(&kb_path, &id).map_err(HttpError::from)?;
 
     Ok(Json(result))
 }
@@ -357,8 +367,7 @@ pub async fn get_knowledge_stale_item_handler(
 ) -> Result<Json<KnowledgeWithStale>> {
     let kb_path = state.get_kb_path().await?;
 
-    let result = get_knowledge_with_stale(&kb_path, &query.id)
-        .map_err(HttpError::from)?;
+    let result = get_knowledge_with_stale(&kb_path, &query.id).map_err(HttpError::from)?;
 
     Ok(Json(result))
 }
@@ -382,7 +391,8 @@ pub async fn create_knowledge_handler(
         body.tags.unwrap_or_default(),
         body.category_id,
         body.summary,
-    ).map_err(HttpError::from)?;
+    )
+    .map_err(HttpError::from)?;
 
     Ok(Json(CreateResponse { id, created: true }))
 }
@@ -408,7 +418,8 @@ pub async fn update_knowledge_handler(
         body.tags,
         body.category.as_deref(),
         body.summary.as_deref(),
-    ).map_err(HttpError::from)?;
+    )
+    .map_err(HttpError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -433,7 +444,8 @@ pub async fn update_knowledge_item_handler(
         body.tags,
         body.category.as_deref(),
         body.summary.as_deref(),
-    ).map_err(HttpError::from)?;
+    )
+    .map_err(HttpError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -494,12 +506,8 @@ pub async fn create_category_handler(
 
     let kb_path = state.get_kb_path().await?;
 
-    let id = create_category(
-        &kb_path,
-        &body.name,
-        body.parent_id,
-        body.description,
-    ).map_err(HttpError::from)?;
+    let id = create_category(&kb_path, &body.name, body.parent_id, body.description)
+        .map_err(HttpError::from)?;
 
     Ok(Json(CreateResponse { id, created: true }))
 }
@@ -522,7 +530,8 @@ pub async fn update_category_handler(
         &id,
         body.name.as_deref(),
         body.description.as_deref(),
-    ).map_err(HttpError::from)?;
+    )
+    .map_err(HttpError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -551,8 +560,7 @@ pub async fn get_tags_handler(
 ) -> Result<Json<TagsResponse>> {
     let kb_path = state.get_kb_path().await?;
 
-    let tags = get_tags(&kb_path, query.prefix.as_deref())
-        .map_err(HttpError::from)?;
+    let tags = get_tags(&kb_path, query.prefix.as_deref()).map_err(HttpError::from)?;
 
     Ok(Json(TagsResponse {
         total: tags.len(),
@@ -566,12 +574,12 @@ pub async fn get_tags_with_counts_handler(
 ) -> Result<Json<TagsWithCountsResponse>> {
     let kb_path = state.get_kb_path().await?;
 
-    let tags_with_counts = get_tags_with_counts(&kb_path)
-        .map_err(HttpError::from)?;
+    let tags_with_counts = get_tags_with_counts(&kb_path).map_err(HttpError::from)?;
 
     Ok(Json(TagsWithCountsResponse {
         total: tags_with_counts.len(),
-        tags: tags_with_counts.into_iter()
+        tags: tags_with_counts
+            .into_iter()
             .map(|(tag, count)| TagWithCount { tag, count })
             .collect(),
     }))
@@ -590,12 +598,27 @@ pub async fn search_handler(
         query.get_tags().as_deref(),
         None,
         query.limit,
-    ).map_err(HttpError::from)?;
+    )
+    .map_err(HttpError::from)?;
 
     Ok(Json(KnowledgeListResponse {
         items: results,
         total: 0, // Search doesn't return total
     }))
+}
+
+/// GET /api/knowledge/link-completions - Complete wiki links
+pub async fn complete_knowledge_links_handler(
+    State(state): State<AppState>,
+    Query(query): Query<KnowledgeLinkCompletionQuery>,
+) -> Result<Json<Vec<KnowledgeLinkCompletion>>> {
+    let kb_path = state.get_kb_path().await?;
+
+    let results =
+        complete_knowledge_links(&kb_path, query.query.as_deref().unwrap_or(""), query.limit)
+            .map_err(HttpError::from)?;
+
+    Ok(Json(results))
 }
 
 /// GET /api/grep - Grep knowledge content
@@ -609,9 +632,10 @@ pub async fn grep_handler(
         &kb_path,
         &query.query,
         query.get_tags().as_deref(),
-        None,
+        query.category_id.as_deref(),
         query.limit,
-    ).map_err(HttpError::from)?;
+    )
+    .map_err(HttpError::from)?;
 
     Ok(Json(GrepResponse {
         total: results.len(),
@@ -658,9 +682,7 @@ pub async fn init_kb_handler(
 }
 
 /// GET /api/git/status - Get git status
-pub async fn git_status_handler(
-    State(state): State<AppState>,
-) -> Result<Json<GitStatusResponse>> {
+pub async fn git_status_handler(State(state): State<AppState>) -> Result<Json<GitStatusResponse>> {
     let kb_path = state.get_kb_path().await?;
     let files = git_status(&kb_path).map_err(HttpError::from)?;
     Ok(Json(GitStatusResponse { files }))
@@ -681,9 +703,7 @@ pub async fn git_commit_handler(
 }
 
 /// POST /api/git/pull - Pull from remote
-pub async fn git_pull_handler(
-    State(state): State<AppState>,
-) -> Result<StatusCode> {
+pub async fn git_pull_handler(State(state): State<AppState>) -> Result<StatusCode> {
     if state.config.readonly {
         return Err(HttpError::Readonly);
     }
@@ -694,9 +714,7 @@ pub async fn git_pull_handler(
 }
 
 /// POST /api/git/push - Push to remote
-pub async fn git_push_handler(
-    State(state): State<AppState>,
-) -> Result<StatusCode> {
+pub async fn git_push_handler(State(state): State<AppState>) -> Result<StatusCode> {
     if state.config.readonly {
         return Err(HttpError::Readonly);
     }
@@ -763,8 +781,8 @@ pub async fn preview_move_knowledge_handler(
     Json(body): Json<MoveKnowledgeBody>,
 ) -> Result<Json<MovePreview>> {
     let kb_path = state.get_kb_path().await?;
-    let preview = preview_move_knowledge(&kb_path, &id, &body.new_category_id)
-        .map_err(HttpError::from)?;
+    let preview =
+        preview_move_knowledge(&kb_path, &id, &body.new_category_id).map_err(HttpError::from)?;
     Ok(Json(preview))
 }
 
@@ -855,8 +873,9 @@ pub async fn import_folder_handler(
         auto_categories: body.auto_categories,
         dry_run: body.dry_run,
     };
-    let stats = import_markdown_folder(&kb_path, PathBuf::from(body.source_path).as_path(), options)
-        .map_err(|e| HttpError::Internal(e.to_string()))?;
+    let stats =
+        import_markdown_folder(&kb_path, PathBuf::from(body.source_path).as_path(), options)
+            .map_err(|e| HttpError::Internal(e.to_string()))?;
     Ok(Json(stats))
 }
 
@@ -887,9 +906,7 @@ pub async fn switch_kb_handler(
 }
 
 /// POST /api/kb/unregister - Unregister a knowledge base
-pub async fn unregister_kb_handler(
-    Json(body): Json<SwitchKbBody>,
-) -> Result<StatusCode> {
+pub async fn unregister_kb_handler(Json(body): Json<SwitchKbBody>) -> Result<StatusCode> {
     unregister_kb(&body.path).map_err(HttpError::from)?;
     Ok(StatusCode::NO_CONTENT)
 }

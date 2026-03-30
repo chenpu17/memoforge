@@ -1,21 +1,39 @@
 import React, { useState } from 'react'
+import { shallow } from 'zustand/shallow'
 import { X, Plus } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { tauriService } from '../services/tauri'
+import { useKnowledgeNavigation } from '../hooks/useKnowledgeNavigation'
 
 interface NewKnowledgeModalProps {
   onClose: () => void
+  initialTitle?: string
+  initialCategory?: string
+  categoryHint?: string
+  onCreated?: (knowledgeId: string) => void | Promise<void>
 }
 
-export const NewKnowledgeModal: React.FC<NewKnowledgeModalProps> = ({ onClose }) => {
+export const NewKnowledgeModal: React.FC<NewKnowledgeModalProps> = ({
+  onClose,
+  initialTitle = '',
+  initialCategory = '',
+  categoryHint,
+  onCreated,
+}) => {
+  const { confirmDiscardIfNeeded } = useKnowledgeNavigation()
   const [step, setStep] = useState(1)
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('')
+  const [title, setTitle] = useState(initialTitle)
+  const [category, setCategory] = useState(initialCategory)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
-  const { setCurrentKnowledge, setKnowledgeList } = useAppStore()
+  const { setCurrentKnowledge, setKnowledgeList } = useAppStore((state) => ({
+    setCurrentKnowledge: state.setCurrentKnowledge,
+    setKnowledgeList: state.setKnowledgeList,
+  }), shallow)
 
   const handleCreate = async () => {
+    if (!confirmDiscardIfNeeded()) return
+
     try {
       const newKnowledge = {
         id: '',
@@ -32,6 +50,7 @@ export const NewKnowledgeModal: React.FC<NewKnowledgeModalProps> = ({ onClose })
 
       const knowledgeList = await tauriService.listKnowledge(1)
       setKnowledgeList(knowledgeList.items)
+      await onCreated?.(createdId)
 
       onClose()
     } catch (error) {
@@ -105,6 +124,11 @@ export const NewKnowledgeModal: React.FC<NewKnowledgeModalProps> = ({ onClose })
                   className="w-full px-3 py-2 text-sm border rounded-md outline-none focus:border-indigo-500"
                   style={{ borderColor: '#E5E5E5' }}
                 />
+                {categoryHint && (
+                  <div className="mt-2 rounded-lg border px-3 py-2 text-[12px]" style={{ borderColor: '#E5E7EB', backgroundColor: '#FAFAFA', color: '#64748B' }}>
+                    {categoryHint}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: '#737373' }}>标签</label>

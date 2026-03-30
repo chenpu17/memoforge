@@ -1,4 +1,4 @@
-import type { Category, Knowledge, KnowledgeWithStale, GrepMatch, PaginatedKnowledge } from '../types'
+import type { Category, Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, GrepMatch, PaginatedKnowledge } from '../types'
 import { getHttpService, initHttpService } from './http'
 
 const runtimeEnv = ((import.meta as unknown as { env?: Record<string, string | undefined> }).env) || {}
@@ -53,6 +53,13 @@ export const tauriService = {
   async startWindowDrag(): Promise<void> {
     if (isTauriEnv()) {
       return invoke('start_window_drag_cmd')
+    }
+  },
+
+  async toggleWindowMaximize(): Promise<void> {
+    if (isTauriEnv()) {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      await getCurrentWindow().toggleMaximize()
     }
   },
 
@@ -151,11 +158,18 @@ export const tauriService = {
     return getHttpClient().searchKnowledge(query, tags)
   },
 
-  async grep(query: string, tags?: string[], limit?: number): Promise<GrepMatch[]> {
+  async completeKnowledgeLinks(query: string, limit?: number): Promise<KnowledgeLinkCompletion[]> {
     if (isTauriEnv()) {
-      return invoke('grep_cmd', { query, tags, limit: limit || 50 })
+      return invoke('complete_knowledge_links_cmd', { query, limit })
     }
-    return getHttpClient().grep(query, tags, limit)
+    return getHttpClient().completeKnowledgeLinks(query, limit)
+  },
+
+  async grep(query: string, tags?: string[], limit?: number, categoryId?: string): Promise<GrepMatch[]> {
+    if (isTauriEnv()) {
+      return invoke('grep_cmd', { query, tags, categoryId, limit: limit || 50 })
+    }
+    return getHttpClient().grep(query, tags, limit, categoryId)
   },
 
   async getCategories(): Promise<Category[]> {
@@ -303,6 +317,16 @@ export const tauriService = {
     }
     // HTTP 模式不支持文件选择器
     return null
+  },
+
+  async importAssets(
+    knowledgeId: string,
+    assets: Array<{ fileName: string; mimeType?: string; bytes: number[] }>
+  ): Promise<Array<{ file_name: string; relative_path: string; markdown: string; reused: boolean }>> {
+    if (isTauriEnv()) {
+      return invoke('import_assets_cmd', { knowledgeId, assets })
+    }
+    throw new Error('HTTP 模式暂不支持自动导入素材')
   },
 
   // Preview operations for dry_run mode

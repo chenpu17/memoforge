@@ -2,12 +2,12 @@
 //!
 //! Scan a directory for .md files and generate frontmatter for files that don't have it.
 
-use crate::*;
 use crate::config::{load_config, save_config, CategoryConfig};
 use crate::fs::write_knowledge_file;
+use crate::*;
+use chrono::{DateTime, Utc};
 use std::fs;
 use std::path::Path;
-use chrono::{DateTime, Utc};
 
 /// Result of importing a single file
 #[derive(Debug, Clone, serde::Serialize)]
@@ -56,18 +56,21 @@ fn title_from_filename(path: &Path) -> String {
         .map(|s| {
             // Replace dashes and underscores with spaces
             s.replace('-', " ")
-             .replace('_', " ")
-             // Split on capital letters for camelCase
-             .split_whitespace()
-             .map(|word| {
-                 let mut chars = word.chars();
-                 match chars.next() {
-                     Some(c) => c.to_uppercase().collect::<String>() + chars.as_str().to_lowercase().as_str(),
-                     None => String::new(),
-                 }
-             })
-             .collect::<Vec<_>>()
-             .join(" ")
+                .replace('_', " ")
+                // Split on capital letters for camelCase
+                .split_whitespace()
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        Some(c) => {
+                            c.to_uppercase().collect::<String>()
+                                + chars.as_str().to_lowercase().as_str()
+                        }
+                        None => String::new(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
         })
         .unwrap_or_else(|| "Untitled".to_string())
 }
@@ -93,7 +96,8 @@ fn import_file(
     options: &ImportOptions,
 ) -> std::io::Result<ImportResult> {
     let content = fs::read_to_string(file_path)?;
-    let relative_path = file_path.strip_prefix(source_root)
+    let relative_path = file_path
+        .strip_prefix(source_root)
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| file_path.to_string_lossy().to_string());
     let target_path = kb_path.join(&relative_path);
@@ -111,7 +115,8 @@ fn import_file(
             .and_then(|c| c.as_os_str().to_str())
             .map(|s| s.to_string());
 
-        let id = file_path.file_stem()
+        let id = file_path
+            .file_stem()
             .and_then(|s| s.to_str())
             .map(|s| s.to_string())
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -164,9 +169,7 @@ fn collect_markdown_files(dir: &Path) -> std::io::Result<Vec<std::path::PathBuf>
 
         // Skip hidden directories and .git, .memoforge
         if path.is_dir() {
-            let name = path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("");
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if !name.starts_with('.') {
                 files.extend(collect_markdown_files(&path)?);
             }
@@ -191,7 +194,8 @@ fn get_top_level_dirs(dir: &Path) -> std::io::Result<Vec<String>> {
         let path = entry.path();
 
         if path.is_dir() {
-            let name = path.file_name()
+            let name = path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .map(|s| s.to_string())
                 .unwrap_or_default();
@@ -227,7 +231,8 @@ pub fn import_markdown_folder(
     // Auto-register categories if enabled
     if options.auto_categories && !options.dry_run {
         let top_dirs = get_top_level_dirs(source_path)?;
-        let mut config = load_config(kb_path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let mut config =
+            load_config(kb_path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         for dir_name in top_dirs {
             // Check if category already exists
@@ -245,7 +250,8 @@ pub fn import_markdown_folder(
             }
         }
 
-        save_config(kb_path, &config).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        save_config(kb_path, &config)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
     }
 
     // Process each file
@@ -270,10 +276,7 @@ pub fn import_markdown_folder(
 }
 
 /// Preview import without making changes
-pub fn preview_import(
-    kb_path: &Path,
-    source_path: &Path,
-) -> std::io::Result<ImportStats> {
+pub fn preview_import(kb_path: &Path, source_path: &Path) -> std::io::Result<ImportStats> {
     let options = ImportOptions {
         generate_frontmatter: true,
         auto_categories: true,

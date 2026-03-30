@@ -7,6 +7,6 @@ pub mod tools;
 
 // Re-export commonly used types for Tauri integration
 pub use sse::{
-    start_sse_server, McpServerConfig, McpServerState,
-    EditorStateSnapshot, DesktopInfo, ActiveAgent, CurrentKb, CurrentKnowledge, Selection,
+    start_sse_server, ActiveAgent, CurrentKb, CurrentKnowledge, DesktopInfo, EditorStateSnapshot,
+    McpServerConfig, McpServerState, Selection,
 };

@@ -70,7 +70,10 @@ pub fn parse_wiki_links(content: &str) -> Vec<(String, Option<String>, usize)> {
 
     for (line_num, line) in content.lines().enumerate() {
         for cap in re.captures_iter(line) {
-            let link_text = cap.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+            let link_text = cap
+                .get(1)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
             let display_text = cap.get(2).map(|m| m.as_str().to_string());
             links.push((link_text, display_text, line_num + 1));
         }
@@ -82,10 +85,7 @@ pub fn parse_wiki_links(content: &str) -> Vec<(String, Option<String>, usize)> {
 /// 将链接文本解析为可能的知识 ID
 fn resolve_link_to_knowledge_id(link_text: &str, kb_path: &Path) -> Option<String> {
     // 尝试直接匹配文件名
-    let candidates = vec![
-        link_text.to_string(),
-        format!("{}.md", link_text),
-    ];
+    let candidates = vec![link_text.to_string(), format!("{}.md", link_text)];
 
     for candidate in candidates {
         let path = kb_path.join(&candidate);
@@ -160,10 +160,7 @@ fn collect_markdown_files(dir: &Path) -> Result<Vec<std::path::PathBuf>, MemoErr
 }
 
 /// 获取知识的正向链接（此知识链接到哪些其他知识）
-pub fn get_outgoing_links(
-    kb_path: &Path,
-    knowledge_id: &str,
-) -> Result<Vec<LinkInfo>, MemoError> {
+pub fn get_outgoing_links(kb_path: &Path, knowledge_id: &str) -> Result<Vec<LinkInfo>, MemoError> {
     // 修复：正确处理路径解析
     let mut path = kb_path.join(knowledge_id);
     if !path.exists() {
@@ -206,14 +203,13 @@ pub fn get_outgoing_links(
 }
 
 /// 获取知识的反向链接（哪些知识链接到此知识）
-pub fn get_backlinks(
-    kb_path: &Path,
-    knowledge_id: &str,
-) -> Result<BacklinksResult, MemoError> {
+pub fn get_backlinks(kb_path: &Path, knowledge_id: &str) -> Result<BacklinksResult, MemoError> {
     let target_path = kb_path.join(knowledge_id);
     let target_title = if target_path.exists() {
         let content = fs::read_to_string(&target_path).unwrap_or_default();
-        parse_frontmatter(&content).map(|(fm, _)| fm.title).unwrap_or_else(|_| knowledge_id.to_string())
+        parse_frontmatter(&content)
+            .map(|(fm, _)| fm.title)
+            .unwrap_or_else(|_| knowledge_id.to_string())
     } else {
         knowledge_id.to_string()
     };
@@ -231,7 +227,8 @@ pub fn get_backlinks(
     // 遍历所有知识，查找链接到此知识的条目
     let files = collect_markdown_files(kb_path)?;
     for file_path in files {
-        let relative = file_path.strip_prefix(kb_path)
+        let relative = file_path
+            .strip_prefix(kb_path)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
@@ -254,10 +251,12 @@ pub fn get_backlinks(
         for (link_text, display_text, line_number) in wiki_links {
             // 检查链接是否指向目标知识
             if target_variants.iter().any(|v| {
-                link_text == *v ||
-                link_text == v.trim_end_matches(".md") ||
-                resolve_link_to_knowledge_id(&link_text, kb_path).as_ref() == Some(&knowledge_id.to_string()) ||
-                resolve_link_to_knowledge_id(&link_text, kb_path).as_ref() == Some(&format!("{}.md", knowledge_id))
+                link_text == *v
+                    || link_text == v.trim_end_matches(".md")
+                    || resolve_link_to_knowledge_id(&link_text, kb_path).as_ref()
+                        == Some(&knowledge_id.to_string())
+                    || resolve_link_to_knowledge_id(&link_text, kb_path).as_ref()
+                        == Some(&format!("{}.md", knowledge_id))
             }) {
                 backlinks.push(LinkInfo {
                     source_id: relative.clone(),
@@ -278,10 +277,7 @@ pub fn get_backlinks(
 }
 
 /// 获取相关知识（正向链接 + 反向链接 + 共享标签）
-pub fn get_related(
-    kb_path: &Path,
-    knowledge_id: &str,
-) -> Result<RelatedResult, MemoError> {
+pub fn get_related(kb_path: &Path, knowledge_id: &str) -> Result<RelatedResult, MemoError> {
     let mut related_map: HashMap<String, RelatedKnowledge> = HashMap::new();
 
     // 获取当前知识
@@ -300,11 +296,13 @@ pub fn get_related(
     for link in outgoing {
         if let Ok(target_content) = fs::read_to_string(kb_path.join(&link.link_text)) {
             if let Ok((target_fm, _)) = parse_frontmatter(&target_content) {
-                related_map.entry(link.link_text.clone()).or_insert(RelatedKnowledge {
-                    id: link.link_text,
-                    title: target_fm.title,
-                    relation_type: RelationType::Outgoing,
-                });
+                related_map
+                    .entry(link.link_text.clone())
+                    .or_insert(RelatedKnowledge {
+                        id: link.link_text,
+                        title: target_fm.title,
+                        relation_type: RelationType::Outgoing,
+                    });
             }
         }
     }
@@ -314,11 +312,13 @@ pub fn get_related(
     for link in backlinks.backlinks {
         if let Ok(target_content) = fs::read_to_string(kb_path.join(&link.source_id)) {
             if let Ok((target_fm, _)) = parse_frontmatter(&target_content) {
-                related_map.entry(link.source_id.clone()).or_insert(RelatedKnowledge {
-                    id: link.source_id,
-                    title: target_fm.title,
-                    relation_type: RelationType::Incoming,
-                });
+                related_map
+                    .entry(link.source_id.clone())
+                    .or_insert(RelatedKnowledge {
+                        id: link.source_id,
+                        title: target_fm.title,
+                        relation_type: RelationType::Incoming,
+                    });
             }
         }
     }
@@ -326,7 +326,8 @@ pub fn get_related(
     // 3. 共享标签
     let files = collect_markdown_files(kb_path)?;
     for file_path in files {
-        let relative = file_path.strip_prefix(kb_path)
+        let relative = file_path
+            .strip_prefix(kb_path)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
@@ -341,11 +342,14 @@ pub fn get_related(
                 let shared = current_tags.intersection(&target_tags).count();
 
                 if shared > 0 && !related_map.contains_key(&relative) {
-                    related_map.insert(relative.clone(), RelatedKnowledge {
-                        id: relative,
-                        title: target_fm.title,
-                        relation_type: RelationType::SharedTags,
-                    });
+                    related_map.insert(
+                        relative.clone(),
+                        RelatedKnowledge {
+                            id: relative,
+                            title: target_fm.title,
+                            relation_type: RelationType::SharedTags,
+                        },
+                    );
                 }
             }
         }
@@ -407,8 +411,14 @@ pub fn update_references(
     let normalize_link_key = |value: &str| value.trim().trim_matches('/').replace('\\', "/");
     let old_path = normalize_link_key(old_path);
     let new_path = normalize_link_key(new_path);
-    let old_path_no_ext = old_path.strip_suffix(".md").unwrap_or(&old_path).to_string();
-    let new_path_no_ext = new_path.strip_suffix(".md").unwrap_or(&new_path).to_string();
+    let old_path_no_ext = old_path
+        .strip_suffix(".md")
+        .unwrap_or(&old_path)
+        .to_string();
+    let new_path_no_ext = new_path
+        .strip_suffix(".md")
+        .unwrap_or(&new_path)
+        .to_string();
     let old_file_name = Path::new(&old_path)
         .file_name()
         .and_then(|s| s.to_str())
@@ -443,13 +453,17 @@ pub fn update_references(
     // 遍历所有 markdown 文件
     let files = collect_markdown_files(kb_path)?;
     for file_path in files {
-        let relative = file_path.strip_prefix(kb_path)
+        let relative = file_path
+            .strip_prefix(kb_path)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
         // 跳过被移动的文件本身
-        if relative == old_path || relative == format!("{}.md", old_path) ||
-           relative == new_path || relative == format!("{}.md", new_path) {
+        if relative == old_path
+            || relative == format!("{}.md", old_path)
+            || relative == new_path
+            || relative == format!("{}.md", new_path)
+        {
             continue;
         }
 
@@ -482,10 +496,16 @@ pub fn update_references(
                         links_updated += 1;
                         format!("[[{}{}]]", value, display)
                     } else {
-                        caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string()
+                        caps.get(0)
+                            .map(|m| m.as_str())
+                            .unwrap_or_default()
+                            .to_string()
                     }
                 } else {
-                    caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string()
+                    caps.get(0)
+                        .map(|m| m.as_str())
+                        .unwrap_or_default()
+                        .to_string()
                 }
             })
             .to_string();
@@ -589,7 +609,10 @@ pub fn build_knowledge_graph(kb_path: &Path) -> Result<KnowledgeGraph, MemoError
 }
 
 /// 构建知识图谱（带选项）
-pub fn build_knowledge_graph_with_options(kb_path: &Path, options: GraphOptions) -> Result<KnowledgeGraph, MemoError> {
+pub fn build_knowledge_graph_with_options(
+    kb_path: &Path,
+    options: GraphOptions,
+) -> Result<KnowledgeGraph, MemoError> {
     let mut nodes: Vec<GraphNode> = Vec::new();
     let mut edges: Vec<GraphEdge> = Vec::new();
     let mut seen_edges: HashSet<(String, String, GraphRelationType)> = HashSet::new();
@@ -609,7 +632,8 @@ pub fn build_knowledge_graph_with_options(kb_path: &Path, options: GraphOptions)
             }
         }
 
-        let relative = file_path.strip_prefix(kb_path)
+        let relative = file_path
+            .strip_prefix(kb_path)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
@@ -643,7 +667,8 @@ pub fn build_knowledge_graph_with_options(kb_path: &Path, options: GraphOptions)
             break;
         }
 
-        let source_id = file_path.strip_prefix(kb_path)
+        let source_id = file_path
+            .strip_prefix(kb_path)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
@@ -664,7 +689,11 @@ pub fn build_knowledge_graph_with_options(kb_path: &Path, options: GraphOptions)
             }
 
             if let Some(target_id) = resolve_link_to_knowledge_id(&link_text, kb_path) {
-                let edge_key = (source_id.clone(), target_id.clone(), GraphRelationType::WikiLink);
+                let edge_key = (
+                    source_id.clone(),
+                    target_id.clone(),
+                    GraphRelationType::WikiLink,
+                );
                 if !seen_edges.contains(&edge_key) && knowledge_map.contains_key(&target_id) {
                     seen_edges.insert(edge_key.clone());
                     edges.push(GraphEdge {
@@ -683,7 +712,8 @@ pub fn build_knowledge_graph_with_options(kb_path: &Path, options: GraphOptions)
         let mut tag_index: HashMap<String, Vec<String>> = HashMap::new();
         for (id, (_, _, tags)) in &knowledge_map {
             for tag in tags {
-                tag_index.entry(tag.clone())
+                tag_index
+                    .entry(tag.clone())
                     .or_insert_with(Vec::new)
                     .push(id.clone());
             }

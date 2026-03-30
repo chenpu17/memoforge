@@ -1,14 +1,19 @@
-import React from 'react'
+import React, { useMemo } from 'react'
+import { shallow } from 'zustand/shallow'
 import { useAppStore } from '../stores/appStore'
-import { ChevronRight, ChevronDown, Search, GitBranch, Settings, Database, ChevronsUpDown, FolderInput, Bot } from 'lucide-react'
-import { cn } from '../lib/utils'
+import { Search, GitBranch, Settings, Database, ChevronsUpDown, FolderInput, Bot } from 'lucide-react'
 import { KbSwitcher } from './KbSwitcher'
 import { SettingsModal } from './SettingsModal'
 
 interface SidebarProps {
   onImport?: () => void
   onOpenSearch?: () => void
+  onOpenBrowserMode?: (mode: 'knowledge' | 'category' | 'tag') => void
+  onToggleTagShortcut?: (tag: string) => void
+  onClearFilters?: () => void
+  browserMode?: 'knowledge' | 'category' | 'tag'
   selectedCategory?: string | null
+  selectedTags?: string[]
   onSelectCategory?: (categoryId: string | null) => void
   pendingChangesCount?: number
   readonly?: boolean
@@ -20,7 +25,12 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   onImport,
   onOpenSearch,
+  onOpenBrowserMode,
+  onToggleTagShortcut,
+  onClearFilters,
+  browserMode = 'knowledge',
   selectedCategory = null,
+  selectedTags = [],
   onSelectCategory,
   pendingChangesCount = 0,
   readonly = false,
@@ -28,27 +38,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isGitRepo = true,
   mcpConnectionCount = 0,
 }) => {
-  const { categories, knowledgeList } = useAppStore()
-  const [expandedCategories, setExpandedCategories] = React.useState<Set<string>>(new Set())
+  const { categories, knowledgeList, allTags } = useAppStore((state) => ({
+    categories: state.categories ?? [],
+    knowledgeList: state.knowledgeList ?? [],
+    allTags: state.allTags ?? [],
+  }), shallow)
   const [showKbSwitcher, setShowKbSwitcher] = React.useState(false)
   const [showSettings, setShowSettings] = React.useState(false)
-
-  const toggleCategory = (catId: string) => {
-    const newExpanded = new Set(expandedCategories)
-    if (newExpanded.has(catId)) {
-      newExpanded.delete(catId)
-    } else {
-      newExpanded.add(catId)
-    }
-    setExpandedCategories(newExpanded)
-  }
-
-  const getCategoryCount = (catId: string, catName: string) => {
-    return knowledgeList.filter(k => {
-      const kCategory = k.category || ''
-      return kCategory === catId || kCategory === catName
-    }).length
-  }
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    knowledgeList.forEach((knowledge) => {
+      if (!knowledge.category) return
+      counts.set(knowledge.category, (counts.get(knowledge.category) ?? 0) + 1)
+    })
+    return counts
+  }, [knowledgeList])
+  const totalKnowledgeCount = useMemo(
+    () => categories.reduce((sum, category) => sum + (category.count ?? categoryCounts.get(category.id) ?? 0), 0),
+    [categories, categoryCounts],
+  )
+  const topCategories = useMemo(() => categories.slice().sort((left, right) => {
+    const leftCount = left.count ?? categoryCounts.get(left.id) ?? 0
+    const rightCount = right.count ?? categoryCounts.get(right.id) ?? 0
+    if (rightCount !== leftCount) return rightCount - leftCount
+    return left.name.localeCompare(right.name, 'zh-CN')
+  }).slice(0, 4), [categories, categoryCounts])
+  const topTags = useMemo(() => [...allTags]
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count
+      return left.tag.localeCompare(right.tag, 'zh-CN')
+    })
+    .slice(0, 6), [allTags])
+  const hasActiveFilters = selectedCategory !== null || selectedTags.length > 0
+  const showSelectedCategorySummary = selectedCategory !== null && browserMode !== 'category'
+  const showSelectedTagSummary = selectedTags.length > 0 && browserMode !== 'tag'
+  const showFilterSummary = showSelectedCategorySummary || showSelectedTagSummary
+  const showCategoryShortcuts = browserMode !== 'category'
+  const showTagShortcuts = browserMode !== 'tag'
+  const showShortcutSection = showCategoryShortcuts || showTagShortcuts
 
   return (
     <div className="flex flex-col h-full">
@@ -70,53 +97,161 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="h-px" style={{ backgroundColor: '#E5E5E5' }} />
 
-      {/* Categories Section */}
       <div className="flex-1 overflow-y-auto p-2">
-        <div className="mb-1 px-1 py-1">
-          <div className="text-[11px] font-medium" style={{ color: '#A3A3A3' }}>分类</div>
+        <div className="rounded-xl border bg-white p-2" style={{ borderColor: '#E5E7EB' }}>
+          <div className="mb-1 px-1 text-[11px] font-medium" style={{ color: '#A3A3A3' }}>
+            辅助入口
+          </div>
+          <div className="text-[11px] px-1" style={{ color: '#94A3B8' }}>
+            主浏览切换已放到中间区域，这里只保留常用辅助操作。
+          </div>
         </div>
 
-        {categories.map(cat => {
-          const isSelected = selectedCategory === cat.name
-          const isExpanded = expandedCategories.has(cat.id)
-          return (
-            <div key={cat.id}>
-              <div
-                className={cn(
-                  "flex items-center justify-between px-2 py-[5px] rounded-md cursor-pointer text-sm",
-                  isSelected ? "bg-[#EEF2FF]" : "hover:bg-[#F5F5F5]"
-                )}
-                onClick={() => {
-                  onSelectCategory?.(isSelected ? null : cat.name)
-                  toggleCategory(cat.id)
-                }}
-              >
-                <div className="flex items-center gap-1">
-                  {isExpanded ? (
-                    <ChevronDown className="h-3 w-3" style={{ color: isSelected ? '#4338CA' : '#737373' }} />
-                  ) : (
-                    <ChevronRight className="h-3 w-3" style={{ color: isSelected ? '#4338CA' : '#737373' }} />
-                  )}
-                  <span style={{ color: isSelected ? '#4338CA' : '#404040', fontWeight: isSelected ? 600 : 'normal' }}>{cat.name}</span>
-                </div>
-                <span
-                  className="text-[10px] px-1.5 min-w-[20px] h-5 flex items-center justify-center rounded-full"
-                  style={{
-                    backgroundColor: isSelected ? '#6366F1' : '#F5F5F5',
-                    color: isSelected ? '#FFFFFF' : '#737373'
-                  }}
-                >
-                  {cat.count ?? getCategoryCount(cat.id, cat.name)}
+        {hasActiveFilters && showFilterSummary && (
+          <div className="mt-2 rounded-xl border bg-[#FCFCFD] p-2" style={{ borderColor: '#E5E7EB' }}>
+            <div className="mb-1 px-1 text-[11px] font-medium" style={{ color: '#A3A3A3' }}>当前筛选</div>
+            <div className="flex flex-wrap gap-1.5">
+              {showSelectedCategorySummary && (
+                <span className="rounded-full bg-[#EEF2FF] px-2 py-1 text-[11px]" style={{ color: '#4338CA' }}>
+                  分类 · {categories.find((category) => category.id === selectedCategory)?.name ?? selectedCategory}
                 </span>
-              </div>
+              )}
+              {showSelectedTagSummary && selectedTags.map((tag) => (
+                <span key={tag} className="rounded-full bg-[#F5F3FF] px-2 py-1 text-[11px]" style={{ color: '#6D28D9' }}>
+                  标签 · {tag}
+                </span>
+              ))}
             </div>
-          )
-        })}
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="mt-2 w-full rounded-lg border px-2 py-2 text-xs font-medium"
+              style={{ borderColor: '#E5E7EB', color: '#525252', backgroundColor: '#FFFFFF' }}
+            >
+              返回全部知识
+            </button>
+          </div>
+        )}
+
+        <div className="mt-2 rounded-xl border bg-white p-2" style={{ borderColor: '#E5E7EB' }}>
+          <div className="mb-2 px-1 text-[11px] font-medium" style={{ color: '#A3A3A3' }}>
+            {showShortcutSection ? '常用入口' : '辅助提示'}
+          </div>
+
+          {showShortcutSection ? (
+            <>
+              {showCategoryShortcuts && (
+                <div className={showTagShortcuts ? 'mb-2' : undefined}>
+                  <div className="mb-1 flex items-center justify-between px-1">
+                    <div className="text-[11px]" style={{ color: '#737373' }}>高频分类</div>
+                    <button
+                      type="button"
+                      onClick={() => onOpenBrowserMode?.('category')}
+                      className="text-[11px] font-medium"
+                      style={{ color: '#6366F1' }}
+                    >
+                      全部
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left"
+                      style={{
+                        borderColor: selectedCategory === null && selectedTags.length === 0 ? '#C7D2FE' : '#E5E7EB',
+                        backgroundColor: selectedCategory === null && selectedTags.length === 0 ? '#EEF2FF' : '#FFFFFF',
+                      }}
+                      onClick={() => {
+                        onClearFilters?.()
+                        onOpenBrowserMode?.('knowledge')
+                      }}
+                    >
+                      <span className="text-xs font-medium" style={{ color: '#171717' }}>全部知识</span>
+                      <span className="rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px]" style={{ color: '#64748B' }}>
+                        {totalKnowledgeCount || knowledgeList.length}
+                      </span>
+                    </button>
+                    {topCategories.map((category) => {
+                      const active = selectedCategory === category.id
+                      return (
+                        <button
+                          type="button"
+                          key={category.id}
+                          className="flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left"
+                          style={{
+                            borderColor: active ? '#C7D2FE' : '#E5E7EB',
+                            backgroundColor: active ? '#EEF2FF' : '#FFFFFF',
+                          }}
+                          onClick={() => {
+                            onSelectCategory?.(active ? null : category.id)
+                            onOpenBrowserMode?.('knowledge')
+                          }}
+                        >
+                          <span className="truncate text-xs font-medium" style={{ color: active ? '#312E81' : '#171717' }}>
+                            {category.name}
+                          </span>
+                          <span className="rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px]" style={{ color: '#64748B' }}>
+                            {category.count ?? categoryCounts.get(category.id) ?? 0}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {showTagShortcuts && (
+                <div>
+                  <div className="mb-1 flex items-center justify-between px-1">
+                    <div className="text-[11px]" style={{ color: '#737373' }}>热门标签</div>
+                    <button
+                      type="button"
+                      onClick={() => onOpenBrowserMode?.('tag')}
+                      className="text-[11px] font-medium"
+                      style={{ color: '#6366F1' }}
+                    >
+                      全部
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topTags.map(({ tag, count }) => {
+                      const active = selectedTags.includes(tag)
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            onToggleTagShortcut?.(tag)
+                            onOpenBrowserMode?.('knowledge')
+                          }}
+                          className="rounded-full border px-2 py-1 text-[10px] font-medium"
+                          style={{
+                            borderColor: active ? '#C7D2FE' : '#E5E7EB',
+                            backgroundColor: active ? '#EEF2FF' : '#FFFFFF',
+                            color: active ? '#4338CA' : '#525252',
+                          }}
+                        >
+                          #{tag} · {count}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div
+              className="rounded-lg border px-3 py-2 text-[11px]"
+              style={{ borderColor: '#E5E7EB', backgroundColor: '#FCFCFD', color: '#64748B' }}
+            >
+              当前主浏览区已经在展示相同维度的内容，这里自动收起重复入口，避免两边同时出现两套分类列表。
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer */}
       <div className="border-t p-2" style={{ borderColor: '#E5E5E5' }}>
-        {/* Search Row */}
         <div
           className="flex items-center gap-2 px-2 py-[7px] rounded-md cursor-pointer"
           style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E5E5' }}
@@ -132,44 +267,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </div>
 
-        {/* Git Row - only show if Git repo */}
-        {isGitRepo && (
-          <div className="flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded-md cursor-pointer hover:bg-[#F5F5F5]">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pendingChangesCount > 0 ? '#F59E0B' : '#10B981' }} />
-            <span className="text-xs flex-1" style={{ color: '#737373' }}>
-              {pendingChangesCount > 0 ? `${pendingChangesCount} 处变更未提交` : '工作区已同步'}
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {isGitRepo && (
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-1"
+              style={{ backgroundColor: '#F5F5F5', color: '#737373' }}
+            >
+              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: pendingChangesCount > 0 ? '#F59E0B' : '#10B981' }} />
+              <GitBranch className="h-3 w-3" />
+              <span className="text-[11px]">
+                {pendingChangesCount > 0 ? `${pendingChangesCount} 处变更` : 'Git 已同步'}
+              </span>
+            </div>
+          )}
+          <div
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-1"
+            style={{ backgroundColor: '#F5F5F5', color: '#737373' }}
+          >
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: mcpConnectionCount > 0 ? '#10B981' : '#A3A3A3' }} />
+            <Bot className="h-3 w-3" style={{ color: mcpConnectionCount > 0 ? '#10B981' : '#A3A3A3' }} />
+            <span className="text-[11px]">
+              {mcpConnectionCount > 0 ? `MCP ${mcpConnectionCount}` : 'MCP 未连接'}
             </span>
-            <GitBranch className="h-3.5 w-3.5" style={{ color: '#A3A3A3' }} />
           </div>
-        )}
-
-        {/* MCP Agent Status */}
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-[#F5F5F5]">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: mcpConnectionCount > 0 ? '#10B981' : '#A3A3A3' }} />
-          <span className="text-xs flex-1" style={{ color: '#737373' }}>
-            {mcpConnectionCount > 0 ? `MCP: ${mcpConnectionCount} 个连接` : 'MCP: 未连接'}
-          </span>
-          <Bot className="h-3.5 w-3.5" style={{ color: mcpConnectionCount > 0 ? '#10B981' : '#A3A3A3' }} />
         </div>
 
-        {/* Import Row */}
-        {onImport && !readonly && (
-          <div
-            onClick={onImport}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-[#F5F5F5]"
-          >
-            <FolderInput className="h-3.5 w-3.5" style={{ color: '#6366F1' }} />
-            <span className="text-xs" style={{ color: '#6366F1' }}>导入 Markdown</span>
-          </div>
-        )}
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          {onImport && !readonly && (
+            <button
+              type="button"
+              onClick={onImport}
+              className="flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium"
+              style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+            >
+              <FolderInput className="h-3.5 w-3.5" />
+              导入
+            </button>
+          )}
 
-        {/* Settings Row */}
-        <div
-          onClick={() => setShowSettings(true)}
-          className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-[#F5F5F5]"
-        >
-          <Settings className="h-3.5 w-3.5" style={{ color: '#A3A3A3' }} />
-          <span className="text-xs" style={{ color: '#737373' }}>设置</span>
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            className="flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium"
+            style={{
+              backgroundColor: onImport && !readonly ? '#F5F5F5' : '#FFFFFF',
+              border: '1px solid #E5E5E5',
+              color: '#737373',
+              gridColumn: onImport && !readonly ? undefined : '1 / -1',
+            }}
+          >
+            <Settings className="h-3.5 w-3.5" />
+            设置
+          </button>
         </div>
       </div>
 

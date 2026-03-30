@@ -12,22 +12,31 @@ use std::thread;
 use std::time::Duration;
 
 use memoforge_core::{
-    init_store, close_store, MemoError, Knowledge, KnowledgeWithStale, Category, LoadLevel, GrepMatch, Event,
-    git::{git_pull, git_push, git_commit, git_log, git_diff, git_status, GitCommit, is_git_repo},
-    init::{init_open, init_new},
-    list_knowledge, get_knowledge_by_id, get_knowledge_with_stale, create_knowledge, update_knowledge,
-    delete_knowledge, move_knowledge, search_knowledge, grep,
-    list_categories, create_category, update_category, delete_category,
-    get_tags, get_tags_with_counts, read_recent_events,
-    import::{import_markdown_folder, preview_import, ImportOptions, ImportStats},
-    registry::{KnowledgeBaseInfo, list_knowledge_bases, get_current_kb, switch_kb, register_kb, unregister_kb, get_recent_kbs, get_last_kb},
-    preview_delete_knowledge, preview_move_knowledge, DeletePreview, MovePreview,
-    links::{LinkInfo, BacklinksResult, RelatedResult, get_outgoing_links, get_backlinks, get_related, KnowledgeGraph},
+    agent::{get_active_agents, get_agent_count, AgentInfo},
     api::{get_knowledge_graph, PaginatedKnowledge},
-    agent::{AgentInfo, get_active_agents, get_agent_count},
+    close_store, complete_knowledge_links, create_category, create_knowledge, delete_category,
+    delete_knowledge, get_knowledge_by_id, get_knowledge_with_stale, get_tags,
+    get_tags_with_counts,
+    git::{git_commit, git_diff, git_log, git_pull, git_push, git_status, is_git_repo, GitCommit},
+    grep,
+    import::{import_markdown_folder, preview_import, ImportOptions, ImportStats},
+    init::{init_new, init_open},
+    init_store,
+    links::{
+        get_backlinks, get_outgoing_links, get_related, BacklinksResult, KnowledgeGraph, LinkInfo,
+        RelatedResult,
+    },
+    list_categories, list_knowledge, move_knowledge, preview_delete_knowledge,
+    preview_move_knowledge, read_recent_events,
+    registry::{
+        get_current_kb, get_last_kb, get_recent_kbs, list_knowledge_bases, register_kb, switch_kb,
+        unregister_kb, KnowledgeBaseInfo,
+    },
+    search_knowledge, update_category, update_knowledge, Category, DeletePreview, Event, GrepMatch,
+    Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, LoadLevel, MemoError, MovePreview,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{Manager, Window};
 
 // 全局状态：知识库路径
@@ -57,15 +66,122 @@ struct StatusResponse {
     kb_path: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct AssetPayload {
+    file_name: String,
+    mime_type: Option<String>,
+    bytes: Vec<u8>,
+}
+
+#[derive(Debug, Serialize)]
+struct ImportedAsset {
+    file_name: String,
+    relative_path: String,
+    markdown: String,
+    reused: bool,
+}
+
 // 辅助函数：转换 MemoError 为 Tauri Result
 fn to_tauri_error(e: MemoError) -> String {
     serde_json::to_string(&e).unwrap_or_else(|_| e.message)
 }
 
 fn get_kb_path() -> Result<PathBuf, String> {
-    KB_PATH.lock().unwrap()
+    KB_PATH
+        .lock()
+        .unwrap()
         .clone()
         .ok_or_else(|| "Knowledge base not initialized".to_string())
+}
+
+fn sanitize_asset_file_name(file_name: &str) -> String {
+    let sanitized = file_name
+        .chars()
+        .map(|ch| match ch {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+            c if c.is_control() => '-',
+            c if c.is_whitespace() => '-',
+            c => c,
+        })
+        .collect::<String>()
+        .trim_matches('.')
+        .trim_matches('-')
+        .to_string();
+
+    if sanitized.is_empty() {
+        "asset".to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn build_asset_markdown(relative_path: &str, file_name: &str, mime_type: Option<&str>) -> String {
+    if mime_type
+        .map(|value| value.starts_with("image/"))
+        .unwrap_or(false)
+    {
+        let alt_text = file_name
+            .rsplit_once('.')
+            .map(|(name, _)| name)
+            .unwrap_or(file_name);
+        format!("![{}]({})", alt_text, relative_path)
+    } else {
+        format!("[{}]({})", file_name, relative_path)
+    }
+}
+
+fn resolve_unique_asset_path(assets_dir: &Path, file_name: &str) -> PathBuf {
+    let sanitized_name = sanitize_asset_file_name(file_name);
+    let candidate_path = assets_dir.join(&sanitized_name);
+    if !candidate_path.exists() {
+        return candidate_path;
+    }
+
+    let stem = Path::new(&sanitized_name)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("asset");
+    let extension = Path::new(&sanitized_name)
+        .extension()
+        .and_then(|value| value.to_str());
+
+    let mut counter = 1;
+    loop {
+        let next_name = match extension {
+            Some(ext) => format!("{}-{}.{}", stem, counter, ext),
+            None => format!("{}-{}", stem, counter),
+        };
+        let next_path = assets_dir.join(next_name);
+        if !next_path.exists() {
+            return next_path;
+        }
+        counter += 1;
+    }
+}
+
+fn find_existing_asset_by_content(assets_dir: &Path, bytes: &[u8]) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(assets_dir).ok()?;
+    let expected_len = bytes.len() as u64;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if metadata.len() != expected_len {
+            continue;
+        }
+
+        if std::fs::read(&path).ok().as_deref() == Some(bytes) {
+            return Some(path);
+        }
+    }
+
+    None
 }
 
 fn bootstrap_kb_from_env() {
@@ -97,7 +213,11 @@ fn sync_kb_state(
         kb_info.name.clone(),
         kb_info.count,
     );
-    memory_state.0.set_kb(canonical_kb_path.clone(), kb_info.name.clone(), kb_info.count);
+    memory_state.0.set_kb(
+        canonical_kb_path.clone(),
+        kb_info.name.clone(),
+        kb_info.count,
+    );
 
     memoforge_mcp::tools::set_kb_path(canonical_kb_path);
 
@@ -146,12 +266,24 @@ fn get_kb_info(kb_path: &PathBuf) -> Result<KBInfo, String> {
         .metadata
         .as_ref()
         .map(|metadata| metadata.name.clone())
-        .or_else(|| kb_path.file_name().and_then(|value| value.to_str()).map(String::from))
+        .or_else(|| {
+            kb_path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .map(String::from)
+        })
         .unwrap_or_else(|| "knowledge-base".to_string());
 
     // 获取知识点数量
-    let result = memoforge_core::list_knowledge(kb_path, memoforge_core::LoadLevel::L0, None, None, None, None)
-        .map_err(|e| e.to_string())?;
+    let result = memoforge_core::list_knowledge(
+        kb_path,
+        memoforge_core::LoadLevel::L0,
+        None,
+        None,
+        None,
+        None,
+    )
+    .map_err(|e| e.to_string())?;
     let count = result.total;
 
     Ok(KBInfo { name, count })
@@ -195,7 +327,8 @@ fn list_knowledge_cmd(
         tags.as_deref(),
         limit,
         offset,
-    ).map_err(to_tauri_error)
+    )
+    .map_err(to_tauri_error)
 }
 
 #[tauri::command]
@@ -225,8 +358,7 @@ fn create_knowledge_cmd(
     summary: Option<String>,
 ) -> Result<String, String> {
     let kb_path = get_kb_path()?;
-    create_knowledge(&kb_path, &title, &content, tags, category_id, summary)
-        .map_err(to_tauri_error)
+    create_knowledge(&kb_path, &title, &content, tags, category_id, summary).map_err(to_tauri_error)
 }
 
 #[tauri::command]
@@ -240,7 +372,8 @@ fn update_knowledge_cmd(id: String, patch: KnowledgePatch) -> Result<(), String>
         patch.tags,
         patch.category.as_deref(),
         patch.summary.as_deref(),
-    ).map_err(to_tauri_error)
+    )
+    .map_err(to_tauri_error)
 }
 
 #[tauri::command]
@@ -275,8 +408,23 @@ fn search_knowledge_cmd(
     limit: Option<usize>,
 ) -> Result<Vec<Knowledge>, String> {
     let kb_path = get_kb_path()?;
-    search_knowledge(&kb_path, &query, tags.as_deref(), category_id.as_deref(), limit)
-        .map_err(to_tauri_error)
+    search_knowledge(
+        &kb_path,
+        &query,
+        tags.as_deref(),
+        category_id.as_deref(),
+        limit,
+    )
+    .map_err(to_tauri_error)
+}
+
+#[tauri::command]
+fn complete_knowledge_links_cmd(
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<KnowledgeLinkCompletion>, String> {
+    let kb_path = get_kb_path()?;
+    complete_knowledge_links(&kb_path, &query, limit).map_err(to_tauri_error)
 }
 
 #[tauri::command]
@@ -287,8 +435,14 @@ fn grep_cmd(
     limit: Option<usize>,
 ) -> Result<Vec<GrepMatch>, String> {
     let kb_path = get_kb_path()?;
-    grep(&kb_path, &query, tags.as_deref(), category_id.as_deref(), limit)
-        .map_err(to_tauri_error)
+    grep(
+        &kb_path,
+        &query,
+        tags.as_deref(),
+        category_id.as_deref(),
+        limit,
+    )
+    .map_err(to_tauri_error)
 }
 
 // 分类管理命令
@@ -315,8 +469,7 @@ fn update_category_cmd(
     description: Option<String>,
 ) -> Result<(), String> {
     let kb_path = get_kb_path()?;
-    update_category(&kb_path, &id, name.as_deref(), description.as_deref())
-        .map_err(to_tauri_error)
+    update_category(&kb_path, &id, name.as_deref(), description.as_deref()).map_err(to_tauri_error)
 }
 
 #[tauri::command]
@@ -409,8 +562,7 @@ fn import_folder_cmd(
 #[tauri::command]
 fn preview_import_cmd(source_path: String) -> Result<ImportStats, String> {
     let kb_path = get_kb_path()?;
-    preview_import(&kb_path, PathBuf::from(&source_path).as_path())
-        .map_err(|e| e.to_string())
+    preview_import(&kb_path, PathBuf::from(&source_path).as_path()).map_err(|e| e.to_string())
 }
 
 // 多知识库管理命令
@@ -432,7 +584,8 @@ fn switch_kb_cmd(
 ) -> Result<(), String> {
     switch_kb(&path).map_err(|e| e.to_string())?;
 
-    let kb_path = std::fs::canonicalize(PathBuf::from(&path)).unwrap_or_else(|_| PathBuf::from(&path));
+    let kb_path =
+        std::fs::canonicalize(PathBuf::from(&path)).unwrap_or_else(|_| PathBuf::from(&path));
 
     // 更新全局 KB_PATH
     *KB_PATH.lock().unwrap() = Some(kb_path.clone());
@@ -468,11 +621,54 @@ fn get_last_kb_cmd() -> Result<Option<String>, String> {
 async fn select_folder_cmd(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
-    let folder_path = app.dialog()
-        .file()
-        .blocking_pick_folder();
+    let folder_path = app.dialog().file().blocking_pick_folder();
 
     Ok(folder_path.map(|p| p.to_string()))
+}
+
+#[tauri::command]
+fn import_assets_cmd(knowledge_id: String, assets: Vec<AssetPayload>) -> Result<Vec<ImportedAsset>, String> {
+    let kb_path = get_kb_path()?;
+    let knowledge_path = kb_path.join(&knowledge_id);
+    let knowledge_parent = knowledge_path.parent().unwrap_or(kb_path.as_path());
+    let assets_dir = knowledge_parent.join("assets");
+
+    std::fs::create_dir_all(&assets_dir).map_err(|error| {
+        format!("Failed to create assets directory {}: {}", assets_dir.display(), error)
+    })?;
+
+    let mut imported_assets = Vec::with_capacity(assets.len());
+
+    for asset in assets {
+        let (target_path, reused) = if let Some(existing_path) =
+            find_existing_asset_by_content(&assets_dir, &asset.bytes)
+        {
+            (existing_path, true)
+        } else {
+            let next_path = resolve_unique_asset_path(&assets_dir, &asset.file_name);
+            std::fs::write(&next_path, &asset.bytes).map_err(|error| {
+                format!("Failed to write asset {}: {}", next_path.display(), error)
+            })?;
+            (next_path, false)
+        };
+
+        let saved_file_name = target_path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(&asset.file_name)
+            .to_string();
+        let relative_path = format!("./assets/{}", saved_file_name);
+        let markdown = build_asset_markdown(&relative_path, &saved_file_name, asset.mime_type.as_deref());
+
+        imported_assets.push(ImportedAsset {
+            file_name: saved_file_name,
+            relative_path,
+            markdown,
+            reused,
+        });
+    }
+
+    Ok(imported_assets)
 }
 
 // 链接管理命令
@@ -513,9 +709,7 @@ fn get_agent_count_cmd() -> Result<usize, String> {
 }
 
 #[tauri::command]
-fn get_mcp_connection_count_cmd(
-    server: tauri::State<McpServer>,
-) -> Result<usize, String> {
+fn get_mcp_connection_count_cmd(server: tauri::State<McpServer>) -> Result<usize, String> {
     let sse_connections = server.0.connection_count();
     let agent_connections = match get_kb_path() {
         Ok(kb_path) => get_agent_count(&kb_path),
@@ -540,7 +734,11 @@ fn select_knowledge_cmd(
     category: Option<String>,
 ) -> Result<(), String> {
     // 更新文件态（兼容旧流程）
-    publisher.0.lock().unwrap().set_knowledge(path.clone(), title.clone(), category.clone());
+    publisher
+        .0
+        .lock()
+        .unwrap()
+        .set_knowledge(path.clone(), title.clone(), category.clone());
     // 更新内存态（供 SSE 使用）
     memory_state.0.set_knowledge(path, title, category);
     Ok(())
@@ -556,9 +754,15 @@ fn update_selection_cmd(
     text: Option<String>,
 ) -> Result<(), String> {
     // 更新文件态（兼容旧流程）
-    publisher.0.lock().unwrap().set_selection(start_line, end_line, text_length, text.clone());
+    publisher
+        .0
+        .lock()
+        .unwrap()
+        .set_selection(start_line, end_line, text_length, text.clone());
     // 更新内存态（供 SSE 使用）
-    memory_state.0.set_selection(start_line, end_line, text_length, text);
+    memory_state
+        .0
+        .set_selection(start_line, end_line, text_length, text);
     Ok(())
 }
 
@@ -594,11 +798,18 @@ fn set_kb_cmd(
     name: String,
     count: usize,
 ) -> Result<(), String> {
-    let canonical_kb_path = std::fs::canonicalize(PathBuf::from(&path)).unwrap_or_else(|_| PathBuf::from(&path));
+    let canonical_kb_path =
+        std::fs::canonicalize(PathBuf::from(&path)).unwrap_or_else(|_| PathBuf::from(&path));
     // 更新文件态（兼容旧流程）
-    publisher.0.lock().unwrap().set_kb(canonical_kb_path.clone(), name.clone(), count);
+    publisher
+        .0
+        .lock()
+        .unwrap()
+        .set_kb(canonical_kb_path.clone(), name.clone(), count);
     // 更新内存态（供 SSE 使用）
-    memory_state.0.set_kb(canonical_kb_path.clone(), name, count);
+    memory_state
+        .0
+        .set_kb(canonical_kb_path.clone(), name, count);
     // 同步更新 MCP 工具层
     memoforge_mcp::tools::set_kb_path(canonical_kb_path);
     Ok(())
@@ -657,15 +868,15 @@ fn update_memory_selection_cmd(
     text_length: usize,
     text: Option<String>,
 ) -> Result<(), String> {
-    memory_state.0.set_selection(start_line, end_line, text_length, text);
+    memory_state
+        .0
+        .set_selection(start_line, end_line, text_length, text);
     Ok(())
 }
 
 /// 清除内存中的知识点状态
 #[tauri::command]
-fn clear_memory_knowledge_cmd(
-    memory_state: tauri::State<MemoryState>,
-) -> Result<(), String> {
+fn clear_memory_knowledge_cmd(memory_state: tauri::State<MemoryState>) -> Result<(), String> {
     memory_state.0.clear_knowledge();
     Ok(())
 }
@@ -760,6 +971,7 @@ fn main() {
             preview_delete_knowledge_cmd,
             preview_move_knowledge_cmd,
             search_knowledge_cmd,
+            complete_knowledge_links_cmd,
             grep_cmd,
             list_categories_cmd,
             create_category_cmd,
@@ -785,6 +997,7 @@ fn main() {
             get_recent_kbs_cmd,
             get_last_kb_cmd,
             select_folder_cmd,
+            import_assets_cmd,
             get_outgoing_links_cmd,
             get_backlinks_cmd,
             get_related_cmd,

@@ -15,14 +15,14 @@
 //! 参考: 技术实现文档 §2.4
 
 use memoforge_core::editor_state::{
-    EditorState, EditorMode, CurrentKb, CurrentKnowledge, Selection, DesktopState,
+    CurrentKb, CurrentKnowledge, DesktopState, EditorMode, EditorState, Selection,
     SELECTED_TEXT_MAX_LENGTH,
 };
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::sync::Arc;
 use std::thread;
+use std::time::{Duration, Instant};
 
 /// Desktop application state publisher
 ///
@@ -91,7 +91,13 @@ impl DesktopStatePublisher {
     /// * `start_line` - Starting line number (1-based)
     /// * `end_line` - Ending line number (1-based)
     /// * `text` - Optional selected text content
-    pub fn set_selection(&mut self, start_line: usize, end_line: usize, text_length: usize, text: Option<String>) {
+    pub fn set_selection(
+        &mut self,
+        start_line: usize,
+        end_line: usize,
+        text_length: usize,
+        text: Option<String>,
+    ) {
         // 先保存原始文本的元数据
         let has_text = text_length > 0 || text.is_some();
         let original_text_length = if text_length > 0 {
@@ -121,9 +127,9 @@ impl DesktopStatePublisher {
         self.selection = Some(Selection {
             start_line,
             end_line,
-            has_text,  // 基于原始文本
-            text_length: original_text_length,  // 基于原始文本
-            selected_text,  // 过滤后的文本
+            has_text,                          // 基于原始文本
+            text_length: original_text_length, // 基于原始文本
+            selected_text,                     // 过滤后的文本
         });
 
         // Throttle: delay publication for frequent selection changes
@@ -162,7 +168,10 @@ impl DesktopStatePublisher {
                 thread::spawn(move || {
                     thread::sleep(interval);
                     // 原子地检查并清除标志（使用 compare_exchange 避免竞态条件）
-                    if pending.compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire).is_ok() {
+                    if pending
+                        .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
+                        .is_ok()
+                    {
                         publisher.do_publish();
                     }
                 });
@@ -205,8 +214,12 @@ impl DesktopStatePublisher {
 
         if let Err(e) = state.save() {
             // 记录错误到日志
-            eprintln!("[DesktopStatePublisher] Failed to publish shared state: {}", e);
-            eprintln!("[DesktopStatePublisher] KB: {:?}, Knowledge: {:?}",
+            eprintln!(
+                "[DesktopStatePublisher] Failed to publish shared state: {}",
+                e
+            );
+            eprintln!(
+                "[DesktopStatePublisher] KB: {:?}, Knowledge: {:?}",
                 self.current_kb.as_ref().map(|kb| &kb.path),
                 self.current_knowledge.as_ref().map(|k| &k.path)
             );
@@ -231,21 +244,21 @@ impl DesktopStatePublisher {
 fn contains_sensitive_content(text: &str) -> bool {
     let sensitive_patterns = [
         // API Keys - 更精确的模式以减少误报
-        r"(?i)sk-[a-zA-Z0-9]{20,}",  // OpenAI API keys
-        r"(?i)ghp_[a-zA-Z0-9]{36}",   // GitHub personal access tokens
-        r"(?i)AKIA[0-9A-Z]{16}",      // AWS access keys
-        r"(?i)gho_[a-zA-Z0-9]{36}",   // GitHub OAuth tokens
-        r"(?i)ghu_[a-zA-Z0-9]{36}",   // GitHub user-to-server tokens
-        r"(?i)ghs_[a-zA-Z0-9]{36}",   // GitHub server-to-server tokens
-        r"(?i)ghr_[a-zA-Z0-9]{36}",   // GitHub refresh tokens
+        r"(?i)sk-[a-zA-Z0-9]{20,}", // OpenAI API keys
+        r"(?i)ghp_[a-zA-Z0-9]{36}", // GitHub personal access tokens
+        r"(?i)AKIA[0-9A-Z]{16}",    // AWS access keys
+        r"(?i)gho_[a-zA-Z0-9]{36}", // GitHub OAuth tokens
+        r"(?i)ghu_[a-zA-Z0-9]{36}", // GitHub user-to-server tokens
+        r"(?i)ghs_[a-zA-Z0-9]{36}", // GitHub server-to-server tokens
+        r"(?i)ghr_[a-zA-Z0-9]{36}", // GitHub refresh tokens
         // Passwords - 更严格的模式
-        r"(?i)password\s*[:=]\s*[^\s]{8,}",  // password: value with >=8 chars
+        r"(?i)password\s*[:=]\s*[^\s]{8,}", // password: value with >=8 chars
         r"(?i)passwd\s*[:=]\s*[^\s]{8,}",
         r"(?i)pwd\s*[:=]\s*[^\s]{8,}",
         // Private keys - 明确的标记
         r"-----BEGIN (RSA |EC |DSA |OPENSSH |PRIVATE )?PRIVATE KEY-----",
         // 更长的随机字符串（likely tokens）- 增加长度限制
-        r"[a-zA-Z0-9/_-]{64,}",  // 64+ chars likely a token
+        r"[a-zA-Z0-9/_-]{64,}", // 64+ chars likely a token
     ];
 
     for pattern in &sensitive_patterns {
@@ -293,10 +306,14 @@ mod tests {
         // Should detect API keys
         assert!(contains_sensitive_content("sk-12345678901234567890"));
         assert!(contains_sensitive_content("password: secret123"));
-        assert!(contains_sensitive_content("-----BEGIN RSA PRIVATE KEY-----"));
+        assert!(contains_sensitive_content(
+            "-----BEGIN RSA PRIVATE KEY-----"
+        ));
 
         // Should allow normal text
         assert!(!contains_sensitive_content("This is normal text"));
-        assert!(!contains_sensitive_content("function hello() { return true; }"));
+        assert!(!contains_sensitive_content(
+            "function hello() { return true; }"
+        ));
     }
 }

@@ -1,7 +1,7 @@
 //! 统一错误类型
 //! 参考: 技术实现文档 §2.1.7, PRD §6.1.1
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error, Serialize)]

@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState, type MouseEvent } from 'react'
-import { Search, Plus, Save, ArrowUpDown, ChevronRight, MoreHorizontal, Trash2, GitBranch, FolderOpen } from 'lucide-react'
-import { Sidebar } from './components/Sidebar'
-import { Editor } from './components/Editor'
+import { Suspense, lazy, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Search, Plus, Save, ChevronRight, MoreHorizontal, Trash2, FolderOpen, AlertCircle, Database, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle } from 'react-resizable-panels'
+import { shallow } from 'zustand/shallow'
+import { CurrentKnowledgeEditorPane } from './components/CurrentKnowledgeEditorPane'
+import { DirectoryKnowledgeBrowser } from './components/DirectoryKnowledgeBrowser'
+import { KnowledgeTreeNav } from './components/KnowledgeTreeNav'
 import { SearchPanel } from './components/SearchPanel'
 import { NewKnowledgeModal } from './components/NewKnowledgeModal'
 import { ImportModal } from './components/ImportModal'
@@ -9,26 +12,78 @@ import { ToastNotifications } from './components/ToastNotifications'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ReadOnlyBanner } from './components/ReadOnlyBanner'
 import { Input } from './components/ui/Input'
-import { KnowledgeGraphPanel } from './components/KnowledgeGraphPanel'
 import { KbSwitcher } from './components/KbSwitcher'
 import { RightPanel } from './components/RightPanel'
+import { SettingsModal } from './components/SettingsModal'
 import { useAppStore } from './stores/appStore'
 import { tauriService, DeletePreview } from './services/tauri'
+import { useKnowledgeNavigation } from './hooks/useKnowledgeNavigation'
+import { hasKnowledgeUnsavedChanges } from './lib/knowledgeChanges'
+import { clearKnowledgeDraft } from './lib/knowledgeDrafts'
+import {
+  buildKnowledgeTreeRoot,
+  findFolderNode,
+  getFolderBreadcrumbs,
+  getFolderDisplayName,
+  getKnowledgeFolderPath,
+  type TreeSelection,
+} from './lib/knowledgeTree'
+
+const KnowledgeGraphPanel = lazy(async () => {
+  const module = await import('./components/KnowledgeGraphPanel')
+  return { default: module.KnowledgeGraphPanel }
+})
 
 const isMacOS = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')
+const LIST_WIDTH_KEY = 'memoforge.knowledge-list.width'
+const LIST_COLLAPSED_KEY = 'memoforge.knowledge-list.collapsed'
+const LIST_DENSITY_KEY = 'memoforge.knowledge-list.density'
+const LIST_MIN_WIDTH = 240
+const LIST_MAX_WIDTH = 520
 
-const getTagColors = (tag: string) => {
-  const colors: Record<string, { bg: string; text: string }> = {
-    Rust: { bg: '#FEF3C7', text: '#92400E' },
-    Python: { bg: '#EFF6FF', text: '#1D4ED8' },
-    Docker: { bg: '#EFF6FF', text: '#1D4ED8' },
-    TypeScript: { bg: '#EFF6FF', text: '#1D4ED8' },
-    内存管理: { bg: '#DCFCE7', text: '#166534' },
-    并发: { bg: '#F5F3FF', text: '#6D28D9' },
-    Redis: { bg: '#FEE2E2', text: '#991B1B' },
-    缓存: { bg: '#F5F5F5', text: '#525252' },
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+const wait = (ms: number) => new Promise<void>((resolve) => {
+  window.setTimeout(resolve, ms)
+})
+
+const isRetriableRequestError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  return /Failed to fetch|Load failed|NetworkError|ERR_ABORTED/i.test(message)
+}
+
+async function retryAsync<T>(operation: () => Promise<T>, attempts = 2, delayMs = 160): Promise<T> {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error
+      if (!isRetriableRequestError(error) || attempt === attempts - 1) {
+        throw error
+      }
+      await wait(delayMs * (attempt + 1))
+    }
   }
-  return colors[tag] || { bg: '#F5F5F5', text: '#525252' }
+
+  throw lastError
+}
+
+const getStoredNumber = (key: string, fallback: number) => {
+  if (typeof window === 'undefined') return fallback
+
+  const stored = window.localStorage.getItem(key)
+  const parsed = stored ? Number(stored) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const getStoredBoolean = (key: string, fallback = false) => {
+  if (typeof window === 'undefined') return fallback
+
+  const stored = window.localStorage.getItem(key)
+  if (stored === null) return fallback
+  return stored === 'true'
 }
 
 const formatDate = (dateStr: string) => {
@@ -44,45 +99,301 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }
 
+const countDocumentWords = (content: string) => {
+  const cjkCharacterCount = (content.match(/[\u3400-\u9FFF]/g) ?? []).length
+  const latinWordCount = (
+    content
+      .replace(/[\u3400-\u9FFF]/g, ' ')
+      .match(/[A-Za-z0-9_]+(?:[.-][A-Za-z0-9_]+)*/g) ?? []
+  ).length
+
+  return cjkCharacterCount + latinWordCount
+}
+
+const getEditorModeLabel = (mode: 'read' | 'markdown' | 'rich') => {
+  switch (mode) {
+    case 'markdown':
+      return 'Markdown'
+    case 'rich':
+      return '高级编辑'
+    default:
+      return '阅读'
+  }
+}
+
+const getEditorModeBadgeStyle = (mode: 'read' | 'markdown' | 'rich') => {
+  switch (mode) {
+    case 'markdown':
+      return {
+        backgroundColor: '#EEF2FF',
+        border: '1px solid #C7D2FE',
+        color: '#4338CA',
+      }
+    case 'rich':
+      return {
+        backgroundColor: '#ECFDF5',
+        border: '1px solid #A7F3D0',
+        color: '#047857',
+      }
+    default:
+      return {
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E5E7EB',
+        color: '#64748B',
+      }
+  }
+}
+
+interface ResizableHandleProps {
+  collapsed: boolean
+  onToggle: () => void
+  expandTitle: string
+  collapseTitle: string
+  collapsedDirection: 'left' | 'right'
+  expandedDirection: 'left' | 'right'
+  topOffset?: number
+}
+
+const ResizableHandle = ({
+  collapsed,
+  onToggle,
+  expandTitle,
+  collapseTitle,
+  collapsedDirection,
+  expandedDirection,
+  topOffset = 14,
+}: ResizableHandleProps) => {
+  const iconDirection = collapsed ? collapsedDirection : expandedDirection
+  const Icon = iconDirection === 'left' ? ChevronsLeft : ChevronsRight
+
+  return (
+    <PanelResizeHandle
+      className={`panel-resize-handle ${collapsed ? 'panel-resize-handle--collapsed' : ''}`}
+      onDoubleClick={(event) => {
+        event.preventDefault()
+        onToggle()
+      }}
+    >
+      <div className="panel-resize-handle__line" />
+      <button
+        type="button"
+        className="panel-resize-handle__toggle"
+        title={collapsed ? expandTitle : collapseTitle}
+        style={{ top: topOffset }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation()
+          onToggle()
+        }}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </button>
+    </PanelResizeHandle>
+  )
+}
+
 function App() {
+  const { openKnowledgeWithStale, confirmDiscardIfNeeded } = useKnowledgeNavigation()
   const [showSearch, setShowSearch] = useState(false)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [newKnowledgeSeed, setNewKnowledgeSeed] = useState<{
+    initialCategory?: string
+    categoryHint?: string
+  } | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletePreview, setDeletePreview] = useState<DeletePreview | null>(null)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false)
   const [showKbSwitcher, setShowKbSwitcher] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [initialized, setInitialized] = useState(false)
   const [readonly, setReadonly] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [kbPath, setKbPath] = useState('')
   const [currentKbName, setCurrentKbName] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<'recent' | 'title'>('recent')
   const [pendingChangesCount, setPendingChangesCount] = useState(0)
   const [isGitRepo, setIsGitRepo] = useState(true)
   const [mcpConnectionCount, setMcpConnectionCount] = useState(0)
+  const [knowledgeListWidth, setKnowledgeListWidth] = useState(() => getStoredNumber(LIST_WIDTH_KEY, 300))
+  const [knowledgeListCollapsed, setKnowledgeListCollapsed] = useState(() => getStoredBoolean(LIST_COLLAPSED_KEY))
+  const [knowledgeQuery, setKnowledgeQuery] = useState('')
+  const [saveFeedback, setSaveFeedback] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [listDensity, setListDensity] = useState<'compact' | 'comfortable'>(() => {
+    if (typeof window === 'undefined') return 'compact'
+    const stored = window.localStorage.getItem(LIST_DENSITY_KEY)
+    return stored === 'comfortable' ? 'comfortable' : 'compact'
+  })
+  const [treeSelection, setTreeSelection] = useState<TreeSelection>({ type: 'folder', path: '' })
+  const knowledgeListPanelRef = useRef<PanelImperativeHandle | null>(null)
+  const resizeSyncTimerRef = useRef<number | null>(null)
 
   const {
-    currentKnowledge,
     setCurrentKnowledge,
     knowledgeList,
     setKnowledgeList,
     appendKnowledgeList,
     setHasMore,
     setOffset,
-    hasMore,
     offset,
     categories,
     setCategories,
     editorMode,
     setEditorMode,
-    allTags,
     setAllTags,
-    selectedTags,
-    toggleTag,
-  } = useAppStore()
+    currentKnowledgeId,
+    currentKnowledgeTitle,
+    currentKnowledgeCategory,
+    currentKnowledgeContent,
+    editorSelection,
+    hasCurrentKnowledge,
+    hasUnsavedChanges,
+  } = useAppStore((state) => ({
+    setCurrentKnowledge: state.setCurrentKnowledge,
+    knowledgeList: state.knowledgeList,
+    setKnowledgeList: state.setKnowledgeList,
+    appendKnowledgeList: state.appendKnowledgeList,
+    setHasMore: state.setHasMore,
+    setOffset: state.setOffset,
+    offset: state.offset,
+    categories: state.categories,
+    setCategories: state.setCategories,
+    editorMode: state.editorMode,
+    setEditorMode: state.setEditorMode,
+    setAllTags: state.setAllTags,
+    currentKnowledgeId: state.currentKnowledge?.id ?? null,
+    currentKnowledgeTitle: state.currentKnowledge?.title ?? '',
+    currentKnowledgeCategory: state.currentKnowledge?.category ?? null,
+    currentKnowledgeContent: state.currentKnowledgeContent,
+    editorSelection: state.editorSelection,
+    hasCurrentKnowledge: state.currentKnowledge !== null,
+    hasUnsavedChanges: hasKnowledgeUnsavedChanges(
+      state.currentKnowledge,
+      state.currentKnowledgeBaseline,
+      state.currentKnowledgeContent,
+    ),
+  }), shallow)
+
+  const deferredKnowledgeQuery = useDeferredValue(knowledgeQuery)
+  const categoryLabelMap = useMemo(() => {
+    const map = new Map<string, string>()
+    categories.forEach((category) => {
+      map.set(category.id, category.name)
+      map.set(category.name, category.name)
+    })
+    return map
+  }, [categories])
+
+  useEffect(() => {
+    if (!currentKnowledgeId) return
+
+    setTreeSelection((previous) => {
+      if (previous.type === 'knowledge' && previous.path === currentKnowledgeId) {
+        return previous
+      }
+      return { type: 'knowledge', path: currentKnowledgeId }
+    })
+  }, [currentKnowledgeId])
+  const getCategoryLabel = useCallback((categoryId?: string | null) => {
+    if (!categoryId) return ''
+    return categoryLabelMap.get(categoryId) || categoryId
+  }, [categoryLabelMap])
+
+  useEffect(() => {
+    if (!currentKnowledgeId) return
+    setTreeSelection({ type: 'knowledge', path: currentKnowledgeId })
+  }, [currentKnowledgeId])
+
+  useEffect(() => {
+    if (saveFeedback === 'idle') return
+
+    const timer = window.setTimeout(() => {
+      setSaveFeedback('idle')
+    }, 2400)
+
+    return () => window.clearTimeout(timer)
+  }, [saveFeedback])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  useEffect(() => {
+    window.localStorage.setItem(LIST_WIDTH_KEY, String(knowledgeListWidth))
+  }, [knowledgeListWidth])
+
+  useEffect(() => {
+    window.localStorage.setItem(LIST_COLLAPSED_KEY, String(knowledgeListCollapsed))
+  }, [knowledgeListCollapsed])
+
+  useEffect(() => {
+    window.localStorage.setItem(LIST_DENSITY_KEY, listDensity)
+  }, [listDensity])
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('[data-floating-menu="true"]')) {
+        return
+      }
+      setShowMoreMenu(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => window.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
+  const toggleKnowledgeList = useCallback(() => {
+    const panel = knowledgeListPanelRef.current
+    if (!panel) return
+
+    if (panel.isCollapsed()) {
+      panel.expand()
+      setKnowledgeListCollapsed(false)
+      return
+    }
+
+    panel.collapse()
+    setKnowledgeListCollapsed(true)
+  }, [])
+
+  const syncResizablePanelState = useCallback(() => {
+    if (resizeSyncTimerRef.current) {
+      window.clearTimeout(resizeSyncTimerRef.current)
+    }
+
+    resizeSyncTimerRef.current = window.setTimeout(() => {
+      const knowledgeListPanel = knowledgeListPanelRef.current
+      if (knowledgeListPanel) {
+        const collapsed = knowledgeListPanel.isCollapsed()
+        setKnowledgeListCollapsed((prev) => (prev === collapsed ? prev : collapsed))
+
+        if (!collapsed) {
+          const nextWidth = clamp(knowledgeListPanel.getSize().inPixels, LIST_MIN_WIDTH, LIST_MAX_WIDTH)
+          setKnowledgeListWidth((prev) => (Math.abs(prev - nextWidth) < 1 ? prev : nextWidth))
+        }
+      }
+
+      resizeSyncTimerRef.current = null
+    }, 96)
+  }, [])
+
+  useEffect(() => () => {
+    if (resizeSyncTimerRef.current) {
+      window.clearTimeout(resizeSyncTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     void checkInit()
@@ -130,22 +441,21 @@ function App() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [initialized, readonly])
 
-  // 分类或标签变化时重新加载数据
   useEffect(() => {
     if (!initialized) return
     void loadData()
-  }, [selectedCategory, selectedTags])
+  }, [initialized])
 
   useEffect(() => {
     if (!initialized) return
 
     const syncCurrentKnowledge = async () => {
       try {
-        if (currentKnowledge?.id && currentKnowledge.title) {
+        if (currentKnowledgeId && currentKnowledgeTitle) {
           await tauriService.selectKnowledge(
-            currentKnowledge.id,
-            currentKnowledge.title,
-            currentKnowledge.category ?? undefined
+            currentKnowledgeId,
+            currentKnowledgeTitle,
+            currentKnowledgeCategory ?? undefined
           )
         } else {
           await tauriService.clearKnowledge()
@@ -158,9 +468,9 @@ function App() {
     void syncCurrentKnowledge()
   }, [
     initialized,
-    currentKnowledge?.id,
-    currentKnowledge?.title,
-    currentKnowledge?.category,
+    currentKnowledgeCategory,
+    currentKnowledgeId,
+    currentKnowledgeTitle,
   ])
 
   const checkInit = async () => {
@@ -249,12 +559,8 @@ function App() {
       const connectionCount = await tauriService.getMcpConnectionCount()
       setMcpConnectionCount(connectionCount)
 
-      // 获取当前筛选条件
-      const currentCategory = selectedCategory ?? undefined
-      const currentTags = selectedTags.length > 0 ? selectedTags : undefined
-
       const [knowledgeResult, loadedCategories, tags, gitStatus] = await Promise.all([
-        tauriService.listKnowledge(1, 200, nextOffset, currentCategory, currentTags),
+        tauriService.listKnowledge(1, 5000, nextOffset),
         tauriService.getCategories(),
         tauriService.getTagsWithCounts(),
         (readonly || !gitRepo) ? Promise.resolve<string[]>([]) : tauriService.gitStatus().catch(() => []),
@@ -277,28 +583,162 @@ function App() {
     }
   }
 
-  const loadMore = async () => {
-    if (!hasMore) return
-
-    const nextOffset = offset + 200
-    setOffset(nextOffset)
-    try {
-      const currentCategory = selectedCategory ?? undefined
-      const currentTags = selectedTags.length > 0 ? selectedTags : undefined
-      const knowledgeResult = await tauriService.listKnowledge(1, 200, nextOffset, currentCategory, currentTags)
-      appendKnowledgeList(knowledgeResult.items)
-      setHasMore(knowledgeResult.has_more)
-    } catch (error) {
-      console.error('Failed to load more:', error)
-    }
-  }
-
-  const sortedKnowledge = [...knowledgeList].sort((left, right) => {
+  const sortedKnowledge = useMemo(() => [...knowledgeList].sort((left, right) => {
     if (sortMode === 'title') {
       return left.title.localeCompare(right.title, 'zh-CN')
     }
     return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime()
-  })
+  }), [knowledgeList, sortMode])
+  const treeFilteredKnowledge = useMemo(() => {
+    const normalizedQuery = deferredKnowledgeQuery.trim().toLowerCase()
+    if (!normalizedQuery) return sortedKnowledge
+
+    return sortedKnowledge.filter((knowledge) => {
+      const haystacks = [
+        knowledge.title,
+        knowledge.summary ?? '',
+        knowledge.id,
+        getCategoryLabel(knowledge.category),
+        knowledge.tags.join(' '),
+      ]
+
+      return haystacks.some((value) => value.toLowerCase().includes(normalizedQuery))
+    })
+  }, [deferredKnowledgeQuery, getCategoryLabel, sortedKnowledge])
+  const selectedFolderKnowledge = useMemo(() => {
+    if (treeSelection.type !== 'folder') return []
+    return treeFilteredKnowledge.filter((knowledge) => getKnowledgeFolderPath(knowledge.id) === treeSelection.path)
+  }, [treeFilteredKnowledge, treeSelection])
+  const treeRootNode = useMemo(() => buildKnowledgeTreeRoot(sortedKnowledge), [sortedKnowledge])
+  const selectedFolderNode = useMemo(
+    () => (treeSelection.type === 'folder' ? findFolderNode(treeRootNode, treeSelection.path) : null),
+    [treeRootNode, treeSelection],
+  )
+  const selectedFolderTitle = useMemo(
+    () => getFolderDisplayName(treeSelection.type === 'folder' ? treeSelection.path : getKnowledgeFolderPath(treeSelection.path)),
+    [treeSelection],
+  )
+  const selectedFolderBreadcrumbs = useMemo(
+    () => getFolderBreadcrumbs(treeSelection.type === 'folder' ? treeSelection.path : getKnowledgeFolderPath(treeSelection.path)),
+    [treeSelection],
+  )
+  const selectedChildFolders = useMemo(
+    () => selectedFolderNode?.children.filter((node) => node.type === 'folder') ?? [],
+    [selectedFolderNode],
+  )
+  const selectedFolderDescendantKnowledge = useMemo(() => {
+    if (treeSelection.type !== 'folder') return []
+    const folderPath = treeSelection.path
+    if (!folderPath) return treeFilteredKnowledge
+
+    return treeFilteredKnowledge.filter((knowledge) => {
+      const knowledgeFolderPath = getKnowledgeFolderPath(knowledge.id)
+      return knowledgeFolderPath === folderPath || knowledgeFolderPath.startsWith(`${folderPath}/`)
+    })
+  }, [treeFilteredKnowledge, treeSelection])
+  const selectedFolderLatestUpdatedAt = useMemo(() => {
+    if (selectedFolderDescendantKnowledge.length === 0) return null
+    return selectedFolderDescendantKnowledge.reduce((latest, knowledge) => (
+      new Date(knowledge.updated_at).getTime() > new Date(latest).getTime() ? knowledge.updated_at : latest
+    ), selectedFolderDescendantKnowledge[0].updated_at)
+  }, [selectedFolderDescendantKnowledge])
+  const categoryPathSet = useMemo(() => new Set(categories.map((category) => category.id)), [categories])
+  const canCreateInSelectedFolder = useMemo(() => {
+    if (treeSelection.type !== 'folder') return false
+    return treeSelection.path === '' || categoryPathSet.has(treeSelection.path)
+  }, [categoryPathSet, treeSelection])
+  const selectedFolderCreateHint = useMemo(() => {
+    if (treeSelection.type !== 'folder') return ''
+    if (treeSelection.path === '') {
+      return '根目录下新建文档，不会自动附带分类。'
+    }
+    if (categoryPathSet.has(treeSelection.path)) {
+      return `将按当前分类路径 ${treeSelection.path} 创建新文档。`
+    }
+    return '当前目录未注册为分类，暂不能直接在此新建；如需固定落在该目录，请先将其注册为分类。'
+  }, [categoryPathSet, treeSelection])
+  const currentKnowledgeFolderPath = useMemo(
+    () => (currentKnowledgeId ? getKnowledgeFolderPath(currentKnowledgeId) : ''),
+    [currentKnowledgeId],
+  )
+  const currentKnowledgeFolderLabel = useMemo(
+    () => getFolderDisplayName(currentKnowledgeFolderPath),
+    [currentKnowledgeFolderPath],
+  )
+  const currentDocumentLineCount = useMemo(
+    () => (currentKnowledgeContent ? currentKnowledgeContent.split('\n').length : 0),
+    [currentKnowledgeContent],
+  )
+  const currentDocumentWordCount = useMemo(
+    () => countDocumentWords(currentKnowledgeContent),
+    [currentKnowledgeContent],
+  )
+  const currentDocumentCharCount = useMemo(
+    () => currentKnowledgeContent.length,
+    [currentKnowledgeContent],
+  )
+  const currentEditorModeLabel = useMemo(
+    () => getEditorModeLabel(editorMode),
+    [editorMode],
+  )
+  const currentEditorModeBadgeStyle = useMemo(
+    () => getEditorModeBadgeStyle(editorMode),
+    [editorMode],
+  )
+  const statusSelectionLabel = useMemo(() => {
+    if (!editorSelection) return null
+    const lineSpan = editorSelection.endLine - editorSelection.startLine + 1
+    return `选区 ${lineSpan} 行 · ${editorSelection.textLength} 字符`
+  }, [editorSelection])
+
+  const handleSelectKnowledge = useCallback(async (knowledgeId: string) => {
+    try {
+      await openKnowledgeWithStale(knowledgeId)
+    } catch (error) {
+      console.error('Failed to load knowledge:', error)
+    }
+  }, [openKnowledgeWithStale])
+
+  const handleSelectTreeFolder = useCallback((folderPath: string) => {
+    if (!confirmDiscardIfNeeded()) return
+    setCurrentKnowledge(null)
+    setTreeSelection({ type: 'folder', path: folderPath })
+    setShowMoreMenu(false)
+    setEditorMode('read')
+  }, [confirmDiscardIfNeeded, setCurrentKnowledge, setEditorMode])
+
+  const handleSelectTreeKnowledge = useCallback(async (knowledgeId: string) => {
+    setTreeSelection({ type: 'knowledge', path: knowledgeId })
+    setShowMoreMenu(false)
+    await handleSelectKnowledge(knowledgeId)
+  }, [handleSelectKnowledge])
+
+  const openNewKnowledgeModal = useCallback((seed?: { initialCategory?: string; categoryHint?: string }) => {
+    setNewKnowledgeSeed(seed ?? null)
+    setShowNewModal(true)
+  }, [])
+
+  const handleCreateKnowledgeInSelectedFolder = useCallback(() => {
+    if (treeSelection.type !== 'folder') {
+      openNewKnowledgeModal()
+      return
+    }
+
+    if (treeSelection.path === '') {
+      openNewKnowledgeModal({ categoryHint: selectedFolderCreateHint })
+      return
+    }
+
+    if (!categoryPathSet.has(treeSelection.path)) {
+      openNewKnowledgeModal({ categoryHint: selectedFolderCreateHint })
+      return
+    }
+
+    openNewKnowledgeModal({
+      initialCategory: treeSelection.path,
+      categoryHint: selectedFolderCreateHint,
+    })
+  }, [categoryPathSet, openNewKnowledgeModal, selectedFolderCreateHint, treeSelection])
 
   const handleExternalKnowledgeChange = useCallback(async (events: import('./services/tauri').Event[]) => {
     await loadData()
@@ -325,7 +765,7 @@ function App() {
     } catch (error) {
       console.error('Failed to refresh current knowledge after external update:', error)
     }
-  }, [readonly, selectedCategory, selectedTags, offset])
+  }, [readonly, setCurrentKnowledge])
 
   const handleTitlebarMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
@@ -340,46 +780,121 @@ function App() {
     })
   }
 
+  const handleTitlebarDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null
+    if (target?.closest('.titlebar-no-drag')) {
+      return
+    }
+
+    void tauriService.toggleWindowMaximize().catch((error) => {
+      console.error('Failed to toggle window maximize:', error)
+    })
+  }
+
   const handleSave = async () => {
-    const latestKnowledge = useAppStore.getState().currentKnowledge
+    const { currentKnowledge: latestKnowledge, currentKnowledgeContent: latestContent } = useAppStore.getState()
     if (!latestKnowledge || isSaving) return
 
     setIsSaving(true)
+    setSaveFeedback('idle')
     try {
+      const knowledgePayload = { ...latestKnowledge, content: latestContent }
+      const refreshAfterSave = async (expectedTitle: string, expectedCategory: string | null) => {
+        try {
+          await retryAsync(() => loadData(), 2)
+          const refreshed = await retryAsync(() => tauriService.listKnowledge(1, 200, 0), 2)
+          const updatedItem = refreshed.items.find((knowledge) => {
+            if (knowledge.title !== expectedTitle) return false
+            if (!expectedCategory) return true
+            return knowledge.category === expectedCategory || knowledge.id.startsWith(`${expectedCategory}/`)
+          })
+          if (!updatedItem) {
+            return
+          }
+
+          const fullKnowledge = await retryAsync(() => tauriService.getKnowledgeWithStale(updatedItem.id), 2)
+          setCurrentKnowledge(fullKnowledge)
+        } catch (error) {
+          console.error('Post-save refresh failed:', error)
+        }
+      }
+
       if (latestKnowledge.id) {
         const expectedTitle = latestKnowledge.title
-        const expectedCategory = latestKnowledge.category
-        await tauriService.updateKnowledge(latestKnowledge.id, latestKnowledge)
-        await loadData()
-        const refreshed = await tauriService.listKnowledge(1, 200, 0)
-        const updatedItem = refreshed.items.find((knowledge) => {
-          if (knowledge.title !== expectedTitle) return false
-          if (!expectedCategory) return true
-          return knowledge.category === expectedCategory || knowledge.id.startsWith(`${expectedCategory}/`)
-        })
-        if (updatedItem) {
-          const fullKnowledge = await tauriService.getKnowledgeWithStale(updatedItem.id)
-          setCurrentKnowledge(fullKnowledge)
+        const expectedCategory = latestKnowledge.category ?? null
+        let saveConfirmed = false
+
+        try {
+          await retryAsync(() => tauriService.updateKnowledge(latestKnowledge.id, knowledgePayload), 2)
+          saveConfirmed = true
+        } catch (error) {
+          if (!isRetriableRequestError(error)) {
+            throw error
+          }
+
+          try {
+            await wait(180)
+            const reconciledKnowledge = await retryAsync(() => tauriService.getKnowledge(latestKnowledge.id, 2), 2)
+            if (
+              reconciledKnowledge.title === expectedTitle &&
+              (reconciledKnowledge.category ?? null) === (expectedCategory ?? null) &&
+              reconciledKnowledge.content === latestContent
+            ) {
+              setCurrentKnowledge(reconciledKnowledge)
+              saveConfirmed = true
+            }
+          } catch (reconcileError) {
+            console.error('Failed to reconcile save after aborted request:', reconcileError)
+          }
+
+          if (!saveConfirmed) {
+            throw error
+          }
         }
+
+        clearKnowledgeDraft(latestKnowledge.id)
+        setCurrentKnowledge({
+          ...knowledgePayload,
+          updated_at: new Date().toISOString(),
+        })
+        void refreshAfterSave(expectedTitle, expectedCategory)
       } else {
-        const createdId = await tauriService.createKnowledge(latestKnowledge)
-        const createdKnowledge = await tauriService.getKnowledge(createdId, 2)
+        const createdId = await retryAsync(() => tauriService.createKnowledge(knowledgePayload), 2)
+        clearKnowledgeDraft(createdId)
+        const createdKnowledge = await retryAsync(() => tauriService.getKnowledge(createdId, 2), 2)
         setCurrentKnowledge(createdKnowledge)
-        await loadData()
+        void refreshAfterSave(createdKnowledge.title, createdKnowledge.category ?? null)
       }
+      setSaveFeedback('saved')
     } catch (error) {
       console.error('Save failed:', error)
+      setSaveFeedback('error')
       alert('保存失败: ' + error)
     } finally {
       setIsSaving(false)
     }
   }
 
+  useEffect(() => {
+    if (readonly) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        void handleSave()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSave, readonly])
+
   const handleDelete = async () => {
-    if (!currentKnowledge?.id) return
+    const latestKnowledge = useAppStore.getState().currentKnowledge
+    if (!latestKnowledge?.id) return
 
     try {
-      const preview = await tauriService.previewDeleteKnowledge(currentKnowledge.id)
+      const preview = await tauriService.previewDeleteKnowledge(latestKnowledge.id)
       setDeletePreview(preview)
       setShowDeleteConfirm(true)
       setShowMoreMenu(false)
@@ -390,11 +905,14 @@ function App() {
   }
 
   const confirmDelete = async () => {
-    if (!currentKnowledge?.id) return
+    const latestKnowledge = useAppStore.getState().currentKnowledge
+    if (!latestKnowledge?.id) return
 
     try {
-      await tauriService.deleteKnowledge(currentKnowledge.id)
+      const deletedFolderPath = getKnowledgeFolderPath(latestKnowledge.id)
+      await tauriService.deleteKnowledge(latestKnowledge.id)
       setCurrentKnowledge(null)
+      setTreeSelection({ type: 'folder', path: deletedFolderPath })
       setShowDeleteConfirm(false)
       setDeletePreview(null)
       await loadData()
@@ -461,6 +979,7 @@ function App() {
         data-macos-native-titlebar={isMacOS ? 'true' : 'false'}
         data-tauri-drag-region={isMacOS ? true : undefined}
         onMouseDown={isMacOS ? handleTitlebarMouseDown : undefined}
+        onDoubleClick={handleTitlebarDoubleClick}
       >
         <div
           className="flex items-center gap-2"
@@ -475,279 +994,399 @@ function App() {
           <div className="flex-1" />
         )}
         <div className="titlebar-no-drag flex items-center gap-1">
-          <button onClick={() => setShowKnowledgeGraph(true)} className="titlebar-no-drag p-1 hover:bg-gray-200 rounded" title="知识图谱">
-            <GitBranch className="h-4 w-4" style={{ color: '#737373' }} />
+          <button
+            onClick={() => setShowKbSwitcher(true)}
+            className="titlebar-no-drag flex items-center gap-1 rounded px-2 py-1 hover:bg-gray-200"
+            title="切换知识库"
+          >
+            <Database className="h-4 w-4" style={{ color: '#737373' }} />
+            <span className="max-w-[140px] truncate text-xs font-medium" style={{ color: '#525252' }}>
+              {currentKbName}
+            </span>
           </button>
           <button onClick={() => setShowSearch(true)} className="titlebar-no-drag p-1 hover:bg-gray-200 rounded" title="搜索">
             <Search className="h-4 w-4" style={{ color: '#737373' }} />
           </button>
-          {!readonly && (
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="titlebar-no-drag flex items-center gap-1 px-2.5 py-1 rounded text-white text-xs font-medium"
-              style={{ backgroundColor: '#6366F1' }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              新建
-            </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-hidden">
+        <PanelGroup
+          orientation="horizontal"
+          className="h-full"
+          resizeTargetMinimumSize={{ fine: 24, coarse: 36 }}
+          onLayoutChanged={syncResizablePanelState}
+        >
+          <Panel
+            id="knowledge-list"
+            panelRef={knowledgeListPanelRef}
+            collapsible
+            collapsedSize={0}
+            minSize={LIST_MIN_WIDTH}
+            maxSize={LIST_MAX_WIDTH}
+            defaultSize={knowledgeListCollapsed ? 0 : clamp(knowledgeListWidth, LIST_MIN_WIDTH, LIST_MAX_WIDTH)}
+            groupResizeBehavior="preserve-pixel-size"
+            className="h-full bg-white"
+          >
+            <KnowledgeTreeNav
+              rootNode={treeRootNode}
+              query={knowledgeQuery}
+              selected={treeSelection}
+              readonly={readonly}
+              mcpConnectionCount={mcpConnectionCount}
+              onQueryChange={setKnowledgeQuery}
+              onSelectFolder={handleSelectTreeFolder}
+              onSelectKnowledge={(knowledgeId) => {
+                void handleSelectTreeKnowledge(knowledgeId)
+              }}
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenKnowledgeGraph={() => setShowKnowledgeGraph(true)}
+              onOpenImport={!readonly ? () => setShowImportModal(true) : undefined}
+            />
+          </Panel>
+
+          <ResizableHandle
+            collapsed={knowledgeListCollapsed}
+            onToggle={toggleKnowledgeList}
+            expandTitle="展开知识列表"
+            collapseTitle="折叠知识列表"
+            collapsedDirection="right"
+            expandedDirection="left"
+            topOffset={58}
+          />
+
+          <Panel id="editor-main" minSize="25%" className="h-full min-w-0 bg-white">
+            <div className="flex h-full min-w-0 flex-col bg-white">
+              <div className="h-12 flex-shrink-0 flex items-center gap-2 px-4 border-b overflow-visible relative z-20" style={{ borderColor: '#E5E5E5' }}>
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  {treeSelection.type === 'folder' ? (
+                    <>
+                      {treeSelection.path && (
+                        <>
+                          <span className="text-[13px]" style={{ color: '#A3A3A3' }}>目录</span>
+                          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#D4D4D4' }} />
+                        </>
+                      )}
+                      <span className="text-[13px] font-medium truncate" style={{ color: '#0A0A0A' }}>
+                        {selectedFolderTitle}
+                      </span>
+                      <span
+                        className="hidden rounded-full px-2 py-1 text-[10px] font-medium md:inline-flex"
+                        style={{ backgroundColor: '#F8FAFC', color: '#64748B' }}
+                      >
+                        {selectedFolderDescendantKnowledge.length} 篇
+                      </span>
+                      {knowledgeQuery.trim() && (
+                        <span
+                          className="hidden max-w-[180px] truncate rounded-full px-2 py-1 text-[10px] font-medium md:inline-flex"
+                          style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+                          title={`当前搜索：${knowledgeQuery}`}
+                        >
+                          搜索：{knowledgeQuery}
+                        </span>
+                      )}
+                    </>
+                  ) : hasCurrentKnowledge && (
+                    <>
+                      {currentKnowledgeFolderPath && (
+                        <>
+                          <span className="text-[13px]" style={{ color: '#A3A3A3' }}>{currentKnowledgeFolderLabel}</span>
+                          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#D4D4D4' }} />
+                        </>
+                      )}
+                      <span className="text-[13px] font-medium truncate" style={{ color: '#0A0A0A' }}>{currentKnowledgeTitle}</span>
+                    </>
+                  )}
+                </div>
+
+                {treeSelection.type === 'folder' && (
+                  <div className="flex items-center gap-1.5 rounded-xl border px-2 py-1.5" style={{ borderColor: '#E5E5E5', backgroundColor: '#FAFAFA' }}>
+                    <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ backgroundColor: '#FFFFFF' }}>
+                      <button
+                        type="button"
+                        onClick={() => setSortMode('recent')}
+                        className="rounded-md px-2 py-1 text-[11px] font-medium"
+                        style={{
+                          backgroundColor: sortMode === 'recent' ? '#EEF2FF' : 'transparent',
+                          color: sortMode === 'recent' ? '#4338CA' : '#737373',
+                        }}
+                      >
+                        最近
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSortMode('title')}
+                        className="rounded-md px-2 py-1 text-[11px] font-medium"
+                        style={{
+                          backgroundColor: sortMode === 'title' ? '#EEF2FF' : 'transparent',
+                          color: sortMode === 'title' ? '#4338CA' : '#737373',
+                        }}
+                      >
+                        标题
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ backgroundColor: '#FFFFFF' }}>
+                      <button
+                        type="button"
+                        onClick={() => setListDensity('compact')}
+                        className="rounded-md px-2 py-1 text-[11px] font-medium"
+                        style={{
+                          backgroundColor: listDensity === 'compact' ? '#EEF2FF' : 'transparent',
+                          color: listDensity === 'compact' ? '#4338CA' : '#737373',
+                        }}
+                      >
+                        紧凑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setListDensity('comfortable')}
+                        className="rounded-md px-2 py-1 text-[11px] font-medium"
+                        style={{
+                          backgroundColor: listDensity === 'comfortable' ? '#EEF2FF' : 'transparent',
+                          color: listDensity === 'comfortable' ? '#4338CA' : '#737373',
+                        }}
+                      >
+                        预览
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {!readonly && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (treeSelection.type === 'folder') {
+                          handleCreateKnowledgeInSelectedFolder()
+                          return
+                        }
+                        openNewKnowledgeModal()
+                      }}
+                      className="inline-flex h-8 items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-white"
+                      style={{ backgroundColor: '#6366F1' }}
+                      title="新建知识"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      新建
+                    </button>
+                  )}
+                </div>
+
+                {!readonly && treeSelection.type === 'knowledge' && (
+                  <div className="browser-mode-switch w-auto max-w-[320px] flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditorMode('read')}
+                      className={`browser-mode-switch__button ${editorMode === 'read' ? 'browser-mode-switch__button--active' : ''}`}
+                    >
+                      阅读
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditorMode('markdown')}
+                      className={`browser-mode-switch__button ${editorMode === 'markdown' ? 'browser-mode-switch__button--active' : ''}`}
+                    >
+                      Markdown
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditorMode('rich')}
+                      className={`browser-mode-switch__button ${editorMode === 'rich' ? 'browser-mode-switch__button--active' : ''}`}
+                    >
+                      高级编辑
+                    </button>
+                  </div>
+                )}
+
+                {!readonly && treeSelection.type === 'knowledge' && hasCurrentKnowledge && (
+                  <div className="relative flex-shrink-0" data-floating-menu="true">
+                    <button
+                      onClick={() => setShowMoreMenu((open) => !open)}
+                      className="h-8 w-8 rounded-md inline-flex items-center justify-center"
+                      style={{ border: '1px solid #E5E5E5' }}
+                    >
+                      <MoreHorizontal className="h-4 w-4" style={{ color: '#737373' }} />
+                    </button>
+                    {showMoreMenu && (
+                      <div
+                        className="absolute right-0 top-full mt-2 min-w-[156px] rounded-2xl border p-1.5 shadow-xl z-50"
+                        style={{
+                          borderColor: '#E5E5E5',
+                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                          boxShadow: '0 20px 44px rgba(15, 23, 42, 0.14)',
+                          backdropFilter: 'blur(10px)',
+                        }}
+                      >
+                        <button
+                          onClick={handleDelete}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-red-50"
+                          style={{ color: '#EF4444' }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          删除知识
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!readonly && treeSelection.type === 'knowledge' && (hasUnsavedChanges || isSaving || saveFeedback === 'error') && (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving || !hasCurrentKnowledge || !hasUnsavedChanges}
+                    className="flex-shrink-0 flex h-8 items-center gap-1 px-2.5 py-1 rounded-md text-white text-xs font-medium"
+                    style={{
+                      backgroundColor: saveFeedback === 'error' ? '#DC2626' : '#6366F1',
+                      opacity: isSaving || !hasCurrentKnowledge || !hasUnsavedChanges ? 0.7 : 1,
+                      cursor: isSaving || !hasCurrentKnowledge || !hasUnsavedChanges ? 'not-allowed' : 'pointer',
+                    }}
+                    title={`${isMacOS ? '⌘' : 'Ctrl'}+S`}
+                  >
+                    {saveFeedback === 'error' ? (
+                      <AlertCircle className="h-3.5 w-3.5" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    {isSaving ? '保存中...' : saveFeedback === 'error' ? '重试保存' : '保存'}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 min-h-0 flex overflow-hidden">
+                {treeSelection.type === 'folder' ? (
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <DirectoryKnowledgeBrowser
+                      title={selectedFolderTitle}
+                      description={treeSelection.path ? `当前目录：${treeSelection.path}` : '根目录下的文档会在这里以卡片方式展示。'}
+                      knowledgeList={selectedFolderKnowledge}
+                      childFolders={selectedChildFolders}
+                      breadcrumbs={selectedFolderBreadcrumbs}
+                      folderTotalCount={selectedFolderDescendantKnowledge.length}
+                      latestUpdatedAt={selectedFolderLatestUpdatedAt}
+                      currentKnowledgeId={currentKnowledgeId}
+                      listDensity={listDensity}
+                      createAction={!readonly ? {
+                        disabled: !canCreateInSelectedFolder,
+                        hint: selectedFolderCreateHint,
+                      } : undefined}
+                      onSelectFolder={handleSelectTreeFolder}
+                      onSelectKnowledge={(knowledgeId) => {
+                        void handleSelectTreeKnowledge(knowledgeId)
+                      }}
+                      getCategoryLabel={getCategoryLabel}
+                      formatDate={formatDate}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 min-w-0 overflow-y-auto" style={{ padding: '32px 24px 32px 48px' }}>
+                    <CurrentKnowledgeEditorPane
+                      readonly={readonly}
+                      editorMode={editorMode}
+                    />
+                  </div>
+                )}
+
+                <RightPanel
+                  readonly={readonly}
+                  isGitRepo={isGitRepo}
+                  hasKnowledge={treeSelection.type === 'knowledge' && hasCurrentKnowledge}
+                  folderMode={treeSelection.type === 'folder'}
+                  pendingChangesCount={pendingChangesCount}
+                  onGitStatusChange={setPendingChangesCount}
+                />
+              </div>
+            </div>
+          </Panel>
+        </PanelGroup>
+      </div>
+
+      <div
+        className="flex h-8 flex-shrink-0 items-center justify-between gap-3 border-t px-3 text-[11px]"
+        style={{ borderColor: '#E5E5E5', backgroundColor: '#FAFAFA', color: '#737373' }}
+      >
+        <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+          {treeSelection.type === 'knowledge' && hasCurrentKnowledge ? (
+            <>
+              <span className="truncate font-medium" style={{ color: '#404040' }}>{currentKnowledgeTitle}</span>
+              {currentKnowledgeFolderPath && (
+                <span
+                  className="hidden rounded-full px-2 py-0.5 sm:inline-flex"
+                  style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#64748B' }}
+                >
+                  {currentKnowledgeFolderLabel}
+                </span>
+              )}
+              {statusSelectionLabel && (
+                <span
+                  className="hidden rounded-full px-2 py-0.5 md:inline-flex"
+                  style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+                >
+                  {statusSelectionLabel}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="truncate font-medium" style={{ color: '#404040' }}>{selectedFolderTitle}</span>
+              <span
+                className="rounded-full px-2 py-0.5"
+                style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#64748B' }}
+              >
+                目录 {selectedChildFolders.length} 个
+              </span>
+              <span
+                className="hidden rounded-full px-2 py-0.5 sm:inline-flex"
+                style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#64748B' }}
+              >
+                文档 {selectedFolderDescendantKnowledge.length} 篇
+              </span>
+            </>
+          )}
+        </div>
+
+        <div className="flex flex-shrink-0 items-center gap-2 overflow-hidden">
+          {treeSelection.type === 'knowledge' && hasCurrentKnowledge ? (
+            <>
+              <span>行 {currentDocumentLineCount}</span>
+              <span className="hidden sm:inline">词 {currentDocumentWordCount}</span>
+              <span className="hidden md:inline">字 {currentDocumentCharCount}</span>
+              <span
+                className="rounded-full px-2 py-0.5"
+                style={readonly ? {
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #E5E7EB',
+                  color: '#64748B',
+                } : currentEditorModeBadgeStyle}
+              >
+                {readonly ? '只读' : currentEditorModeLabel}
+              </span>
+            </>
+          ) : (
+            <>
+              {knowledgeQuery.trim() && <span className="hidden md:inline">筛选：{knowledgeQuery}</span>}
+              <span>{sortMode === 'recent' ? '按最近更新' : '按标题'}</span>
+              <span className="hidden sm:inline">{listDensity === 'compact' ? '紧凑视图' : '预览视图'}</span>
+            </>
           )}
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-[240px] min-w-[240px] flex-shrink-0 border-r" style={{ backgroundColor: '#FAFAFA', borderColor: '#E5E5E5' }}>
-          <Sidebar
-            onImport={() => setShowImportModal(true)}
-            onOpenSearch={() => setShowSearch(true)}
-            readonly={readonly}
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-            pendingChangesCount={pendingChangesCount}
-            currentKbName={currentKbName}
-            isGitRepo={isGitRepo}
-            mcpConnectionCount={mcpConnectionCount}
-          />
-        </div>
-
-        <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col border-r bg-white" style={{ borderColor: '#E5E5E5' }}>
-          <div className="px-3 pt-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[13px]" style={{ color: '#A3A3A3' }}>
-                {selectedCategory
-                  ? (categories.find((category) => category.id === selectedCategory)?.name || selectedCategory)
-                  : '全部知识'}
-              </span>
-              <div className="flex-1" />
-              <button
-                onClick={() => setSortMode((mode) => (mode === 'recent' ? 'title' : 'recent'))}
-                className="flex items-center gap-1 px-2 py-1 rounded-[5px]"
-                style={{ border: '1px solid #E5E5E5' }}
-              >
-                <ArrowUpDown className="h-3 w-3" style={{ color: '#737373' }} />
-                <span className="text-[11px]" style={{ color: '#737373' }}>
-                  {sortMode === 'recent' ? '最近' : '标题'}
-                </span>
-              </button>
-              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ backgroundColor: '#F5F5F5', color: '#737373' }}>
-                {sortedKnowledge.length} 条
-              </span>
-            </div>
-
-            <div className="flex gap-1.5 flex-wrap pb-2.5">
-              <button
-                onClick={() => selectedTags.length > 0 && useAppStore.setState({ selectedTags: [] })}
-                className="px-2.5 py-[3px] text-[11px] rounded-full font-medium"
-                style={{
-                  backgroundColor: selectedTags.length === 0 ? '#6366F1' : 'transparent',
-                  color: selectedTags.length === 0 ? '#FFFFFF' : '#737373',
-                  border: selectedTags.length === 0 ? 'none' : '1px solid #E5E5E5',
-                }}
-              >
-                全部
-              </button>
-              {allTags.map(({ tag, count }) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className="px-2.5 py-[3px] text-[11px] rounded-full font-medium"
-                  style={{
-                    backgroundColor: selectedTags.includes(tag) ? '#6366F1' : 'transparent',
-                    color: selectedTags.includes(tag) ? '#FFFFFF' : '#737373',
-                    border: selectedTags.includes(tag) ? 'none' : '1px solid #E5E5E5',
-                  }}
-                >
-                  {tag} ({count})
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-px" style={{ backgroundColor: '#E5E5E5' }} />
-
-          <div className="flex-1 overflow-y-auto">
-            {sortedKnowledge.map((knowledge) => {
-              const isSelected = currentKnowledge?.id === knowledge.id
-              return (
-                <div
-                  key={knowledge.id}
-                  className="p-3 border-b cursor-pointer"
-                  style={{
-                    backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
-                    borderColor: isSelected ? '#C7D2FE' : '#E5E5E5',
-                  }}
-                  onClick={async () => {
-                    try {
-                      const fullKnowledge = await tauriService.getKnowledgeWithStale(knowledge.id)
-                      setCurrentKnowledge(fullKnowledge)
-                    } catch (error) {
-                      console.error('Failed to load knowledge:', error)
-                    }
-                  }}
-                >
-                  <h3 className="text-[13px] font-semibold mb-1.5 truncate" style={{ color: isSelected ? '#3730A3' : '#0A0A0A' }}>
-                    {knowledge.title}
-                  </h3>
-                  {knowledge.summary && (
-                    <p className="text-xs mb-2 line-clamp-2 leading-relaxed" style={{ color: isSelected ? '#6366F1' : '#737373' }}>
-                      {knowledge.summary}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-wrap gap-1.5">
-                      {knowledge.tags.slice(0, 3).map((tag) => {
-                        const tagColors = getTagColors(tag)
-                        return (
-                          <span
-                            key={tag}
-                            className="px-1.5 py-0.5 text-[10px] rounded font-medium"
-                            style={{ backgroundColor: tagColors.bg, color: tagColors.text }}
-                          >
-                            {tag}
-                          </span>
-                        )
-                      })}
-                    </div>
-                    <span className="text-[11px]" style={{ color: isSelected ? '#818CF8' : '#A3A3A3' }}>
-                      {formatDate(knowledge.updated_at)}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-
-            {hasMore && (
-              <div className="p-3">
-                <button
-                  onClick={loadMore}
-                  className="w-full py-2 text-sm font-medium text-center rounded-lg border hover:bg-gray-50 transition-colors"
-                  style={{ color: '#6366F1', borderColor: '#E5E7EB' }}
-                >
-                  加载更多
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex-1 min-w-0 flex flex-col bg-white">
-          <div className="h-12 flex-shrink-0 flex items-center gap-2 px-4 border-b overflow-visible relative z-20" style={{ borderColor: '#E5E5E5' }}>
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              {currentKnowledge && (
-                <>
-                  {currentKnowledge.category && (
-                    <>
-                      <span className="text-[13px]" style={{ color: '#A3A3A3' }}>{currentKnowledge.category}</span>
-                      <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#D4D4D4' }} />
-                    </>
-                  )}
-                  <span className="text-[13px] font-medium truncate" style={{ color: '#0A0A0A' }}>{currentKnowledge.title}</span>
-                </>
-              )}
-            </div>
-
-            {!readonly && (
-              <div className="flex rounded-md overflow-hidden flex-shrink-0" style={{ border: '1px solid #E5E5E5' }}>
-                <button
-                  onClick={() => setEditorMode('read')}
-                  className="px-3 py-1.5 text-xs"
-                  style={{
-                    backgroundColor: editorMode === 'read' ? '#F5F5F5' : '#FFFFFF',
-                    color: editorMode === 'read' ? '#0A0A0A' : '#737373',
-                    fontWeight: editorMode === 'read' ? 500 : 'normal',
-                  }}
-                >
-                  阅读
-                </button>
-                <button
-                  onClick={() => setEditorMode('edit')}
-                  className="px-3 py-1.5 text-xs"
-                  style={{
-                    backgroundColor: editorMode === 'edit' ? '#F5F5F5' : '#FFFFFF',
-                    color: editorMode === 'edit' ? '#0A0A0A' : '#737373',
-                    fontWeight: editorMode === 'edit' ? 500 : 'normal',
-                  }}
-                >
-                  编辑
-                </button>
-              </div>
-            )}
-
-            {!readonly && currentKnowledge && (
-              <div className="relative flex-shrink-0">
-                <button
-                  onClick={() => setShowMoreMenu((open) => !open)}
-                  className="p-1.5 rounded-[5px]"
-                  style={{ border: '1px solid #E5E5E5' }}
-                >
-                  <MoreHorizontal className="h-4 w-4" style={{ color: '#737373' }} />
-                </button>
-                {showMoreMenu && (
-                  <div
-                    className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg py-1 z-50 min-w-[140px]"
-                    style={{ borderColor: '#E5E5E5' }}
-                  >
-                    <button
-                      onClick={handleDelete}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-50"
-                      style={{ color: '#EF4444' }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      删除知识
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!readonly && (
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded text-white text-xs font-medium"
-                style={{
-                  backgroundColor: '#6366F1',
-                  opacity: isSaving ? 0.7 : 1,
-                  cursor: isSaving ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <Save className="h-3.5 w-3.5" />
-                {isSaving ? '保存中...' : '保存'}
-              </button>
-            )}
-          </div>
-
-          <div className="flex-1 min-h-0 flex overflow-hidden">
-            <div className="flex-1 min-w-0 overflow-y-auto" style={{ padding: '32px 24px 32px 48px' }}>
-              {currentKnowledge ? (
-                <Editor
-                  value={currentKnowledge.content ?? ''}
-                  onChange={(content) => setCurrentKnowledge({ ...currentKnowledge, content })}
-                  mode={readonly ? 'read' : editorMode}
-                  knowledgePath={currentKnowledge.id}
-                  knowledgeTitle={currentKnowledge.title}
-                  knowledgeCategory={currentKnowledge.category}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  选择或创建知识开始编辑
-                </div>
-              )}
-            </div>
-
-            {/* 右侧可折叠面板 */}
-            <RightPanel
-              readonly={readonly}
-              isGitRepo={isGitRepo}
-              hasKnowledge={!!currentKnowledge}
-              pendingChangesCount={pendingChangesCount}
-              onGitStatusChange={setPendingChangesCount}
-            />
-          </div>
-        </div>
-      </div>
-
       {showSearch && <SearchPanel onClose={() => setShowSearch(false)} />}
-      {!readonly && showNewModal && <NewKnowledgeModal onClose={() => setShowNewModal(false)} />}
+      {!readonly && showNewModal && (
+        <NewKnowledgeModal
+          onClose={() => {
+            setShowNewModal(false)
+            setNewKnowledgeSeed(null)
+          }}
+          initialCategory={newKnowledgeSeed?.initialCategory}
+          categoryHint={newKnowledgeSeed?.categoryHint}
+          onCreated={async () => {
+            await loadData()
+          }}
+        />
+      )}
       {!readonly && showImportModal && (
         <ImportModal
           onClose={() => {
@@ -759,13 +1398,22 @@ function App() {
       <ToastNotifications onKnowledgeChange={handleExternalKnowledgeChange} />
 
       {showKnowledgeGraph && (
-        <KnowledgeGraphPanel
-          onClose={() => setShowKnowledgeGraph(false)}
-          onSelectKnowledge={async (id) => {
-            const knowledge = await tauriService.getKnowledge(id, 2)
-            setCurrentKnowledge(knowledge)
-          }}
-        />
+        <Suspense
+          fallback={(
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="rounded-xl bg-white px-4 py-3 text-sm text-neutral-600 shadow-xl">
+                加载知识图谱中...
+              </div>
+            </div>
+          )}
+        >
+          <KnowledgeGraphPanel
+            onClose={() => setShowKnowledgeGraph(false)}
+            onSelectKnowledge={async (id) => {
+              await openKnowledgeWithStale(id)
+            }}
+          />
+        </Suspense>
       )}
 
       {showDeleteConfirm && deletePreview && (
@@ -789,6 +1437,7 @@ function App() {
           onSwitch={handleKbSwitch}
         />
       )}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

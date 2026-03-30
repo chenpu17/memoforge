@@ -35,6 +35,13 @@ export interface GrepMatch {
   line: string
 }
 
+export interface KnowledgeLinkCompletion {
+  id: string
+  title: string
+  summary?: string
+  category?: string
+}
+
 export interface SearchResult {
   knowledge: Knowledge
   matches: GrepMatch[]

@@ -39,8 +39,7 @@ impl HttpConfig {
     /// Create config from environment variables
     pub fn from_env() -> Self {
         Self {
-            bind: std::env::var("MEMOFORGE_HTTP_BIND")
-                .unwrap_or_else(|_| "127.0.0.1".to_string()),
+            bind: std::env::var("MEMOFORGE_HTTP_BIND").unwrap_or_else(|_| "127.0.0.1".to_string()),
             port: std::env::var("MEMOFORGE_HTTP_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok())

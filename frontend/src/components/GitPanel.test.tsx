@@ -25,19 +25,20 @@ describe('GitPanel', () => {
 
   it('reports git status count on initial load and after commit', async () => {
     const onStatusChange = vi.fn()
-    gitStatusMock
-      .mockResolvedValueOnce(['M programming/alpha.md'])
-      .mockResolvedValueOnce([])
+    gitStatusMock.mockResolvedValue(['M programming/alpha.md'])
     gitCommitMock.mockResolvedValue(undefined)
 
     render(<GitPanel compact onStatusChange={onStatusChange} />)
 
     await waitFor(() => {
+      expect(screen.getByText(/总计 1/)).toBeInTheDocument()
       expect(screen.getByText('M programming/alpha.md')).toBeInTheDocument()
     })
     expect(onStatusChange).toHaveBeenCalledWith(1)
 
-    fireEvent.change(screen.getByPlaceholderText('提交信息'), {
+    gitStatusMock.mockResolvedValue([])
+
+    fireEvent.change(screen.getByPlaceholderText('输入提交信息'), {
       target: { value: 'fix sidebar status sync' },
     })
     fireEvent.click(screen.getByRole('button', { name: '提交' }))
@@ -53,16 +54,16 @@ describe('GitPanel', () => {
 
   it('reloads status when refresh token changes', async () => {
     const onStatusChange = vi.fn()
-    gitStatusMock
-      .mockResolvedValueOnce(['M programming/alpha.md'])
-      .mockResolvedValueOnce([])
+    gitStatusMock.mockResolvedValue(['M programming/alpha.md'])
 
     const { rerender } = render(<GitPanel compact refreshToken={0} onStatusChange={onStatusChange} />)
 
     await waitFor(() => {
+      expect(screen.getByText(/总计 1/)).toBeInTheDocument()
       expect(screen.getByText('M programming/alpha.md')).toBeInTheDocument()
     })
 
+    gitStatusMock.mockResolvedValue([])
     rerender(<GitPanel compact refreshToken={1} onStatusChange={onStatusChange} />)
 
     await waitFor(() => {

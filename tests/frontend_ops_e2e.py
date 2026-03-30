@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -42,27 +43,35 @@ def run_frontend_ops_e2e(paths: dict[str, str], web_port: int) -> None:
         def mark(step: str) -> None:
             print(f"OK {step}")
 
-        middle_list = page.locator("div.w-\\[300px\\]")
+        tree_nav = page.locator(".knowledge-tree-shell")
+        browser_shell = page.locator(".directory-browser-shell")
+        main_header = page.locator("div.h-12")
 
-        page.locator('button[title="知识图谱"]').click()
+        def tree_button(text: str):
+            return tree_nav.locator("button").filter(has_text=re.compile(text)).first
+
+        page.get_by_role("button", name="更多").click()
+        page.get_by_role("button", name="知识图谱").click()
         expect(page.get_by_text("知识图谱")).to_be_visible()
         page.locator(".react-flow__node").filter(has_text="Alpha Rust Patterns").first.wait_for()
         page.locator(".react-flow__node").filter(has_text="Alpha Rust Patterns").first.click()
         page.wait_for_timeout(800)
-        expect(page.locator("div.h-12").get_by_text("Alpha Rust Patterns")).to_be_visible()
+        expect(main_header.get_by_text("Alpha Rust Patterns")).to_be_visible()
         mark("graph-select")
 
-        page.get_by_text("导入 Markdown").click()
-        expect(page.get_by_text("导入 Markdown 文件夹")).to_be_visible()
-        page.get_by_placeholder("例如: ~/Documents/notes 或 /path/to/markdown/files").fill(paths["import_src"])
-        page.get_by_role("button", name="预览").click()
-        expect(page.get_by_text("预览结果")).to_be_visible()
-        expect(page.get_by_text("Imported Note")).to_be_visible()
-        page.get_by_role("button", name="开始导入").click()
-        expect(page.get_by_text("导入完成")).to_be_visible()
-        page.get_by_role("button", name="关闭").click()
+        tree_button("全部文档").click()
+        page.locator('button[title="导入 Markdown"]').click()
+        import_modal = page.locator("div.fixed.inset-0.z-50").filter(has=page.get_by_text("导入 Markdown 文件夹"))
+        expect(import_modal).to_be_visible()
+        import_modal.get_by_placeholder("例如: ~/Documents/notes 或 /path/to/markdown/files").fill(paths["import_src"])
+        import_modal.get_by_role("button", name="预览").click()
+        expect(import_modal.get_by_text("预览结果")).to_be_visible()
+        expect(import_modal.get_by_text("Imported Note")).to_be_visible()
+        import_modal.get_by_role("button", name="开始导入").click()
+        expect(import_modal.get_by_text("导入完成")).to_be_visible()
+        import_modal.get_by_role("button", name="关闭").click()
         page.wait_for_timeout(1200)
-        expect(middle_list.get_by_text("Imported Note")).to_be_visible()
+        expect(browser_shell.get_by_text("Imported Note")).to_be_visible()
 
         imported_path = Path(paths["kb1"]) / "imported-note.md"
         source_path = Path(paths["import_src"]) / "imported-note.md"
@@ -71,26 +80,28 @@ def run_frontend_ops_e2e(paths: dict[str, str], web_port: int) -> None:
         assert not source_path.read_text(encoding="utf-8").startswith("---\n")
         mark("import")
 
-        page.get_by_placeholder("提交信息").fill(commit_message)
+        page.get_by_role("button", name="Git").click()
+        page.get_by_placeholder("输入提交信息").fill(commit_message)
         page.get_by_role("button", name="提交").click()
         expect(page.get_by_text("无变更")).to_be_visible(timeout=10_000)
         assert git_output("-C", paths["kb1"], "log", "-1", "--pretty=%s") == commit_message
 
-        page.get_by_role("button", name="拉取").click()
+        page.locator(".side-panel-body button").filter(has=page.locator("svg.lucide-arrow-down")).first.click()
         page.wait_for_timeout(1000)
-        page.locator("button").filter(has=page.locator("svg.lucide-upload")).first.click()
+        page.locator(".side-panel-body button").filter(has=page.locator("svg.lucide-upload")).first.click()
         page.wait_for_timeout(1500)
         assert git_output("--git-dir", paths["remote"], "log", "--all", "-1", "--pretty=%s") == commit_message
         mark("git")
 
-        page.get_by_text("我的知识库").click()
+        page.locator('button[title="切换知识库"]').click()
         expect(page.get_by_text("知识库管理")).to_be_visible()
-        page.get_by_placeholder("输入知识库路径...").fill(paths["kb2"])
+        page.get_by_placeholder("输入知识库路径或选择目录...").fill(paths["kb2"])
         page.get_by_role("button", name="打开").click()
         page.wait_for_timeout(1000)
         page.reload(wait_until="networkidle")
         page.wait_for_timeout(1000)
-        expect(middle_list.get_by_text("Gamma Python Tips")).to_be_visible()
+        tree_button("programming").click()
+        expect(browser_shell.get_by_text("Gamma Python Tips")).to_be_visible()
         mark("kb-switch")
 
         browser.close()
@@ -106,19 +117,26 @@ def run_readonly_smoke(web_port: int) -> None:
         def mark(step: str) -> None:
             print(f"OK {step}")
 
-        middle_list = page.locator("div.w-\\[300px\\]")
+        tree_nav = page.locator(".knowledge-tree-shell")
+        browser_shell = page.locator(".directory-browser-shell")
+        main_header = page.locator("div.h-12")
+
+        def tree_button(text: str):
+            return tree_nav.locator("button").filter(has_text=re.compile(text)).first
 
         expect(page.get_by_text("Web 访问仅限只读")).to_be_visible()
         expect(page.get_by_role("button", name="新建")).to_have_count(0)
         expect(page.get_by_role("button", name="保存")).to_have_count(0)
-        expect(page.get_by_text("导入 Markdown")).to_have_count(0)
+        expect(page.locator('button[title="导入 Markdown"]')).to_have_count(0)
         expect(page.get_by_text("Git 状态")).to_have_count(0)
 
-        middle_list.get_by_text("Alpha Rust Patterns").click()
+        tree_button("programming").click()
+        browser_shell.locator("button").filter(has_text="Alpha Rust Patterns").first.click()
         page.wait_for_timeout(600)
-        expect(page.locator("div.h-12").get_by_text("Alpha Rust Patterns")).to_be_visible()
+        expect(main_header.get_by_text("Alpha Rust Patterns")).to_be_visible()
         expect(page.get_by_role("button", name="阅读")).to_have_count(0)
-        expect(page.get_by_role("button", name="编辑")).to_have_count(0)
+        expect(page.get_by_role("button", name="Markdown")).to_have_count(0)
+        expect(page.get_by_role("button", name="高级编辑")).to_have_count(0)
         mark("readonly")
 
         browser.close()

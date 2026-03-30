@@ -68,9 +68,10 @@ impl IntoResponse for HttpError {
             HttpError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
             HttpError::Readonly => (StatusCode::FORBIDDEN, self.to_string()),
             HttpError::RateLimited => (StatusCode::TOO_MANY_REQUESTS, self.to_string()),
-            HttpError::ConfigError(_) | HttpError::Internal(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
-            }
+            HttpError::ConfigError(_) | HttpError::Internal(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
         };
 
         let body = Json(json!({
