@@ -239,9 +239,10 @@ jobs:
     needs: [prepare-release, build, build-mcp]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
+      - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: memoforge-*
           path: artifacts
 
       - name: Create Release
