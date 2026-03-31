@@ -7,6 +7,8 @@ mod memory_state;
 use desktop_state_publisher::DesktopStatePublisher;
 use memory_state::StateManager;
 
+use chrono::Utc;
+use std::fs::{self, OpenOptions};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -20,7 +22,7 @@ use memoforge_core::{
     git::{git_commit, git_diff, git_log, git_pull, git_push, git_status, is_git_repo, GitCommit},
     grep,
     import::{import_markdown_folder, preview_import, ImportOptions, ImportStats},
-    init::{init_new, init_open},
+    init::{init_new, init_open, is_initialized},
     init_store,
     links::{
         get_backlinks, get_outgoing_links, get_related, BacklinksResult, KnowledgeGraph, LinkInfo,
@@ -37,10 +39,12 @@ use memoforge_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use tauri::{Manager, Window};
+use tauri::{AppHandle, Manager, Runtime, Window};
+use tauri_plugin_shell::ShellExt;
 
 // 全局状态：知识库路径
 static KB_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
+static APP_LOG_FILE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 // 全局状态发布器（兼容旧代码）
 pub struct StatePublisher(pub Arc<Mutex<DesktopStatePublisher>>);
@@ -81,6 +85,14 @@ struct ImportedAsset {
     reused: bool,
 }
 
+#[derive(Debug, Serialize)]
+struct AppDiagnostics {
+    log_dir: String,
+    log_file: String,
+    current_kb: Option<String>,
+    recent_logs: Vec<String>,
+}
+
 // 辅助函数：转换 MemoError 为 Tauri Result
 fn to_tauri_error(e: MemoError) -> String {
     serde_json::to_string(&e).unwrap_or_else(|_| e.message)
@@ -92,6 +104,99 @@ fn get_kb_path() -> Result<PathBuf, String> {
         .unwrap()
         .clone()
         .ok_or_else(|| "Knowledge base not initialized".to_string())
+}
+
+fn sanitize_log_message(message: &str) -> String {
+    message
+        .replace('\n', " \\n ")
+        .replace('\r', " ")
+        .replace('\t', " ")
+}
+
+fn append_app_log(level: &str, scope: &str, message: &str) {
+    let Some(log_file) = APP_LOG_FILE.lock().unwrap().clone() else {
+        return;
+    };
+
+    let line = format!(
+        "{} [{}] [{}] {}\n",
+        Utc::now().to_rfc3339(),
+        level,
+        scope,
+        sanitize_log_message(message)
+    );
+
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_file) {
+        let _ = std::io::Write::write_all(&mut file, line.as_bytes());
+    }
+}
+
+fn init_app_logging<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
+    let log_file = log_dir.join("memoforge-desktop.log");
+    *APP_LOG_FILE.lock().unwrap() = Some(log_file.clone());
+    append_app_log(
+        "INFO",
+        "startup",
+        &format!("Desktop log initialized at {}", log_file.display()),
+    );
+    Ok(())
+}
+
+fn get_log_paths<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, PathBuf), String> {
+    if let Some(log_file) = APP_LOG_FILE.lock().unwrap().clone() {
+        let log_dir = log_file
+            .parent()
+            .map(PathBuf::from)
+            .ok_or_else(|| "Invalid desktop log path".to_string())?;
+        return Ok((log_dir, log_file));
+    }
+
+    let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    Ok((log_dir.clone(), log_dir.join("memoforge-desktop.log")))
+}
+
+fn read_recent_log_lines(log_file: &Path, limit: usize) -> Vec<String> {
+    let Ok(content) = fs::read_to_string(log_file) else {
+        return Vec::new();
+    };
+
+    let mut lines = content
+        .lines()
+        .rev()
+        .take(limit)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    lines.reverse();
+    lines
+}
+
+fn is_empty_directory(path: &Path) -> Result<bool, String> {
+    let mut entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+    Ok(entries.next().is_none())
+}
+
+fn prepare_kb_for_open(kb_path: &Path) -> Result<Option<&'static str>, String> {
+    if is_initialized(kb_path) {
+        init_open(kb_path).map_err(to_tauri_error)?;
+        return Ok(None);
+    }
+
+    if !kb_path.exists() {
+        return Err("所选目录不存在。请先创建目录，或选择一个已有目录。".to_string());
+    }
+
+    if !kb_path.is_dir() {
+        return Err("所选路径不是文件夹。请选择一个目录作为知识库。".to_string());
+    }
+
+    if is_empty_directory(kb_path)? {
+        init_new(kb_path, false).map_err(to_tauri_error)?;
+        return Ok(Some("empty_dir_auto_initialized"));
+    }
+
+    Err("所选目录还不是 MemoForge 知识库。空目录会自动初始化；如果目录里已有文件，请先导入 Markdown，或选择一个已初始化目录。".to_string())
 }
 
 fn sanitize_asset_file_name(file_name: &str) -> String {
@@ -234,12 +339,30 @@ fn init_kb_cmd(
 ) -> Result<(), String> {
     let kb_path = PathBuf::from(&path);
 
-    match mode.as_str() {
-        "open" => init_open(&kb_path).map_err(to_tauri_error)?,
-        "new" => init_new(&kb_path, false).map_err(to_tauri_error)?,
-        "clone" => return Err("Clone not supported in this command".to_string()),
-        _ => return Err("Invalid mode".to_string()),
-    }
+    let init_result = match mode.as_str() {
+        "open" => prepare_kb_for_open(&kb_path),
+        "new" => init_new(&kb_path, false)
+            .map(|_| None)
+            .map_err(to_tauri_error),
+        "clone" => Err("Clone not supported in this command".to_string()),
+        _ => Err("Invalid mode".to_string()),
+    };
+
+    let auto_init_reason = match init_result {
+        Ok(reason) => reason,
+        Err(error) => {
+            append_app_log(
+                "ERROR",
+                "init_kb",
+                &format!(
+                    "Failed to initialize knowledge base {}: {}",
+                    kb_path.display(),
+                    error
+                ),
+            );
+            return Err(error);
+        }
+    };
 
     init_store(kb_path.clone()).map_err(to_tauri_error)?;
     let canonical_kb_path = std::fs::canonicalize(&kb_path).unwrap_or(kb_path.clone());
@@ -253,6 +376,12 @@ fn init_kb_cmd(
     let _ = register_kb(&canonical_kb_path, None);
 
     sync_kb_state(&publisher, &memory_state, canonical_kb_path)?;
+
+    let mut detail = format!("Opened knowledge base {}", path);
+    if auto_init_reason == Some("empty_dir_auto_initialized") {
+        detail.push_str(" (empty directory was automatically initialized)");
+    }
+    append_app_log("INFO", "init_kb", &detail);
 
     Ok(())
 }
@@ -582,7 +711,15 @@ fn switch_kb_cmd(
     memory_state: tauri::State<MemoryState>,
     path: String,
 ) -> Result<(), String> {
-    switch_kb(&path).map_err(|e| e.to_string())?;
+    switch_kb(&path).map_err(|e| {
+        let message = e.to_string();
+        append_app_log(
+            "ERROR",
+            "switch_kb",
+            &format!("Failed to switch knowledge base {}: {}", path, message),
+        );
+        message
+    })?;
 
     let kb_path =
         std::fs::canonicalize(PathBuf::from(&path)).unwrap_or_else(|_| PathBuf::from(&path));
@@ -591,6 +728,11 @@ fn switch_kb_cmd(
     *KB_PATH.lock().unwrap() = Some(kb_path.clone());
 
     sync_kb_state(&publisher, &memory_state, kb_path)?;
+    append_app_log(
+        "INFO",
+        "switch_kb",
+        &format!("Switched knowledge base to {}", path),
+    );
 
     Ok(())
 }
@@ -623,18 +765,59 @@ async fn select_folder_cmd(app: tauri::AppHandle) -> Result<Option<String>, Stri
 
     let folder_path = app.dialog().file().blocking_pick_folder();
 
+    if let Some(path) = folder_path.as_ref() {
+        append_app_log(
+            "INFO",
+            "select_folder",
+            &format!("Selected folder {}", path),
+        );
+    } else {
+        append_app_log("INFO", "select_folder", "Folder selection cancelled");
+    }
+
     Ok(folder_path.map(|p| p.to_string()))
 }
 
 #[tauri::command]
-fn import_assets_cmd(knowledge_id: String, assets: Vec<AssetPayload>) -> Result<Vec<ImportedAsset>, String> {
+fn get_app_diagnostics_cmd(app: tauri::AppHandle) -> Result<AppDiagnostics, String> {
+    let (log_dir, log_file) = get_log_paths(&app)?;
+    Ok(AppDiagnostics {
+        log_dir: log_dir.to_string_lossy().to_string(),
+        log_file: log_file.to_string_lossy().to_string(),
+        current_kb: KB_PATH
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string()),
+        recent_logs: read_recent_log_lines(&log_file, 20),
+    })
+}
+
+#[tauri::command]
+fn open_app_log_dir_cmd(app: tauri::AppHandle) -> Result<(), String> {
+    let (log_dir, _) = get_log_paths(&app)?;
+    #[allow(deprecated)]
+    app.shell()
+        .open(log_dir.to_string_lossy().to_string(), None)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn import_assets_cmd(
+    knowledge_id: String,
+    assets: Vec<AssetPayload>,
+) -> Result<Vec<ImportedAsset>, String> {
     let kb_path = get_kb_path()?;
     let knowledge_path = kb_path.join(&knowledge_id);
     let knowledge_parent = knowledge_path.parent().unwrap_or(kb_path.as_path());
     let assets_dir = knowledge_parent.join("assets");
 
     std::fs::create_dir_all(&assets_dir).map_err(|error| {
-        format!("Failed to create assets directory {}: {}", assets_dir.display(), error)
+        format!(
+            "Failed to create assets directory {}: {}",
+            assets_dir.display(),
+            error
+        )
     })?;
 
     let mut imported_assets = Vec::with_capacity(assets.len());
@@ -658,7 +841,8 @@ fn import_assets_cmd(knowledge_id: String, assets: Vec<AssetPayload>) -> Result<
             .unwrap_or(&asset.file_name)
             .to_string();
         let relative_path = format!("./assets/{}", saved_file_name);
-        let markdown = build_asset_markdown(&relative_path, &saved_file_name, asset.mime_type.as_deref());
+        let markdown =
+            build_asset_markdown(&relative_path, &saved_file_name, asset.mime_type.as_deref());
 
         imported_assets.push(ImportedAsset {
             file_name: saved_file_name,
@@ -952,6 +1136,9 @@ fn main() {
         .manage(managed_memory_state)
         .manage(McpServer(server_state))
         .setup(|app| {
+            if let Err(error) = init_app_logging(app.handle()) {
+                eprintln!("[desktop-log] failed to initialize logging: {}", error);
+            }
             // 显示主窗口（配置中 visible: false，需要手动显示）
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -997,6 +1184,8 @@ fn main() {
             get_recent_kbs_cmd,
             get_last_kb_cmd,
             select_folder_cmd,
+            get_app_diagnostics_cmd,
+            open_app_log_dir_cmd,
             import_assets_cmd,
             get_outgoing_links_cmd,
             get_backlinks_cmd,
@@ -1021,4 +1210,47 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prepare_kb_for_open;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn prepare_kb_for_open_auto_initializes_empty_directory() {
+        let temp = TempDir::new().unwrap();
+
+        let reason = prepare_kb_for_open(temp.path()).unwrap();
+
+        assert_eq!(reason, Some("empty_dir_auto_initialized"));
+        assert!(temp.path().join(".memoforge").exists());
+        assert!(temp.path().join(".memoforge/config.yaml").exists());
+    }
+
+    #[test]
+    fn prepare_kb_for_open_rejects_non_empty_non_initialized_directory() {
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("notes.md"), "# hello").unwrap();
+
+        let error = prepare_kb_for_open(temp.path()).unwrap_err();
+
+        assert!(error.contains("空目录会自动初始化"));
+    }
+
+    #[test]
+    fn prepare_kb_for_open_accepts_initialized_directory() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join(".memoforge")).unwrap();
+        fs::write(
+            temp.path().join(".memoforge/config.yaml"),
+            "version: \"1.0\"\ncategories: []\n",
+        )
+        .unwrap();
+
+        let reason = prepare_kb_for_open(temp.path()).unwrap();
+
+        assert_eq!(reason, None);
+    }
 }

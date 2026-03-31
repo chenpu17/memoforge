@@ -7,6 +7,9 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const APP_IDENTIFIER: &str = "com.memoforge.app";
+const REGISTRY_FILE_NAME: &str = "registry.yaml";
+
 /// 知识库信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnowledgeBaseInfo {
@@ -31,6 +34,77 @@ pub struct KnowledgeBaseRegistry {
 }
 
 impl KnowledgeBaseRegistry {
+    fn legacy_registry_path() -> Result<PathBuf, MemoError> {
+        let home = env::var("HOME")
+            .or_else(|_| env::var("USERPROFILE"))
+            .map_err(|_| MemoError {
+                code: ErrorCode::InvalidPath,
+                message: "Cannot determine home directory".to_string(),
+                retry_after_ms: None,
+                context: None,
+            })?;
+
+        Ok(PathBuf::from(home).join(".memoforge").join(REGISTRY_FILE_NAME))
+    }
+
+    fn registry_dir() -> Result<PathBuf, MemoError> {
+        if let Ok(dir) = env::var("MEMOFORGE_REGISTRY_DIR") {
+            return Ok(PathBuf::from(dir));
+        }
+
+        if let Some(config_dir) = dirs::config_dir() {
+            return Ok(config_dir.join(APP_IDENTIFIER));
+        }
+
+        if let Some(local_data_dir) = dirs::data_local_dir() {
+            return Ok(local_data_dir.join(APP_IDENTIFIER));
+        }
+
+        Self::legacy_registry_path()?
+            .parent()
+            .map(PathBuf::from)
+            .ok_or_else(|| MemoError {
+                code: ErrorCode::InvalidPath,
+                message: "Cannot determine registry directory".to_string(),
+                retry_after_ms: None,
+                context: None,
+            })
+    }
+
+    fn migrate_legacy_registry_if_needed(target_path: &Path) -> Result<(), MemoError> {
+        if target_path.exists() {
+            return Ok(());
+        }
+
+        let legacy_path = Self::legacy_registry_path()?;
+        if !legacy_path.exists() || legacy_path == target_path {
+            return Ok(());
+        }
+
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| MemoError {
+                code: ErrorCode::InvalidPath,
+                message: format!("Failed to create registry directory: {}", e),
+                retry_after_ms: None,
+                context: None,
+            })?;
+        }
+
+        fs::copy(&legacy_path, target_path).map_err(|e| MemoError {
+            code: ErrorCode::InvalidPath,
+            message: format!(
+                "Failed to migrate knowledge base registry from {} to {}: {}",
+                legacy_path.display(),
+                target_path.display(),
+                e
+            ),
+            retry_after_ms: None,
+            context: None,
+        })?;
+
+        Ok(())
+    }
+
     fn normalize_path(path: &Path) -> PathBuf {
         fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
     }
@@ -43,24 +117,17 @@ impl KnowledgeBaseRegistry {
 
     /// 获取注册表文件路径
     fn registry_path() -> Result<PathBuf, MemoError> {
-        let home = env::var("HOME")
-            .or_else(|_| env::var("USERPROFILE"))
-            .map_err(|_| MemoError {
-                code: ErrorCode::InvalidPath,
-                message: "Cannot determine home directory".to_string(),
-                retry_after_ms: None,
-                context: None,
-            })?;
-
-        let memoforge_dir = PathBuf::from(home).join(".memoforge");
-        fs::create_dir_all(&memoforge_dir).map_err(|e| MemoError {
+        let registry_dir = Self::registry_dir()?;
+        fs::create_dir_all(&registry_dir).map_err(|e| MemoError {
             code: ErrorCode::InvalidPath,
-            message: format!("Failed to create ~/.memoforge: {}", e),
+            message: format!("Failed to create registry directory {}: {}", registry_dir.display(), e),
             retry_after_ms: None,
             context: None,
         })?;
 
-        Ok(memoforge_dir.join("registry.yaml"))
+        let registry_path = registry_dir.join(REGISTRY_FILE_NAME);
+        Self::migrate_legacy_registry_if_needed(&registry_path)?;
+        Ok(registry_path)
     }
 
     /// 加载注册表
@@ -344,7 +411,13 @@ pub fn get_last_kb() -> Result<Option<String>, MemoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[cfg(unix)]
     #[test]
@@ -390,6 +463,58 @@ mod tests {
         assert_eq!(registry.knowledge_bases[0].path, canonical);
         assert_eq!(registry.current.as_deref(), Some(canonical.as_str()));
         assert_eq!(registry.knowledge_bases[0].name, "kb-alias");
+
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn registry_path_migrates_legacy_registry_file() {
+        let _guard = env_lock().lock().unwrap();
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!("memoforge-registry-migrate-{unique}"));
+        let home = base.join("home");
+        let new_registry_dir = base.join("new-registry");
+        fs::create_dir_all(home.join(".memoforge")).unwrap();
+        fs::create_dir_all(&new_registry_dir).unwrap();
+
+        let legacy_registry_path = home.join(".memoforge").join(REGISTRY_FILE_NAME);
+        fs::write(
+            &legacy_registry_path,
+            "knowledge_bases:\n  - path: /tmp/demo\n    name: demo\n    last_accessed: 2026-03-31T00:00:00Z\n    is_default: true\ncurrent: /tmp/demo\n",
+        )
+        .unwrap();
+
+        let old_home = std::env::var_os("HOME");
+        let old_userprofile = std::env::var_os("USERPROFILE");
+        let old_registry_dir = std::env::var_os("MEMOFORGE_REGISTRY_DIR");
+
+        std::env::set_var("HOME", &home);
+        std::env::remove_var("USERPROFILE");
+        std::env::set_var("MEMOFORGE_REGISTRY_DIR", &new_registry_dir);
+
+        let registry_path = KnowledgeBaseRegistry::registry_path().unwrap();
+        let migrated = fs::read_to_string(&registry_path).unwrap();
+
+        assert_eq!(registry_path, new_registry_dir.join(REGISTRY_FILE_NAME));
+        assert!(migrated.contains("knowledge_bases"));
+        assert!(migrated.contains("/tmp/demo"));
+
+        match old_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        match old_userprofile {
+            Some(value) => std::env::set_var("USERPROFILE", value),
+            None => std::env::remove_var("USERPROFILE"),
+        }
+        match old_registry_dir {
+            Some(value) => std::env::set_var("MEMOFORGE_REGISTRY_DIR", value),
+            None => std::env::remove_var("MEMOFORGE_REGISTRY_DIR"),
+        }
 
         fs::remove_dir_all(&base).unwrap();
     }

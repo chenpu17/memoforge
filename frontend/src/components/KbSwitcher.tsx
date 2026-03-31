@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { tauriService, KnowledgeBaseInfo } from '../services/tauri'
+import { tauriService, KnowledgeBaseInfo, getErrorMessage } from '../services/tauri'
 import { X, Database, Check, FolderOpen, Trash2, Clock } from 'lucide-react'
 
 interface KbSwitcherProps {
@@ -12,6 +12,7 @@ export const KbSwitcher: React.FC<KbSwitcherProps> = ({ onClose, onSwitch }) => 
   const [currentKb, setCurrentKb] = useState<string | null>(null)
   const [newKbPath, setNewKbPath] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [openError, setOpenError] = useState<string | null>(null)
 
   useEffect(() => {
     loadKbList()
@@ -50,9 +51,11 @@ export const KbSwitcher: React.FC<KbSwitcherProps> = ({ onClose, onSwitch }) => 
       const selectedPath = await tauriService.selectFolder()
       if (selectedPath) {
         setNewKbPath(selectedPath)
+        setOpenError(null)
       }
     } catch (error) {
       console.error('Failed to select folder:', error)
+      setOpenError(getErrorMessage(error))
     }
   }
 
@@ -65,11 +68,12 @@ export const KbSwitcher: React.FC<KbSwitcherProps> = ({ onClose, onSwitch }) => 
       await tauriService.initKb(openedPath, 'open')
       const currentPath = await tauriService.getCurrentKb()
       setNewKbPath('')
+      setOpenError(null)
       onSwitch(currentPath || openedPath)
       onClose()
     } catch (error) {
       console.error('Failed to open KB:', error)
-      alert('打开知识库失败: ' + error)
+      setOpenError(getErrorMessage(error))
     } finally {
       setIsLoading(false)
     }
@@ -200,9 +204,20 @@ export const KbSwitcher: React.FC<KbSwitcherProps> = ({ onClose, onSwitch }) => 
                 className="px-3 py-2 border rounded-md text-sm flex items-center gap-1.5 disabled:opacity-50 bg-indigo-50 hover:bg-indigo-100"
                 style={{ borderColor: '#6366F1', color: '#4338CA' }}
               >
-                打开
+                打开 / 初始化
               </button>
             </div>
+            <p className="mt-2 text-xs" style={{ color: '#737373' }}>
+              选择空目录时会自动初始化为新的 MemoForge 知识库。
+            </p>
+            {openError && (
+              <div
+                className="mt-3 rounded-md border px-3 py-2 text-sm"
+                style={{ borderColor: '#FECACA', backgroundColor: '#FEF2F2', color: '#991B1B' }}
+              >
+                {openError}
+              </div>
+            )}
           </div>
         </div>
 

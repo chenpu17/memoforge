@@ -34,6 +34,28 @@ function getHttpClient() {
   })
 }
 
+function tryParseJsonError(error: string): string {
+  try {
+    const parsed = JSON.parse(error) as { message?: string }
+    if (typeof parsed.message === 'string' && parsed.message.trim()) {
+      return parsed.message
+    }
+  } catch {
+    // noop
+  }
+  return error
+}
+
+export function getErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return tryParseJsonError(error)
+  }
+  if (error instanceof Error) {
+    return error.message
+  }
+  return String(error)
+}
+
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (isTauriEnv()) {
     const { invoke: tauriInvoke } = await import('@tauri-apps/api/core')
@@ -319,6 +341,19 @@ export const tauriService = {
     return null
   },
 
+  async getAppDiagnostics(): Promise<AppDiagnostics | null> {
+    if (isTauriEnv()) {
+      return invoke('get_app_diagnostics_cmd')
+    }
+    return null
+  },
+
+  async openAppLogDir(): Promise<void> {
+    if (isTauriEnv()) {
+      return invoke('open_app_log_dir_cmd')
+    }
+  },
+
   async importAssets(
     knowledgeId: string,
     assets: Array<{ fileName: string; mimeType?: string; bytes: number[] }>
@@ -460,6 +495,13 @@ export interface ImportStats {
     had_frontmatter: boolean
     generated_frontmatter: boolean
   }>
+}
+
+export interface AppDiagnostics {
+  log_dir: string
+  log_file: string
+  current_kb: string | null
+  recent_logs: string[]
 }
 
 export interface KnowledgeBaseInfo {

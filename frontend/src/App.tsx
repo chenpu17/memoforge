@@ -16,7 +16,7 @@ import { KbSwitcher } from './components/KbSwitcher'
 import { RightPanel } from './components/RightPanel'
 import { SettingsModal } from './components/SettingsModal'
 import { useAppStore } from './stores/appStore'
-import { tauriService, DeletePreview } from './services/tauri'
+import { tauriService, DeletePreview, getErrorMessage } from './services/tauri'
 import { useKnowledgeNavigation } from './hooks/useKnowledgeNavigation'
 import { hasKnowledgeUnsavedChanges } from './lib/knowledgeChanges'
 import { clearKnowledgeDraft } from './lib/knowledgeDrafts'
@@ -205,6 +205,7 @@ function App() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletePreview, setDeletePreview] = useState<DeletePreview | null>(null)
+  const [initError, setInitError] = useState<string | null>(null)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false)
   const [showKbSwitcher, setShowKbSwitcher] = useState(false)
@@ -495,6 +496,7 @@ function App() {
           }
         } catch (error) {
           console.log('Failed to auto-open last KB, showing init screen')
+          setInitError(`最近使用的知识库自动打开失败：${getErrorMessage(error)}`)
         }
       }
     } catch (error) {
@@ -520,13 +522,14 @@ function App() {
 
     try {
       await tauriService.initKb(kbPath, 'open')
+      setInitError(null)
       setInitialized(true)
       setReadonly(false)
       await loadData()
       await loadCurrentKbName()
     } catch (error) {
       console.error('Init failed:', error)
-      alert('初始化失败: ' + error)
+      setInitError(getErrorMessage(error))
     }
   }
 
@@ -535,9 +538,11 @@ function App() {
       const selectedPath = await tauriService.selectFolder()
       if (selectedPath) {
         setKbPath(selectedPath)
+        setInitError(null)
       }
     } catch (error) {
       console.error('Failed to select folder:', error)
+      setInitError(getErrorMessage(error))
     }
   }
 
@@ -948,8 +953,19 @@ function App() {
             disabled={!kbPath.trim()}
             className="w-full bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50"
           >
-            打开知识库
+            打开或初始化知识库
           </button>
+          <p className="mt-2 text-xs" style={{ color: '#737373' }}>
+            选择空目录时会自动初始化为新的 MemoForge 知识库。
+          </p>
+          {initError && (
+            <div
+              className="mt-3 rounded-md border px-3 py-2 text-sm"
+              style={{ borderColor: '#FECACA', backgroundColor: '#FEF2F2', color: '#991B1B' }}
+            >
+              {initError}
+            </div>
+          )}
           <div className="mt-4 text-center">
             <button
               onClick={() => setShowKbSwitcher(true)}
