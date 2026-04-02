@@ -1126,7 +1126,7 @@ fn handle_update_metadata(args: Value) -> Result<String, MemoError> {
 fn handle_delete_knowledge(args: Value) -> Result<String, MemoError> {
     let kb_path = get_kb_path()?;
     let id = required_str_arg(&args, &["path", "id"])?;
-    let dry_run = optional_bool_arg(&args, &["dry_run"]).unwrap_or(false);
+    let dry_run = optional_bool_arg(&args, &["dry_run"]).unwrap_or(true);
 
     if dry_run {
         let preview = memoforge_core::preview_delete_knowledge(&kb_path, id)?;
@@ -1147,7 +1147,7 @@ fn handle_move_knowledge(args: Value) -> Result<String, MemoError> {
     let kb_path = get_kb_path()?;
     let source = required_str_arg(&args, &["from", "path", "id"])?;
     let move_target = optional_str_arg(&args, &["to"]);
-    let dry_run = optional_bool_arg(&args, &["dry_run"]).unwrap_or(false);
+    let dry_run = optional_bool_arg(&args, &["dry_run"]).unwrap_or(true);
 
     let display_target = if let Some(target) = move_target {
         let normalized_target = normalize_relative_path(target);
