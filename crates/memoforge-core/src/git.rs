@@ -29,7 +29,7 @@ pub fn git_init(path: &Path) -> Result<(), MemoError> {
 pub fn git_status(path: &Path) -> Result<Vec<String>, MemoError> {
     let repo = open_repo(path)?;
     let mut opts = StatusOptions::new();
-    opts.include_untracked(true);
+    opts.include_untracked(true).recurse_untracked_dirs(true);
 
     let statuses = repo.statuses(Some(&mut opts)).map_err(git_error)?;
     let mut files = Vec::new();
@@ -302,5 +302,28 @@ fn git_error(e: git2::Error) -> MemoError {
         message: format!("Git error: {}", e),
         retry_after_ms: None,
         context: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn git_status_includes_nested_untracked_files() {
+        let temp = TempDir::new().unwrap();
+        git_init(temp.path()).unwrap();
+        fs::create_dir_all(temp.path().join("nested/child")).unwrap();
+        fs::write(temp.path().join("nested/child/note.md"), "# nested\n").unwrap();
+
+        let files = git_status(temp.path()).unwrap();
+        let normalized = files
+            .into_iter()
+            .map(|path| path.replace('\\', "/"))
+            .collect::<Vec<_>>();
+
+        assert!(normalized.iter().any(|path| path == "nested/child/note.md"));
     }
 }

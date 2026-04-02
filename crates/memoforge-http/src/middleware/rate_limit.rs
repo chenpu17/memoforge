@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{ConnectInfo, Request, State},
-    http::StatusCode,
+    http::{Method, StatusCode},
     middleware::Next,
     response::Response,
 };
@@ -77,6 +77,10 @@ pub async fn rate_limit_middleware(
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    if request.method() == Method::OPTIONS {
+        return Ok(next.run(request).await);
+    }
+
     let ip = addr.ip().to_string();
 
     if !limiter.check_rate_limit(ip).await {

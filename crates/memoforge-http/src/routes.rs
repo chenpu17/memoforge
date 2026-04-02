@@ -152,11 +152,11 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .merge(public_routes)
         .merge(protected_routes)
-        .layer(cors_layer)
         .layer(middleware::from_fn_with_state(
             rate_limiter,
             rate_limit_middleware,
         ))
+        .layer(cors_layer)
         .with_state(state)
 }
 

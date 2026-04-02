@@ -1311,6 +1311,9 @@ function App() {
                   folderMode={treeSelection.type === 'folder'}
                   pendingChangesCount={pendingChangesCount}
                   onGitStatusChange={setPendingChangesCount}
+                  onRepoChanged={() => {
+                    void loadData()
+                  }}
                 />
               </div>
             </div>

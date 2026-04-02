@@ -569,7 +569,6 @@ fn process_alive(pid: u32) -> bool {
     #[cfg(windows)]
     {
         // Windows: 使用更可靠的进程检测方法
-        use std::ptr;
         unsafe {
             // OpenProcess 需要的权限常量
             const PROCESS_QUERY_INFORMATION: u32 = 0x0400;

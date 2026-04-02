@@ -11,7 +11,7 @@ use std::io::Write;
 use std::path::Path;
 
 /// Event types for logging
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EventAction {
     Create,
@@ -240,4 +240,56 @@ pub fn read_recent_events(kb_path: &Path, limit: usize) -> std::io::Result<Vec<E
         0
     };
     Ok(events[start..].to_vec())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn read_recent_events_returns_latest_entries_only() {
+        let temp = TempDir::new().unwrap();
+        let kb = temp.path();
+
+        log_event(
+            kb,
+            Event {
+                time: Utc::now(),
+                source: EventSource::Gui,
+                action: EventAction::Create,
+                path: Some("one.md".to_string()),
+                detail: "one".to_string(),
+            },
+        )
+        .unwrap();
+        log_event(
+            kb,
+            Event {
+                time: Utc::now(),
+                source: EventSource::Gui,
+                action: EventAction::Update,
+                path: Some("two.md".to_string()),
+                detail: "two".to_string(),
+            },
+        )
+        .unwrap();
+        log_event(
+            kb,
+            Event {
+                time: Utc::now(),
+                source: EventSource::Gui,
+                action: EventAction::Delete,
+                path: Some("three.md".to_string()),
+                detail: "three".to_string(),
+            },
+        )
+        .unwrap();
+
+        let events = read_recent_events(kb, 2).unwrap();
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].path.as_deref(), Some("two.md"));
+        assert_eq!(events[1].path.as_deref(), Some("three.md"));
+    }
 }

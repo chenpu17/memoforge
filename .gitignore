@@ -31,3 +31,8 @@ docs/discussion/
 
 # Claude å·¥ä½œç›®å½•
 .claude/
+
+# ²âÊÔÁÙÊ±Ä¿Â¼
+test-kb-*/
+test_mcp_windows.py
+test_tauri_integration.py

@@ -4,10 +4,14 @@
 use crate::models::Frontmatter;
 use crate::{ErrorCode, MemoError};
 
+fn strip_utf8_bom(content: &str) -> &str {
+    content.strip_prefix('\u{feff}').unwrap_or(content)
+}
+
 /// 解析包含 frontmatter 的 Markdown 文件
 /// 格式: ---\nYAML\n---\nMarkdown body
 pub fn parse_frontmatter(content: &str) -> Result<(Frontmatter, String), MemoError> {
-    let content = content.trim_start();
+    let content = strip_utf8_bom(content).trim_start();
 
     if !content.starts_with("---") {
         return Err(MemoError {
@@ -78,5 +82,22 @@ This is the body."#;
         let result = parse_frontmatter(content);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().code, ErrorCode::InvalidFrontmatter);
+    }
+
+    #[test]
+    fn test_parse_frontmatter_with_utf8_bom() {
+        let content = "\u{feff}---\n\
+id: test-001\n\
+title: Test Knowledge\n\
+tags: [rust, test]\n\
+created_at: 2026-03-23T10:00:00Z\n\
+updated_at: 2026-03-23T11:00:00Z\n\
+---\n\
+# Content\n";
+
+        let (fm, body) = parse_frontmatter(content).unwrap();
+        assert_eq!(fm.id, "test-001");
+        assert_eq!(fm.title, "Test Knowledge");
+        assert!(body.contains("# Content"));
     }
 }

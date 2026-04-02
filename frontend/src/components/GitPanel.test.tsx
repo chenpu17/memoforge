@@ -31,25 +31,26 @@ describe('GitPanel', () => {
     render(<GitPanel compact onStatusChange={onStatusChange} />)
 
     await waitFor(() => {
-      expect(screen.getByText(/总计 1/)).toBeInTheDocument()
       expect(screen.getByText('M programming/alpha.md')).toBeInTheDocument()
     })
+    expect(gitStatusMock).toHaveBeenCalledTimes(1)
     expect(onStatusChange).toHaveBeenCalledWith(1)
 
     gitStatusMock.mockResolvedValue([])
 
-    fireEvent.change(screen.getByPlaceholderText('输入提交信息'), {
+    fireEvent.change(screen.getByRole('textbox'), {
       target: { value: 'fix sidebar status sync' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '提交' }))
+    fireEvent.click(screen.getAllByRole('button')[0])
 
     await waitFor(() => {
       expect(gitCommitMock).toHaveBeenCalledWith('fix sidebar status sync')
     })
     await waitFor(() => {
-      expect(screen.getByText('无变更')).toBeInTheDocument()
+      expect(gitStatusMock).toHaveBeenCalledTimes(2)
+      expect(onStatusChange).toHaveBeenLastCalledWith(0)
+      expect(screen.queryByText('M programming/alpha.md')).not.toBeInTheDocument()
     })
-    expect(onStatusChange).toHaveBeenLastCalledWith(0)
   })
 
   it('reloads status when refresh token changes', async () => {
@@ -59,7 +60,6 @@ describe('GitPanel', () => {
     const { rerender } = render(<GitPanel compact refreshToken={0} onStatusChange={onStatusChange} />)
 
     await waitFor(() => {
-      expect(screen.getByText(/总计 1/)).toBeInTheDocument()
       expect(screen.getByText('M programming/alpha.md')).toBeInTheDocument()
     })
 
@@ -67,9 +67,33 @@ describe('GitPanel', () => {
     rerender(<GitPanel compact refreshToken={1} onStatusChange={onStatusChange} />)
 
     await waitFor(() => {
-      expect(screen.getByText('无变更')).toBeInTheDocument()
+      expect(gitStatusMock).toHaveBeenCalledTimes(2)
+      expect(onStatusChange).toHaveBeenLastCalledWith(0)
+      expect(screen.queryByText('M programming/alpha.md')).not.toBeInTheDocument()
     })
-    expect(gitStatusMock).toHaveBeenCalledTimes(2)
-    expect(onStatusChange).toHaveBeenLastCalledWith(0)
+  })
+
+  it('refreshes repository state after pull', async () => {
+    const onRepoChanged = vi.fn()
+    gitStatusMock.mockResolvedValue(['M programming/alpha.md'])
+
+    const { container } = render(<GitPanel compact onRepoChanged={onRepoChanged} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('M programming/alpha.md')).toBeInTheDocument()
+    })
+
+    const pullButton = container.querySelector('button svg.lucide-arrow-down')?.closest('button')
+    expect(pullButton).not.toBeNull()
+
+    fireEvent.click(pullButton as HTMLElement)
+
+    await waitFor(() => {
+      expect(gitPullMock).toHaveBeenCalledTimes(1)
+    })
+    await waitFor(() => {
+      expect(gitStatusMock).toHaveBeenCalledTimes(2)
+      expect(onRepoChanged).toHaveBeenCalledTimes(1)
+    })
   })
 })

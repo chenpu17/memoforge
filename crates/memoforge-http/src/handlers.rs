@@ -18,31 +18,38 @@ fn validate_kb_path(path: &std::path::Path) -> std::result::Result<(), HttpError
         .canonicalize()
         .map_err(|e| HttpError::BadRequest(format!("Invalid path: {}", e)))?;
 
-    let path_str = canonical.to_string_lossy();
-
-    // Block system sensitive directories
-    let blocked_prefixes = ["/etc", "/sys", "/proc", "/dev", "/root"];
-    for prefix in blocked_prefixes {
-        if path_str.starts_with(prefix) || path_str.contains(&format!("{}/", prefix)) {
-            return Err(HttpError::BadRequest(
-                "Access to system directories is not allowed".to_string(),
-            ));
+    if cfg!(unix) {
+        let path_str = canonical.to_string_lossy();
+        let blocked_prefixes = ["/etc", "/sys", "/proc", "/dev", "/root"];
+        for prefix in blocked_prefixes {
+            if path_str.starts_with(prefix) || path_str.contains(&format!("{}/", prefix)) {
+                return Err(HttpError::BadRequest(
+                    "Access to system directories is not allowed".to_string(),
+                ));
+            }
         }
     }
 
-    // Restrict to safe directories (home, temp, or var/folders)
-    if let Ok(home) = std::env::var("HOME") {
-        if !path_str.starts_with(&home)
-            && !path_str.starts_with("/tmp")
-            && !path_str.starts_with("/var/folders")
-            && !path_str.starts_with("/private/var/folders")
-            && !path_str.starts_with("/Users")
-        {
-            // macOS home directories
-            return Err(HttpError::BadRequest(
-                "Path must be within home directory or allowed temp directories".to_string(),
-            ));
+    let mut allowed_roots = vec![std::env::temp_dir()];
+    for env_key in ["HOME", "USERPROFILE", "TMP", "TEMP"] {
+        if let Ok(value) = std::env::var(env_key) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                allowed_roots.push(std::path::PathBuf::from(trimmed));
+            }
         }
+    }
+
+    let is_allowed = allowed_roots.into_iter().any(|root| {
+        root.canonicalize()
+            .map(|canonical_root| canonical.starts_with(&canonical_root))
+            .unwrap_or(false)
+    });
+
+    if !is_allowed {
+        return Err(HttpError::BadRequest(
+            "Path must be within home directory or allowed temp directories".to_string(),
+        ));
     }
 
     Ok(())

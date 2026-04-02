@@ -8,6 +8,16 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
+fn normalize_relative_id(value: &str) -> String {
+    value.trim().trim_matches('/').replace('\\', "/")
+}
+
+fn relative_id(path: &Path, kb_path: &Path) -> String {
+    path.strip_prefix(kb_path)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_default()
+}
+
 /// 链接信息
 #[derive(Debug, Clone, Serialize)]
 pub struct LinkInfo {
@@ -161,8 +171,9 @@ fn collect_markdown_files(dir: &Path) -> Result<Vec<std::path::PathBuf>, MemoErr
 
 /// 获取知识的正向链接（此知识链接到哪些其他知识）
 pub fn get_outgoing_links(kb_path: &Path, knowledge_id: &str) -> Result<Vec<LinkInfo>, MemoError> {
+    let knowledge_id = normalize_relative_id(knowledge_id);
     // 修复：正确处理路径解析
-    let mut path = kb_path.join(knowledge_id);
+    let mut path = kb_path.join(&knowledge_id);
     if !path.exists() {
         // 尝试添加 .md 后缀
         path = kb_path.join(format!("{}.md", knowledge_id));
@@ -190,7 +201,7 @@ pub fn get_outgoing_links(kb_path: &Path, knowledge_id: &str) -> Result<Vec<Link
     for (link_text, display_text, line_number) in wiki_links {
         if let Some(target_id) = resolve_link_to_knowledge_id(&link_text, kb_path) {
             links.push(LinkInfo {
-                source_id: knowledge_id.to_string(),
+                source_id: knowledge_id.clone(),
                 source_title: fm.title.clone(),
                 link_text: target_id,
                 display_text,
@@ -204,14 +215,15 @@ pub fn get_outgoing_links(kb_path: &Path, knowledge_id: &str) -> Result<Vec<Link
 
 /// 获取知识的反向链接（哪些知识链接到此知识）
 pub fn get_backlinks(kb_path: &Path, knowledge_id: &str) -> Result<BacklinksResult, MemoError> {
-    let target_path = kb_path.join(knowledge_id);
+    let knowledge_id = normalize_relative_id(knowledge_id);
+    let target_path = kb_path.join(&knowledge_id);
     let target_title = if target_path.exists() {
         let content = fs::read_to_string(&target_path).unwrap_or_default();
         parse_frontmatter(&content)
             .map(|(fm, _)| fm.title)
             .unwrap_or_else(|_| knowledge_id.to_string())
     } else {
-        knowledge_id.to_string()
+        knowledge_id.clone()
     };
 
     // 知识 ID 的可能形式
@@ -227,10 +239,7 @@ pub fn get_backlinks(kb_path: &Path, knowledge_id: &str) -> Result<BacklinksResu
     // 遍历所有知识，查找链接到此知识的条目
     let files = collect_markdown_files(kb_path)?;
     for file_path in files {
-        let relative = file_path
-            .strip_prefix(kb_path)
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
+        let relative = relative_id(&file_path, kb_path);
 
         // 跳过自身
         if relative == knowledge_id || relative == format!("{}.md", knowledge_id) {
@@ -254,14 +263,14 @@ pub fn get_backlinks(kb_path: &Path, knowledge_id: &str) -> Result<BacklinksResu
                 link_text == *v
                     || link_text == v.trim_end_matches(".md")
                     || resolve_link_to_knowledge_id(&link_text, kb_path).as_ref()
-                        == Some(&knowledge_id.to_string())
+                        == Some(&knowledge_id)
                     || resolve_link_to_knowledge_id(&link_text, kb_path).as_ref()
-                        == Some(&format!("{}.md", knowledge_id))
+                        == Some(&format!("{}.md", knowledge_id.trim_end_matches(".md")))
             }) {
                 backlinks.push(LinkInfo {
                     source_id: relative.clone(),
                     source_title: fm.title.clone(),
-                    link_text: knowledge_id.to_string(),
+                    link_text: knowledge_id.clone(),
                     display_text,
                     line_number,
                 });
@@ -271,17 +280,18 @@ pub fn get_backlinks(kb_path: &Path, knowledge_id: &str) -> Result<BacklinksResu
     }
 
     Ok(BacklinksResult {
-        target_id: knowledge_id.to_string(),
+        target_id: knowledge_id,
         backlinks,
     })
 }
 
 /// 获取相关知识（正向链接 + 反向链接 + 共享标签）
 pub fn get_related(kb_path: &Path, knowledge_id: &str) -> Result<RelatedResult, MemoError> {
+    let knowledge_id = normalize_relative_id(knowledge_id);
     let mut related_map: HashMap<String, RelatedKnowledge> = HashMap::new();
 
     // 获取当前知识
-    let path = kb_path.join(knowledge_id);
+    let path = kb_path.join(&knowledge_id);
     let content = fs::read_to_string(&path).map_err(|e| MemoError {
         code: ErrorCode::NotFoundKnowledge,
         message: format!("Knowledge not found: {}", e),
@@ -292,7 +302,7 @@ pub fn get_related(kb_path: &Path, knowledge_id: &str) -> Result<RelatedResult, 
     let current_tags: HashSet<String> = fm.tags.iter().cloned().collect();
 
     // 1. 正向链接
-    let outgoing = get_outgoing_links(kb_path, knowledge_id)?;
+    let outgoing = get_outgoing_links(kb_path, &knowledge_id)?;
     for link in outgoing {
         if let Ok(target_content) = fs::read_to_string(kb_path.join(&link.link_text)) {
             if let Ok((target_fm, _)) = parse_frontmatter(&target_content) {
@@ -308,7 +318,7 @@ pub fn get_related(kb_path: &Path, knowledge_id: &str) -> Result<RelatedResult, 
     }
 
     // 2. 反向链接
-    let backlinks = get_backlinks(kb_path, knowledge_id)?;
+    let backlinks = get_backlinks(kb_path, &knowledge_id)?;
     for link in backlinks.backlinks {
         if let Ok(target_content) = fs::read_to_string(kb_path.join(&link.source_id)) {
             if let Ok((target_fm, _)) = parse_frontmatter(&target_content) {
@@ -326,10 +336,7 @@ pub fn get_related(kb_path: &Path, knowledge_id: &str) -> Result<RelatedResult, 
     // 3. 共享标签
     let files = collect_markdown_files(kb_path)?;
     for file_path in files {
-        let relative = file_path
-            .strip_prefix(kb_path)
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
+        let relative = relative_id(&file_path, kb_path);
 
         // 跳过自身
         if relative == knowledge_id || relative == format!("{}.md", knowledge_id) {
@@ -367,7 +374,7 @@ pub fn get_related(kb_path: &Path, knowledge_id: &str) -> Result<RelatedResult, 
     });
 
     Ok(RelatedResult {
-        id: knowledge_id.to_string(),
+        id: knowledge_id,
         related,
     })
 }
@@ -453,10 +460,7 @@ pub fn update_references(
     // 遍历所有 markdown 文件
     let files = collect_markdown_files(kb_path)?;
     for file_path in files {
-        let relative = file_path
-            .strip_prefix(kb_path)
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
+        let relative = relative_id(&file_path, kb_path);
 
         // 跳过被移动的文件本身
         if relative == old_path
@@ -632,10 +636,7 @@ pub fn build_knowledge_graph_with_options(
             }
         }
 
-        let relative = file_path
-            .strip_prefix(kb_path)
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
+        let relative = relative_id(file_path, kb_path);
 
         let content = match fs::read_to_string(file_path) {
             Ok(c) => c,
@@ -667,10 +668,7 @@ pub fn build_knowledge_graph_with_options(
             break;
         }
 
-        let source_id = file_path
-            .strip_prefix(kb_path)
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
+        let source_id = relative_id(file_path, kb_path);
 
         if !knowledge_map.contains_key(&source_id) {
             continue;
@@ -768,6 +766,8 @@ pub fn build_knowledge_graph_with_options(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_parse_wiki_links() {
@@ -783,5 +783,65 @@ Also check [[rust-async|async programming]].
         assert_eq!(links[0].1, None);
         assert_eq!(links[1].0, "rust-async");
         assert_eq!(links[1].1, Some("async programming".to_string()));
+    }
+
+    #[test]
+    fn test_get_related_normalizes_paths_and_skips_self() {
+        let temp = TempDir::new().unwrap();
+        let kb = temp.path();
+        fs::create_dir_all(kb.join("programming")).unwrap();
+        fs::write(
+            kb.join("programming/alpha.md"),
+            r#"---
+id: alpha
+title: Alpha
+tags: [rust, async]
+created_at: 2026-03-20T00:00:00Z
+updated_at: 2026-03-20T00:00:00Z
+---
+# Alpha
+
+Links to [[programming/beta.md]].
+"#,
+        )
+        .unwrap();
+        fs::write(
+            kb.join("programming/beta.md"),
+            r#"---
+id: beta
+title: Beta
+tags: [rust]
+created_at: 2026-03-20T00:00:00Z
+updated_at: 2026-03-20T00:00:00Z
+---
+# Beta
+"#,
+        )
+        .unwrap();
+        fs::write(
+            kb.join("programming/gamma.md"),
+            r#"---
+id: gamma
+title: Gamma
+tags: [rust]
+created_at: 2026-03-20T00:00:00Z
+updated_at: 2026-03-20T00:00:00Z
+---
+# Gamma
+"#,
+        )
+        .unwrap();
+
+        let related = get_related(kb, "programming/alpha.md").unwrap();
+        let ids = related
+            .related
+            .iter()
+            .map(|item| item.id.clone())
+            .collect::<Vec<_>>();
+
+        assert!(!ids.iter().any(|id| id.contains('\\')));
+        assert!(!ids.iter().any(|id| id == "programming/alpha.md"));
+        assert_eq!(ids.len(), ids.iter().collect::<std::collections::HashSet<_>>().len());
+        assert!(ids.iter().any(|id| id == "programming/beta.md"));
     }
 }

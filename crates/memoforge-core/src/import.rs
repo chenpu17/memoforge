@@ -284,3 +284,60 @@ pub fn preview_import(kb_path: &Path, source_path: &Path) -> std::io::Result<Imp
     };
     import_markdown_folder(kb_path, source_path, options)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn write(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, content).unwrap();
+    }
+
+    fn init_kb(path: &Path) {
+        fs::create_dir_all(path.join(".memoforge")).unwrap();
+        fs::write(
+            path.join(".memoforge/config.yaml"),
+            "version: \"1.0\"\nmetadata:\n  name: test\n  created_at: \"2026-03-20T00:00:00Z\"\ncategories: []\n",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn preview_import_does_not_write_files() {
+        let temp = TempDir::new().unwrap();
+        let kb = temp.path().join("kb");
+        let source = temp.path().join("source");
+        init_kb(&kb);
+        write(&source.join("notes/hello_world.md"), "# Hello world\n");
+
+        let stats = preview_import(&kb, &source).unwrap();
+
+        assert_eq!(stats.total_files, 1);
+        assert_eq!(stats.files_imported, 1);
+        assert!(!kb.join("notes/hello_world.md").exists());
+    }
+
+    #[test]
+    fn import_markdown_folder_generates_frontmatter_and_categories() {
+        let temp = TempDir::new().unwrap();
+        let kb = temp.path().join("kb");
+        let source = temp.path().join("source");
+        init_kb(&kb);
+        write(&source.join("notes/hello_world.md"), "# Hello world\n");
+
+        let stats = import_markdown_folder(&kb, &source, ImportOptions::default()).unwrap();
+        let imported = fs::read_to_string(kb.join("notes/hello_world.md")).unwrap();
+        let config = load_config(&kb).unwrap();
+
+        assert_eq!(stats.total_files, 1);
+        assert_eq!(stats.files_imported, 1);
+        assert_eq!(stats.categories_created, 1);
+        assert!(imported.starts_with("---\n"));
+        assert!(imported.contains("title: Hello World"));
+        assert!(config.categories.iter().any(|category| category.path == "notes"));
+    }
+}

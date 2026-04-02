@@ -7,12 +7,14 @@ interface GitPanelProps {
   compact?: boolean
   refreshToken?: number
   onStatusChange?: (count: number) => void
+  onRepoChanged?: () => void | Promise<void>
 }
 
 export const GitPanel: React.FC<GitPanelProps> = ({
   compact = false,
   refreshToken = 0,
   onStatusChange,
+  onRepoChanged,
 }) => {
   const [status, setStatus] = useState('')
   const [commitMessage, setCommitMessage] = useState('')
@@ -69,6 +71,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({
     try {
       await tauriService.gitPull()
       await loadStatus()
+      await onRepoChanged?.()
     } catch (error) {
       console.error('Pull failed:', error)
     }

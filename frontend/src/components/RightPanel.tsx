@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Info, GitBranch, Link2, ChevronsLeft, ChevronsRight } from 'lucide-react'
 
 const GitPanel = lazy(async () => {
@@ -25,6 +25,7 @@ interface RightPanelProps {
   folderMode?: boolean
   pendingChangesCount?: number
   onGitStatusChange?: (count: number) => void
+  onRepoChanged?: () => void | Promise<void>
 }
 
 const panelFallback = (
@@ -68,11 +69,13 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
   folderMode = false,
   pendingChangesCount = 0,
   onGitStatusChange,
+  onRepoChanged,
 }) => {
   const [isOpen, setIsOpen] = usePersistentState('rightPanel.isOpen', false)
   const [activeTab, setActiveTab] = usePersistentState<TabType>('rightPanel.activeTab', 'metadata')
   const [lastKnowledgeTab, setLastKnowledgeTab] = usePersistentState<'metadata' | 'backlinks'>('rightPanel.lastKnowledgeTab', 'metadata')
   const [railTooltip, setRailTooltip] = useState<{ label: string; top: number; left: number } | null>(null)
+  const previousFolderModeRef = useRef(folderMode)
 
   const handleIconClick = (tab: TabType) => {
     if (isOpen && activeTab === tab) {
@@ -110,6 +113,9 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
   }, [activeTab, setLastKnowledgeTab])
 
   useEffect(() => {
+    const wasFolderMode = previousFolderModeRef.current
+    previousFolderModeRef.current = folderMode
+
     if (folderMode) {
       if (activeTab !== 'git') {
         setActiveTab('git')
@@ -117,11 +123,11 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
       return
     }
 
-    if (!hasKnowledge) return
+    if (!wasFolderMode || !hasKnowledge) return
     if (activeTab === 'git') {
       setActiveTab(lastKnowledgeTab)
     }
-  }, [activeTab, folderMode, hasKnowledge, isOpen, lastKnowledgeTab, setActiveTab, setIsOpen])
+  }, [activeTab, folderMode, hasKnowledge, lastKnowledgeTab, setActiveTab])
 
   const edgeToggle = (
     <button
@@ -265,6 +271,7 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
                 compact
                 refreshToken={pendingChangesCount}
                 onStatusChange={onGitStatusChange}
+                onRepoChanged={onRepoChanged}
               />
             )}
             {activeTab === 'backlinks' && !folderMode && hasKnowledge && (

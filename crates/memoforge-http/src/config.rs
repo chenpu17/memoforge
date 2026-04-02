@@ -29,7 +29,7 @@ impl Default for HttpConfig {
             allowed_origins: vec![],
             auth_token: None,
             readonly: false,
-            rate_limit: 60,
+            rate_limit: 600,
             rate_limit_window_secs: 60,
         }
     }
@@ -56,7 +56,7 @@ impl HttpConfig {
             rate_limit: std::env::var("MEMOFORGE_RATE_LIMIT")
                 .ok()
                 .and_then(|p| p.parse().ok())
-                .unwrap_or(60),
+                .unwrap_or(600),
             rate_limit_window_secs: std::env::var("MEMOFORGE_RATE_LIMIT_WINDOW")
                 .ok()
                 .and_then(|p| p.parse().ok())

@@ -19,7 +19,7 @@ interface KnowledgeGraphPanelProps {
 }
 
 // 将后端数据转换为 React Flow 格式
-const convertToReactFlow = (data: GraphData): { nodes: Node[]; edges: Edge[] } => {
+export const convertToReactFlow = (data: GraphData): { nodes: Node[]; edges: Edge[] } => {
   const nodes: Node[] = data.nodes.map((node, index) => ({
     id: node.id,
     type: 'default',
@@ -43,8 +43,8 @@ const convertToReactFlow = (data: GraphData): { nodes: Node[]; edges: Edge[] } =
     },
   }))
 
-  const edges: Edge[] = data.edges.map(edge => ({
-    id: `${edge.source}-${edge.target}`,
+  const edges: Edge[] = data.edges.map((edge, index) => ({
+    id: `${edge.source}-${edge.target}-${edge.relation}-${index}`,
     source: edge.source,
     target: edge.target,
     animated: edge.relation === 'WikiLink',

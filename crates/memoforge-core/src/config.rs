@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+fn strip_utf8_bom(content: &str) -> &str {
+    content.strip_prefix('\u{feff}').unwrap_or(content)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub version: String,
@@ -56,7 +60,7 @@ pub fn load_config(kb_path: &Path) -> Result<Config, MemoError> {
         context: None,
     })?;
 
-    let mut config: Config = serde_yaml::from_str(&content).map_err(|e| MemoError {
+    let mut config: Config = serde_yaml::from_str(strip_utf8_bom(&content)).map_err(|e| MemoError {
         code: ErrorCode::InvalidPath,
         message: format!("Failed to parse config: {}", e),
         retry_after_ms: None,
@@ -114,4 +118,26 @@ pub fn validate_category_path(kb_path: &Path, category_id: &str) -> Result<bool,
         .categories
         .iter()
         .any(|c| c.id == category_id || c.path == category_id || c.name == category_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn load_config_allows_utf8_bom() {
+        let temp = TempDir::new().unwrap();
+        let kb_path = temp.path();
+        fs::create_dir_all(kb_path.join(".memoforge")).unwrap();
+        fs::write(
+            kb_path.join(".memoforge/config.yaml"),
+            "\u{feff}version: \"1.0\"\ncategories: []\n",
+        )
+        .unwrap();
+
+        let config = load_config(kb_path).unwrap();
+        assert_eq!(config.version, "1.0");
+        assert!(config.categories.is_empty());
+    }
 }

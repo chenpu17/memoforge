@@ -78,7 +78,6 @@ fn process_alive(pid: u32) -> bool {
     #[cfg(windows)]
     {
         // Windows: 使用 OpenProcess 检查进程是否存在
-        use std::ptr;
         unsafe {
             const PROCESS_QUERY_INFORMATION: u32 = 0x0400;
             const PROCESS_VM_READ: u32 = 0x0010;

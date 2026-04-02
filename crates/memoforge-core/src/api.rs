@@ -2,7 +2,7 @@
 //! 参考: 技术实现文档 §4
 
 use crate::config::{load_config, register_category, save_config, validate_category_path};
-use crate::events::{log_create, log_delete, log_update, EventSource};
+use crate::events::{log_create, log_delete, log_move, log_update, log_update_metadata, EventSource};
 use crate::fs::write_knowledge_file;
 use crate::knowledge::split_sections;
 use crate::models::KnowledgeWithStale;
@@ -541,6 +541,7 @@ fn move_knowledge_to_relative_path_internal(
     write_knowledge_file(&target_path, &full_content)?;
 
     let _ = update_references(kb_path, &old_relative, &target_relative);
+    let _ = log_move(kb_path, EventSource::Gui, &old_relative, &target_relative);
 
     Ok(MovePreview {
         old_path: old_relative,
@@ -851,10 +852,15 @@ pub fn update_knowledge(
 
     if moved {
         let _ = update_references(kb_path, &relative_path, &final_relative_path);
+        let _ = log_move(kb_path, EventSource::Gui, &relative_path, &final_relative_path);
     }
 
     // Log event (ignore errors in event logging)
-    let _ = log_update(kb_path, EventSource::Gui, &final_relative_path, &fm.title);
+    if content_changed {
+        let _ = log_update(kb_path, EventSource::Gui, &final_relative_path, &fm.title);
+    } else if title_changed || tags_changed || summary_changed {
+        let _ = log_update_metadata(kb_path, EventSource::Gui, &final_relative_path, &fm.title);
+    }
 
     Ok(())
 }
@@ -1332,6 +1338,7 @@ pub fn get_knowledge_graph(kb_path: &Path) -> Result<KnowledgeGraph, MemoError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::events::{read_recent_events, EventAction};
     use std::fs;
 
     #[test]
@@ -1623,5 +1630,96 @@ See [[programming/source.md]] and [[source]]."#,
 
         assert!(!results.is_empty());
         assert!(results[0].id.contains("programming/rust/async-patterns"));
+    }
+
+    #[test]
+    fn test_update_metadata_logs_update_metadata_event() {
+        let temp = tempfile::tempdir().unwrap();
+        let kb_path = temp.path();
+
+        crate::init::init_new(kb_path, false).unwrap();
+        crate::config::save_config(
+            kb_path,
+            &crate::config::Config {
+                version: "1.0".to_string(),
+                categories: vec![crate::config::CategoryConfig {
+                    id: "programming".to_string(),
+                    name: "Programming".to_string(),
+                    path: "programming".to_string(),
+                    parent_id: None,
+                    description: None,
+                }],
+                metadata: None,
+            },
+        )
+        .unwrap();
+
+        let id = create_knowledge(
+            kb_path,
+            "Event Note",
+            "# Event Note",
+            vec![],
+            Some("programming".to_string()),
+            Some("old summary".to_string()),
+        )
+        .unwrap();
+
+        update_metadata(kb_path, &id, Some("Event Note Updated"), None, Some("new summary")).unwrap();
+
+        let events = read_recent_events(kb_path, 10).unwrap();
+        assert!(events.iter().any(|event| event.action == EventAction::UpdateMetadata));
+    }
+
+    #[test]
+    fn test_move_knowledge_to_path_logs_move_event() {
+        let temp = tempfile::tempdir().unwrap();
+        let kb_path = temp.path();
+
+        crate::init::init_new(kb_path, false).unwrap();
+        crate::config::save_config(
+            kb_path,
+            &crate::config::Config {
+                version: "1.0".to_string(),
+                categories: vec![
+                    crate::config::CategoryConfig {
+                        id: "programming".to_string(),
+                        name: "Programming".to_string(),
+                        path: "programming".to_string(),
+                        parent_id: None,
+                        description: None,
+                    },
+                    crate::config::CategoryConfig {
+                        id: "tools".to_string(),
+                        name: "Tools".to_string(),
+                        path: "tools".to_string(),
+                        parent_id: None,
+                        description: None,
+                    },
+                ],
+                metadata: None,
+            },
+        )
+        .unwrap();
+
+        fs::create_dir_all(kb_path.join("programming")).unwrap();
+        fs::write(
+            kb_path.join("programming/source.md"),
+            r#"---
+id: source
+title: Source
+tags: []
+category: programming
+created_at: 2026-03-23T10:00:00Z
+updated_at: 2026-03-23T11:00:00Z
+---
+# Source
+"#,
+        )
+        .unwrap();
+
+        move_knowledge_to_path(kb_path, "programming/source.md", "tools/source-renamed.md").unwrap();
+
+        let events = read_recent_events(kb_path, 10).unwrap();
+        assert!(events.iter().any(|event| event.action == EventAction::Move));
     }
 }
