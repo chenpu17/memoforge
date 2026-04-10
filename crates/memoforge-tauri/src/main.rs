@@ -221,6 +221,7 @@ async fn automation_invoke(
             json!(StatusResponse {
                 initialized: kb_path.is_some(),
                 kb_path: kb_path.map(|path| path.to_string_lossy().to_string()),
+                readonly: is_readonly_mode(),
             })
         }
         "init_kb" => {
@@ -3111,7 +3112,7 @@ mod tests {
 
         let error = prepare_kb_for_open(temp.path()).unwrap_err();
 
-        assert!(error.contains("Empty directories can be auto-initialized"));
+        assert!(error.contains("空目录会自动初始化"));
     }
 
     #[test]
@@ -3166,6 +3167,4 @@ mod tests {
         assert_eq!(found.as_deref(), Some(existing.as_path()));
     }
 }
-
-
 
