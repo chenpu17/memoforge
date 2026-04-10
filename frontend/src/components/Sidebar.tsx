@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { shallow } from 'zustand/shallow'
 import { useAppStore } from '../stores/appStore'
-import { Search, GitBranch, Settings, Database, ChevronsUpDown, FolderInput, Bot } from 'lucide-react'
+import { Search, GitBranch, Settings, Database, ChevronsUpDown, FolderInput, Bot, Inbox, MessageSquare, ClipboardCheck, Shield, Package } from 'lucide-react'
 import { KbSwitcher } from './KbSwitcher'
 import { SettingsModal } from './SettingsModal'
 
@@ -20,6 +20,8 @@ interface SidebarProps {
   currentKbName?: string
   isGitRepo?: boolean
   mcpConnectionCount?: number
+  onOpenAgentPanel?: (panel: 'inbox' | 'sessions' | 'review' | 'reliability' | 'packs') => void
+  activeAgentPanel?: 'inbox' | 'sessions' | 'review' | 'reliability' | 'packs' | null
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -37,6 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentKbName = '知识库',
   isGitRepo = true,
   mcpConnectionCount = 0,
+  onOpenAgentPanel,
+  activeAgentPanel = null,
 }) => {
   const { categories, knowledgeList, allTags } = useAppStore((state) => ({
     categories: state.categories ?? [],
@@ -86,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           style={{ backgroundColor: '#F5F5F5' }}
           onClick={() => setShowKbSwitcher(true)}
         >
-          <Database className="h-4 w-4" style={{ color: '#6366F1' }} />
+          <Database className="h-4 w-4" style={{ color: 'var(--brand-primary)' }} />
           <div className="flex-1">
             <div className="text-[13px] font-semibold" style={{ color: '#0A0A0A' }}>{currentKbName}</div>
             <div className="text-[11px]" style={{ color: '#737373' }}>点击切换知识库</div>
@@ -98,6 +102,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="h-px" style={{ backgroundColor: '#E5E5E5' }} />
 
       <div className="flex-1 overflow-y-auto p-2">
+        {/* Agent Workspace Section */}
+        {onOpenAgentPanel && (
+          <div className="mb-2 rounded-xl border bg-white p-2" style={{ borderColor: '#E5E7EB' }}>
+            <div className="mb-2 px-1 text-[11px] font-medium" style={{ color: '#A3A3A3' }}>
+              Agent 工作台
+            </div>
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => onOpenAgentPanel('inbox')}
+                className="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left"
+                style={{
+                  borderColor: activeAgentPanel === 'inbox' ? 'var(--brand-primary-border)' : '#E5E7EB',
+                  backgroundColor: activeAgentPanel === 'inbox' ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                }}
+              >
+                <Inbox className="h-4 w-4 flex-shrink-0" style={{ color: activeAgentPanel === 'inbox' ? 'var(--brand-primary-strong)' : '#737373' }} />
+                <span className="text-xs font-medium" style={{ color: activeAgentPanel === 'inbox' ? '#312E81' : '#171717' }}>Inbox 收件箱</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenAgentPanel('sessions')}
+                className="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left"
+                style={{
+                  borderColor: activeAgentPanel === 'sessions' ? 'var(--brand-primary-border)' : '#E5E7EB',
+                  backgroundColor: activeAgentPanel === 'sessions' ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                }}
+              >
+                <MessageSquare className="h-4 w-4 flex-shrink-0" style={{ color: activeAgentPanel === 'sessions' ? 'var(--brand-primary-strong)' : '#737373' }} />
+                <span className="text-xs font-medium" style={{ color: activeAgentPanel === 'sessions' ? '#312E81' : '#171717' }}>Sessions 会话</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenAgentPanel('review')}
+                className="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left"
+                style={{
+                  borderColor: activeAgentPanel === 'review' ? 'var(--brand-primary-border)' : '#E5E7EB',
+                  backgroundColor: activeAgentPanel === 'review' ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                }}
+              >
+                <ClipboardCheck className="h-4 w-4 flex-shrink-0" style={{ color: activeAgentPanel === 'review' ? 'var(--brand-primary-strong)' : '#737373' }} />
+                <span className="text-xs font-medium" style={{ color: activeAgentPanel === 'review' ? '#312E81' : '#171717' }}>Review 审阅</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenAgentPanel('reliability')}
+                className="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left"
+                style={{
+                  borderColor: activeAgentPanel === 'reliability' ? 'var(--brand-primary-border)' : '#E5E7EB',
+                  backgroundColor: activeAgentPanel === 'reliability' ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                }}
+              >
+                <Shield className="h-4 w-4 flex-shrink-0" style={{ color: activeAgentPanel === 'reliability' ? 'var(--brand-primary-strong)' : '#737373' }} />
+                <span className="text-xs font-medium" style={{ color: activeAgentPanel === 'reliability' ? '#312E81' : '#171717' }}>Reliability 可靠性</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenAgentPanel('packs')}
+                className="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left"
+                style={{
+                  borderColor: activeAgentPanel === 'packs' ? 'var(--brand-primary-border)' : '#E5E7EB',
+                  backgroundColor: activeAgentPanel === 'packs' ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                }}
+              >
+                <Package className="h-4 w-4 flex-shrink-0" style={{ color: activeAgentPanel === 'packs' ? 'var(--brand-primary-strong)' : '#737373' }} />
+                <span className="text-xs font-medium" style={{ color: activeAgentPanel === 'packs' ? '#312E81' : '#171717' }}>Packs 打包</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-xl border bg-white p-2" style={{ borderColor: '#E5E7EB' }}>
           <div className="mb-1 px-1 text-[11px] font-medium" style={{ color: '#A3A3A3' }}>
             辅助入口
@@ -112,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="mb-1 px-1 text-[11px] font-medium" style={{ color: '#A3A3A3' }}>当前筛选</div>
             <div className="flex flex-wrap gap-1.5">
               {showSelectedCategorySummary && (
-                <span className="rounded-full bg-[#EEF2FF] px-2 py-1 text-[11px]" style={{ color: '#4338CA' }}>
+                <span className="rounded-full px-2 py-1 text-[11px]" style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-strong)' }}>
                   分类 · {categories.find((category) => category.id === selectedCategory)?.name ?? selectedCategory}
                 </span>
               )}
@@ -148,7 +223,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       type="button"
                       onClick={() => onOpenBrowserMode?.('category')}
                       className="text-[11px] font-medium"
-                      style={{ color: '#6366F1' }}
+                      style={{ color: 'var(--brand-primary)' }}
                     >
                       全部
                     </button>
@@ -158,8 +233,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       type="button"
                       className="flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left"
                       style={{
-                        borderColor: selectedCategory === null && selectedTags.length === 0 ? '#C7D2FE' : '#E5E7EB',
-                        backgroundColor: selectedCategory === null && selectedTags.length === 0 ? '#EEF2FF' : '#FFFFFF',
+                        borderColor: selectedCategory === null && selectedTags.length === 0 ? 'var(--brand-primary-border)' : '#E5E7EB',
+                        backgroundColor: selectedCategory === null && selectedTags.length === 0 ? 'var(--brand-primary-soft)' : '#FFFFFF',
                       }}
                       onClick={() => {
                         onClearFilters?.()
@@ -179,8 +254,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           key={category.id}
                           className="flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left"
                           style={{
-                            borderColor: active ? '#C7D2FE' : '#E5E7EB',
-                            backgroundColor: active ? '#EEF2FF' : '#FFFFFF',
+                            borderColor: active ? 'var(--brand-primary-border)' : '#E5E7EB',
+                            backgroundColor: active ? 'var(--brand-primary-soft)' : '#FFFFFF',
                           }}
                           onClick={() => {
                             onSelectCategory?.(active ? null : category.id)
@@ -208,7 +283,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       type="button"
                       onClick={() => onOpenBrowserMode?.('tag')}
                       className="text-[11px] font-medium"
-                      style={{ color: '#6366F1' }}
+                      style={{ color: 'var(--brand-primary)' }}
                     >
                       全部
                     </button>
@@ -226,9 +301,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           }}
                           className="rounded-full border px-2 py-1 text-[10px] font-medium"
                           style={{
-                            borderColor: active ? '#C7D2FE' : '#E5E7EB',
-                            backgroundColor: active ? '#EEF2FF' : '#FFFFFF',
-                            color: active ? '#4338CA' : '#525252',
+                            borderColor: active ? 'var(--brand-primary-border)' : '#E5E7EB',
+                            backgroundColor: active ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                            color: active ? 'var(--brand-primary-strong)' : '#525252',
                           }}
                         >
                           #{tag} · {count}
@@ -298,7 +373,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               onClick={onImport}
               className="flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium"
-              style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+              style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-strong)' }}
             >
               <FolderInput className="h-3.5 w-3.5" />
               导入

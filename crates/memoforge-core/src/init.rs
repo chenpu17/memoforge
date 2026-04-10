@@ -23,9 +23,13 @@ pub fn init_new(path: &Path, use_template: bool) -> Result<(), MemoError> {
 
     // 创建目录结构
     fs::create_dir_all(path.join(".memoforge")).map_err(io_error)?;
+    fs::create_dir_all(path.join(".memoforge/inbox")).map_err(io_error)?;
+    fs::create_dir_all(path.join(".memoforge/sessions")).map_err(io_error)?;
+    fs::create_dir_all(path.join(".memoforge/reliability")).map_err(io_error)?;
+    fs::create_dir_all(path.join(".memoforge/packs")).map_err(io_error)?;
 
     // 创建配置文件
-    let config = r#"# MemoForge 配置文件
+    let config = r#"# ForgeNerve 配置文件
 version: "1.0"
 categories: []
 "#;

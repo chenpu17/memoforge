@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ForgeNerve — Landing Preview</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --panel: rgba(255, 255, 255, 0.78);
+        --border: #e5e7eb;
+        --text: #0f172a;
+        --muted: #475569;
+        --subtle: #64748b;
+        --primary: #4f46e5;
+        --primary-soft: #eef2ff;
+        --success-soft: #ecfdf5;
+        --warning-soft: #fffbeb;
+        --shadow: 0 20px 60px rgba(15, 23, 42, 0.10);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(99, 102, 241, 0.14), transparent 28%),
+          radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 24%),
+          linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+      }
+
+      .container { width: min(1120px, calc(100vw - 32px)); margin: 0 auto; }
+      .nav {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 20px 0;
+      }
+      .brand { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+      .nav-links { display: flex; gap: 18px; color: var(--muted); font-size: 14px; }
+
+      .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 36px; padding: 48px 0 72px; align-items: center; }
+      .eyebrow {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 12px; border-radius: 999px;
+        background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 600;
+      }
+      h1 { font-size: clamp(42px, 6vw, 72px); line-height: 0.98; letter-spacing: -0.05em; margin: 18px 0 16px; }
+      .subtitle { font-size: 22px; color: var(--muted); margin-bottom: 14px; }
+      .desc { font-size: 17px; line-height: 1.7; color: var(--subtle); max-width: 680px; }
+      .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--border);
+        text-decoration: none; font-weight: 600; font-size: 14px;
+      }
+      .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+      .btn.secondary { background: white; color: var(--text); }
+      .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+      .chip {
+        border: 1px solid var(--border); background: white; color: var(--muted);
+        border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 600;
+      }
+
+      .panel {
+        background: var(--panel); backdrop-filter: blur(10px); border: 1px solid rgba(229, 231, 235, 0.8);
+        border-radius: 24px; box-shadow: var(--shadow); overflow: hidden;
+      }
+      .panel-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 18px; border-bottom: 1px solid rgba(229, 231, 235, 0.8); background: rgba(255,255,255,0.84);
+      }
+      .panel-title { font-weight: 700; font-size: 14px; }
+      .panel-body { padding: 18px; display: grid; gap: 14px; }
+      .status {
+        display: flex; align-items: center; gap: 8px; font-size: 13px; color: #166534;
+        background: var(--success-soft); border: 1px solid #bbf7d0; border-radius: 14px; padding: 10px 12px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 999px; background: #22c55e; }
+      .code {
+        border-radius: 16px; background: #0f172a; color: #e2e8f0;
+        padding: 14px; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        overflow: auto;
+      }
+      .steps { display: grid; gap: 10px; }
+      .step {
+        border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; background: white;
+      }
+      .step strong { display: block; font-size: 13px; margin-bottom: 6px; }
+      .step span { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+      .section { padding: 24px 0 36px; }
+      .section h2 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.03em; }
+      .section p.lead { color: var(--subtle); max-width: 760px; line-height: 1.75; margin: 0 0 18px; }
+      .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      .card {
+        border: 1px solid var(--border); border-radius: 20px; background: white; padding: 20px; box-shadow: 0 10px 30px rgba(15,23,42,0.04);
+      }
+      .card h3 { margin: 0 0 10px; font-size: 17px; }
+      .card p { margin: 0; color: var(--muted); line-height: 1.7; font-size: 14px; }
+
+      .proof {
+        display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+      }
+      .proof-item {
+        border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: white;
+      }
+      .proof-item strong { display: block; font-size: 14px; margin-bottom: 8px; }
+      .proof-item span { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+      .callout {
+        margin-top: 18px; padding: 16px 18px; border-radius: 18px;
+        background: var(--warning-soft); border: 1px solid #fde68a; color: #92400e; font-size: 14px; line-height: 1.7;
+      }
+
+      footer { padding: 36px 0 64px; color: var(--subtle); font-size: 13px; }
+
+      @media (max-width: 920px) {
+        .hero, .grid-3, .proof { grid-template-columns: 1fr; }
+        .nav { gap: 12px; flex-direction: column; align-items: flex-start; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <nav class="nav">
+        <div class="brand">ForgeNerve</div>
+        <div class="nav-links">
+          <span>Why</span>
+          <span>Workflow</span>
+          <span>Proof</span>
+          <span>MCP</span>
+        </div>
+      </nav>
+
+      <section class="hero">
+        <div>
+          <div class="eyebrow">Agent Knowledge OS for Developers</div>
+          <h1>ForgeNerve</h1>
+          <div class="subtitle">The Git-native memory layer for AI agents.</div>
+          <div class="desc">
+            ForgeNerve is a Git-native workspace where humans and AI agents collaborate on knowledge safely —
+            with MCP access, draft-based writing, desktop review, and local-first control.
+          </div>
+          <div class="cta-row">
+            <a class="btn primary" href="#">Get Started</a>
+            <a class="btn secondary" href="#">View on GitHub</a>
+            <a class="btn secondary" href="#">Connect via MCP</a>
+          </div>
+          <div class="chips">
+            <span class="chip">Local-first</span>
+            <span class="chip">Git-native</span>
+            <span class="chip">MCP-ready</span>
+            <span class="chip">Reviewable agent writes</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">ForgeNerve Desktop</div>
+            <div style="font-size:12px;color:#64748b;">MCP connected</div>
+          </div>
+          <div class="panel-body">
+            <div class="status"><span class="dot"></span><span>SSE MCP server running at `http://127.0.0.1:31415/mcp`</span></div>
+            <div class="code">{
+  "mcpServers": {
+    "memoforge": {
+      "type": "sse",
+      "url": "http://127.0.0.1:31415/mcp"
+    }
+  }
+}</div>
+            <div class="steps">
+              <div class="step">
+                <strong>1. Connect your agent</strong>
+                <span>Use Claude Code or OpenCode to attach ForgeNerve via MCP.</span>
+              </div>
+              <div class="step">
+                <strong>2. Let it draft changes</strong>
+                <span>Ask the agent to read context, prepare structured draft updates, and avoid unsafe full rewrites.</span>
+              </div>
+              <div class="step">
+                <strong>3. Review and approve</strong>
+                <span>Open the desktop app, inspect draft changes, then commit with full visibility and Git history.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>AI can write code fast. Knowledge is still the hard part.</h2>
+        <p class="lead">
+          Most note tools were built for humans only. They don’t expose the right context to agents, they don’t support safe incremental writing,
+          and they rarely provide a clean review path for AI-generated knowledge changes.
+        </p>
+        <div class="grid-3">
+          <div class="card">
+            <h3>Context that agents can actually use</h3>
+            <p>Expose Markdown knowledge, summaries, graph relations, and current editor context through MCP instead of forcing brittle copy-paste workflows.</p>
+          </div>
+          <div class="card">
+            <h3>Safe writes instead of blind overwrites</h3>
+            <p>Use draft-based updates and desktop review to keep long-form knowledge changes understandable, recoverable, and human-approved.</p>
+          </div>
+          <div class="card">
+            <h3>Git-native collaboration</h3>
+            <p>Keep your knowledge in your repo, review changes with your existing habits, and let AI work inside your real workflow instead of around it.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>What already exists</h2>
+        <p class="lead">
+          ForgeNerve is not just a concept. The core product stack is already in place and continuously hardened through desktop and MCP end-to-end tests.
+        </p>
+        <div class="proof">
+          <div class="proof-item"><strong>Tauri desktop app</strong><span>Local workspace, welcome flow, dashboard, graph, editor, settings, and Git integration.</span></div>
+          <div class="proof-item"><strong>SSE + stdio MCP</strong><span>Desktop-embedded SSE plus CLI fallback for CI, remote, and bound knowledge-base workflows.</span></div>
+          <div class="proof-item"><strong>Draft workflow</strong><span>Structured, reviewable agent writes with preview, commit, discard, and conflict handling.</span></div>
+          <div class="proof-item"><strong>Knowledge graph + retrieval</strong><span>Graph exploration, search, backlinks, and knowledge navigation designed for context-heavy work.</span></div>
+          <div class="proof-item"><strong>Git-native operations</strong><span>Commit, pull, push, and repository-aware collaboration without inventing a new sync layer.</span></div>
+          <div class="proof-item"><strong>Real desktop E2E coverage</strong><span>Linux CI runs real Tauri desktop end-to-end checks across GUI, Tauri commands, and embedded MCP SSE.</span></div>
+        </div>
+        <div class="callout">
+          ForgeNerve is building a new category: not another note app, but the knowledge operating system behind AI-native developer workflows.
+        </div>
+      </section>
+
+      <footer>
+        Preview draft for ForgeNerve landing page. Built for brand positioning, homepage exploration, and launch messaging alignment.
+      </footer>
+    </div>
+  </body>
+  </html>

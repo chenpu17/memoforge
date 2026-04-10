@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search, Settings, FolderInput, Bot, MoreHorizontal, GitBranch } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search, Settings, FolderInput, Bot, MoreHorizontal, GitBranch, Inbox } from 'lucide-react'
 import type { KnowledgeTreeNode, TreeSelection } from '../lib/knowledgeTree'
 import { filterKnowledgeTree, getAncestorFolderPaths } from '../lib/knowledgeTree'
+import { MinimalWorkspace } from './MinimalWorkspace'
+import { type AgentPanel } from '../stores/appStore'
 
 interface VisibleTreeItem {
   path: string
@@ -22,9 +24,12 @@ interface KnowledgeTreeNavProps {
   onOpenSettings: () => void
   onOpenKnowledgeGraph: () => void
   onOpenImport?: () => void
+  onOpenAgentPanel?: (panel: AgentPanel) => void
+  activeAgentPanel?: AgentPanel
 }
 
 const EXPANDED_STORAGE_KEY = 'memoforge.tree.expanded'
+const SHOW_MINIMAL_WORKSPACE_KEY = 'memoforge.show_minimal_workspace'
 
 function collectVisibleFolderPaths(nodes: KnowledgeTreeNode[], result = new Set<string>()) {
   nodes.forEach((node) => {
@@ -116,7 +121,13 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
   onOpenSettings,
   onOpenKnowledgeGraph,
   onOpenImport,
+  onOpenAgentPanel,
+  activeAgentPanel = null,
 }) => {
+  // Props onOpenAgentPanel and activeAgentPanel are passed through but not directly used
+  // They are used by the Sidebar component which is integrated elsewhere
+  void onOpenAgentPanel
+  void activeAgentPanel
   const filteredChildren = useMemo(
     () => filterKnowledgeTree(rootNode.children, query),
     [query, rootNode.children],
@@ -124,6 +135,11 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(getStoredExpandedFolders)
   const [activeItemPath, setActiveItemPath] = useState<string>(selected.path)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
+  const [showMinimalWorkspace, setShowMinimalWorkspace] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const stored = window.localStorage.getItem(SHOW_MINIMAL_WORKSPACE_KEY)
+    return stored === 'true'
+  })
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
   const toolsMenuRef = useRef<HTMLDivElement | null>(null)
@@ -144,6 +160,10 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
   useEffect(() => {
     window.localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(Array.from(expandedFolders)))
   }, [expandedFolders])
+
+  useEffect(() => {
+    window.localStorage.setItem(SHOW_MINIMAL_WORKSPACE_KEY, String(showMinimalWorkspace))
+  }, [showMinimalWorkspace])
 
   useEffect(() => {
     if (!showToolsMenu) return
@@ -304,7 +324,7 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
           className="flex items-center gap-1.5 rounded-xl px-2 py-1"
           style={{
             paddingLeft: `${8 + depth * 14}px`,
-            backgroundColor: isSelected ? '#EEF2FF' : (isActive ? '#F8FAFC' : 'transparent'),
+            backgroundColor: isSelected ? 'var(--brand-primary-soft)' : (isActive ? '#F8FAFC' : 'transparent'),
           }}
         >
           {isFolder ? (
@@ -336,10 +356,10 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
           >
             {isFolder ? (
               isExpanded
-                ? <FolderOpen className="h-4 w-4 shrink-0" style={{ color: isSelected ? '#4F46E5' : '#64748B' }} />
-                : <Folder className="h-4 w-4 shrink-0" style={{ color: isSelected ? '#4F46E5' : '#64748B' }} />
+                ? <FolderOpen className="h-4 w-4 shrink-0" style={{ color: isSelected ? 'var(--brand-primary-hover)' : '#64748B' }} />
+                : <Folder className="h-4 w-4 shrink-0" style={{ color: isSelected ? 'var(--brand-primary-hover)' : '#64748B' }} />
             ) : (
-              <FileText className="h-4 w-4 shrink-0" style={{ color: isSelected ? '#4F46E5' : '#94A3B8' }} />
+              <FileText className="h-4 w-4 shrink-0" style={{ color: isSelected ? 'var(--brand-primary-hover)' : '#94A3B8' }} />
             )}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium">
@@ -422,7 +442,7 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
               type="button"
               onClick={() => onQueryChange('')}
               className="rounded-md px-2 py-1 text-[11px] font-medium"
-              style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+              style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-strong)' }}
             >
               清空
             </button>
@@ -448,9 +468,9 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
           type="button"
           onClick={() => handleActivateItem({ path: '', type: 'folder', depth: 0, label: rootNode.label })}
           className="mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white"
-          style={{ backgroundColor: selected.type === 'folder' && selected.path === '' ? '#EEF2FF' : '#F8FAFC' }}
+          style={{ backgroundColor: selected.type === 'folder' && selected.path === '' ? 'var(--brand-primary-soft)' : '#F8FAFC' }}
         >
-          <FolderOpen className="h-4 w-4 shrink-0" style={{ color: '#4F46E5' }} />
+          <FolderOpen className="h-4 w-4 shrink-0" style={{ color: 'var(--brand-primary-hover)' }} />
           <span className="min-w-0 flex-1 truncate text-[13px] font-semibold" style={{ color: '#171717' }}>
             {renderHighlightedLabel(rootNode.label, query)}
           </span>
@@ -483,7 +503,7 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
                 type="button"
                 onClick={() => onSelectFolder('')}
                 className="rounded-full px-3 py-1.5 text-[12px] font-medium text-white"
-                style={{ backgroundColor: '#6366F1' }}
+                style={{ backgroundColor: 'var(--brand-primary)' }}
               >
                 回到根目录
               </button>
@@ -521,7 +541,7 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
               type="button"
               onClick={onOpenImport}
               className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-medium whitespace-nowrap"
-              style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+              style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-strong)' }}
               title="导入 Markdown"
             >
               <FolderInput className="h-3.5 w-3.5" />
@@ -550,9 +570,9 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
               onClick={() => setShowToolsMenu((open) => !open)}
               className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium whitespace-nowrap"
               style={{
-                borderColor: showToolsMenu ? '#C7D2FE' : '#E5E7EB',
-                backgroundColor: showToolsMenu ? '#EEF2FF' : '#FFFFFF',
-                color: showToolsMenu ? '#4338CA' : '#525252',
+                borderColor: showToolsMenu ? 'var(--brand-primary-border)' : '#E5E7EB',
+                backgroundColor: showToolsMenu ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                color: showToolsMenu ? 'var(--brand-primary-strong)' : '#525252',
               }}
               title="更多工具"
             >
@@ -577,12 +597,56 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
                   <GitBranch className="h-3.5 w-3.5" />
                   知识图谱
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMinimalWorkspace((show) => !show)
+                    setShowToolsMenu(false)
+                  }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium"
+                  style={{ color: '#404040' }}
+                >
+                  {showMinimalWorkspace ? (
+                    <>
+                      <Folder className="h-3.5 w-3.5" />
+                      返回知识树
+                    </>
+                  ) : (
+                    <>
+                      <Inbox className="h-3.5 w-3.5" />
+                      最小工作区
+                    </>
+                  )}
+                </button>
               </div>
             )}
           </div>
         </div>
         </div>
       </div>
+
+      {showMinimalWorkspace && (
+        <div className="absolute inset-0 z-10 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: '#E5E5E5' }}>
+              <div className="flex items-center gap-2">
+                <Inbox className="h-5 w-5" style={{ color: 'var(--brand-primary)' }} />
+                <h2 className="text-sm font-semibold" style={{ color: '#0A0A0A' }}>最小工作区</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMinimalWorkspace(false)}
+                className="rounded-lg p-2 hover:bg-gray-100"
+              >
+                <MoreHorizontal className="h-4 w-4" style={{ color: '#6B7280' }} />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 60px)' }}>
+              <MinimalWorkspace onSelectKnowledge={onSelectKnowledge} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 })

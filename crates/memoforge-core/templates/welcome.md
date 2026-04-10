@@ -1,15 +1,15 @@
 ---
 id: welcome
-title: 欢迎使用 MemoForge
+title: 欢迎使用 ForgeNerve
 tags: [welcome, getting-started]
-summary: MemoForge 知识库快速入门指南
+summary: ForgeNerve 知识库快速入门指南
 created: 2026-03-23T00:00:00Z
 updated: 2026-03-23T00:00:00Z
 ---
 
-# 欢迎使用 MemoForge
+# 欢迎使用 ForgeNerve
 
-MemoForge 是一个为开发者设计的知识管理工具，支持 Markdown 编辑、Git 版本控制和 AI Agent 集成。
+ForgeNerve 是一个为开发者设计的知识管理工具，支持 Markdown 编辑、Git 版本控制和 AI Agent 集成。
 
 ## 快速开始
 

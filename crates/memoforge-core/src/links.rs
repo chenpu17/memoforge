@@ -93,7 +93,7 @@ pub fn parse_wiki_links(content: &str) -> Vec<(String, Option<String>, usize)> {
 }
 
 /// 将链接文本解析为可能的知识 ID
-fn resolve_link_to_knowledge_id(link_text: &str, kb_path: &Path) -> Option<String> {
+pub fn resolve_link_to_knowledge_id(link_text: &str, kb_path: &Path) -> Option<String> {
     // 尝试直接匹配文件名
     let candidates = vec![link_text.to_string(), format!("{}.md", link_text)];
 
@@ -123,7 +123,7 @@ fn resolve_link_to_knowledge_id(link_text: &str, kb_path: &Path) -> Option<Strin
 }
 
 /// 收集所有 markdown 文件
-fn collect_markdown_files(dir: &Path) -> Result<Vec<std::path::PathBuf>, MemoError> {
+pub fn collect_markdown_files(dir: &Path) -> Result<Vec<std::path::PathBuf>, MemoError> {
     let mut files = Vec::new();
 
     fn walk(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<(), MemoError> {

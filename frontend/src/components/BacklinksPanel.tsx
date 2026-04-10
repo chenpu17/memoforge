@@ -83,9 +83,9 @@ export const BacklinksPanel: React.FC = () => {
                       {incomingLinks.length}
                     </div>
                   </div>
-                  <div className="rounded-md bg-[#EEF2FF] px-2.5 py-2 text-center">
-                    <div className="text-[10px]" style={{ color: '#4338CA' }}>链接到</div>
-                    <div className="mt-1 text-sm font-semibold" style={{ color: '#3730A3' }}>
+                  <div className="rounded-md px-2.5 py-2 text-center" style={{ backgroundColor: 'var(--brand-primary-soft)' }}>
+                    <div className="text-[10px]" style={{ color: 'var(--brand-primary-strong)' }}>链接到</div>
+                    <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--brand-primary-stronger)' }}>
                       {outgoingLinks.length}
                     </div>
                   </div>
@@ -145,9 +145,9 @@ export const BacklinksPanel: React.FC = () => {
                 ) : (
                   <ChevronRight className="h-3 w-3" style={{ color: '#737373' }} />
                 )}
-                <ArrowRight className="h-3 w-3" style={{ color: '#6366F1' }} />
+                <ArrowRight className="h-3 w-3" style={{ color: 'var(--brand-primary)' }} />
                 <span className="text-xs" style={{ color: '#0A0A0A' }}>链接到</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#EEF2FF', color: '#3730A3' }}>
+                <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-stronger)' }}>
                   {outgoingLinks.length}
                 </span>
               </div>

@@ -32,6 +32,7 @@ pub struct DesktopStatePublisher {
     current_kb: Option<CurrentKb>,
     current_knowledge: Option<CurrentKnowledge>,
     selection: Option<Selection>,
+    focused: bool,
     last_publish: Option<Instant>,
     throttle_interval: Duration,
     share_selected_text: bool,
@@ -50,6 +51,7 @@ impl DesktopStatePublisher {
             current_kb: None,
             current_knowledge: None,
             selection: None,
+            focused: true,
             last_publish: None,
             throttle_interval: Duration::from_millis(300),
             share_selected_text,
@@ -142,6 +144,12 @@ impl DesktopStatePublisher {
         self.publish();
     }
 
+    /// Update the current desktop focus state.
+    pub fn set_focus(&mut self, focused: bool) {
+        self.focused = focused;
+        self.publish();
+    }
+
     /// Refresh the shared state timestamp without changing the current payload.
     pub fn heartbeat(&mut self) {
         self.publish();
@@ -187,6 +195,7 @@ impl DesktopStatePublisher {
             current_kb: self.current_kb.clone(),
             current_knowledge: self.current_knowledge.clone(),
             selection: self.selection.clone(),
+            focused: self.focused,
             last_publish: self.last_publish,
             throttle_interval: self.throttle_interval,
             share_selected_text: self.share_selected_text,
@@ -201,7 +210,7 @@ impl DesktopStatePublisher {
             desktop: Some(DesktopState {
                 running: true,
                 pid: std::process::id(),
-                focused: true, // TODO: Actually get window focus state
+                focused: self.focused,
             }),
             current_kb: self.current_kb.clone(),
             current_knowledge: self.current_knowledge.clone(),
@@ -315,5 +324,12 @@ mod tests {
         assert!(!contains_sensitive_content(
             "function hello() { return true; }"
         ));
+    }
+
+    #[test]
+    fn test_focus_updates_publisher_state() {
+        let mut publisher = DesktopStatePublisher::new(false);
+        publisher.set_focus(false);
+        assert!(!publisher.focused);
     }
 }

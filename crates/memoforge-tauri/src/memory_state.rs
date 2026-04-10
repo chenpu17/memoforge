@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
 
 /// 内存中的编辑器状态
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MemoryEditorState {
     /// 当前知识库
     pub current_kb: Option<CurrentKb>,
@@ -27,10 +27,25 @@ pub struct MemoryEditorState {
     pub current_knowledge: Option<CurrentKnowledge>,
     /// 文本选择范围
     pub selection: Option<Selection>,
+    /// 桌面窗口是否聚焦
+    pub desktop_focused: bool,
     /// 最后更新时间
     pub updated_at: DateTime<Utc>,
     /// 状态是否有效
     pub state_valid: bool,
+}
+
+impl Default for MemoryEditorState {
+    fn default() -> Self {
+        Self {
+            current_kb: None,
+            current_knowledge: None,
+            selection: None,
+            desktop_focused: true,
+            updated_at: Utc::now(),
+            state_valid: false,
+        }
+    }
 }
 
 impl From<MemoryEditorState> for EditorState {
@@ -40,7 +55,7 @@ impl From<MemoryEditorState> for EditorState {
             desktop: Some(memoforge_core::editor_state::DesktopState {
                 running: true,
                 pid: std::process::id(),
-                focused: true,
+                focused: mem.desktop_focused,
             }),
             current_kb: mem.current_kb,
             current_knowledge: mem.current_knowledge,
@@ -172,6 +187,17 @@ impl StateManager {
         let _ = self.state_tx.send(current);
     }
 
+    /// 更新桌面窗口聚焦状态
+    pub fn set_focus(&self, focused: bool) {
+        let mut state = self.state.lock().unwrap();
+        state.desktop_focused = focused;
+        state.updated_at = Utc::now();
+        drop(state);
+
+        let current = self.state.lock().unwrap().clone();
+        let _ = self.state_tx.send(current);
+    }
+
     /// 设置状态有效性
     pub fn set_valid(&self, valid: bool) {
         let mut state = self.state.lock().unwrap();
@@ -193,7 +219,7 @@ impl StateManager {
             desktop: Some(memoforge_mcp::DesktopInfo {
                 running: true,
                 pid: Some(std::process::id()),
-                focused: Some(true), // SSE 模式下桌面应用始终聚焦
+                focused: Some(state.desktop_focused),
             }),
             current_kb: state.current_kb.map(|kb| memoforge_mcp::CurrentKb {
                 path: kb.path.to_string_lossy().to_string(),
@@ -241,6 +267,7 @@ mod tests {
         assert!(state.current_kb.is_none());
         assert!(state.current_knowledge.is_none());
         assert!(state.selection.is_none());
+        assert!(state.desktop_focused);
     }
 
     #[test]
@@ -335,5 +362,15 @@ mod tests {
         assert!(selection.has_text);
         assert_eq!(selection.text_length, 12);
         assert!(selection.selected_text.is_none());
+    }
+
+    #[test]
+    fn test_set_focus() {
+        let manager = StateManager::new();
+
+        manager.set_focus(false);
+
+        let state = manager.get_state();
+        assert!(!state.desktop_focused);
     }
 }

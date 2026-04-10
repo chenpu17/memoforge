@@ -1,0 +1,20 @@
+<svg width="512" height="512" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="forgenerve-bg" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1" />
+      <stop offset="1" stop-color="#3B82F6" />
+    </linearGradient>
+    <linearGradient id="forgenerve-stroke" x1="16" y1="18" x2="49" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#E0E7FF" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="16" fill="url(#forgenerve-bg)" />
+  <path d="M20 20H42" stroke="url(#forgenerve-stroke)" stroke-width="4" stroke-linecap="round" />
+  <path d="M20 32H36" stroke="url(#forgenerve-stroke)" stroke-width="4" stroke-linecap="round" />
+  <path d="M20 44H30" stroke="url(#forgenerve-stroke)" stroke-width="4" stroke-linecap="round" />
+  <path d="M42 20V44" stroke="url(#forgenerve-stroke)" stroke-width="4" stroke-linecap="round" />
+  <path d="M42 32H50" stroke="url(#forgenerve-stroke)" stroke-width="4" stroke-linecap="round" />
+  <circle cx="50" cy="32" r="4" fill="#C7D2FE" />
+  <circle cx="30" cy="44" r="4" fill="#DBEAFE" />
+</svg>

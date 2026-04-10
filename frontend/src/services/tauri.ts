@@ -1,4 +1,16 @@
-import type { Category, Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, GrepMatch, PaginatedKnowledge } from '../types'
+import type { Category, Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, GrepMatch, PaginatedKnowledge, DraftSummary, DraftPreviewResponse, CommitDraftResponse, DiscardDraftResponse, UpdateDraftReviewStateResponse, ReliabilityIssue, ReliabilityStats, CreateFixDraftResult, ContextPack } from '../types'
+
+// Re-export types for component usage
+export type { InboxItem, PromoteInboxItemResult, ContextItem, AgentSession, CompleteSessionOptions, CreateInboxItemOptions, StartSessionOptions, DraftSummary, DraftPreviewResponse, CommitDraftResponse, DiscardDraftResponse, UpdateDraftReviewStateResponse, ReliabilityIssue, ReliabilityStats, CreateFixDraftResult, ContextPack }
+import type {
+  InboxItem,
+  PromoteInboxItemResult,
+  ContextItem,
+  AgentSession,
+  CompleteSessionOptions,
+  CreateInboxItemOptions,
+  StartSessionOptions,
+} from '../types'
 import { getHttpService, initHttpService } from './http'
 
 const runtimeEnv = ((import.meta as unknown as { env?: Record<string, string | undefined> }).env) || {}
@@ -85,6 +97,9 @@ export const tauriService = {
     }
   },
 
+  /**
+   * @deprecated 对于 clone 操作，请使用 cloneKb() 代替
+   */
   async initKb(path: string, mode: 'open' | 'new' | 'clone'): Promise<void> {
     if (isTauriEnv()) {
       return invoke('init_kb_cmd', { path, mode })
@@ -473,9 +488,320 @@ export const tauriService = {
     }
     // HTTP 模式不支持状态发布
   },
+
+  // Clone Git 仓库到本地并初始化为知识库
+  async cloneKb(repoUrl: string, localPath: string): Promise<string> {
+    if (isTauriEnv()) {
+      const result = await invoke<{ path: string }>('clone_kb_cmd', { repoUrl, localPath })
+      return result.path
+    }
+    throw new Error('HTTP 模式暂不支持 Clone 操作')
+  },
+
+  // 获取内置知识库模板列表
+  async listTemplates(): Promise<TemplateInfo[]> {
+    if (isTauriEnv()) {
+      return invoke('list_templates_cmd')
+    }
+    // HTTP fallback: 返回硬编码模板列表
+    return [
+      { id: 'developer-kb', name: '开发者知识库', description: '面向开发者的技术知识管理，预置开发分类和示例文档', categories: [{ name: '开发', path: '开发' }] },
+      { id: 'project-retrospective', name: '项目复盘', description: '项目经验总结与复盘，预置复盘、问题、决策分类', categories: [{ name: '复盘', path: '复盘' }, { name: '问题', path: '问题' }, { name: '决策', path: '决策' }] },
+      { id: 'tech-reading', name: '技术阅读笔记', description: '技术文章与书籍阅读笔记，预置阅读、笔记、收藏分类', categories: [{ name: '阅读', path: '阅读' }, { name: '笔记', path: '笔记' }, { name: '收藏', path: '收藏' }] },
+    ]
+  },
+
+  // 基于模板创建知识库
+  async createKbFromTemplate(templateId: string, targetPath: string, kbName?: string): Promise<string> {
+    if (isTauriEnv()) {
+      const result = await invoke<{ path: string }>('create_kb_from_template_cmd', { templateId, targetPath, kbName: kbName ?? null })
+      return result.path
+    }
+    throw new Error('HTTP 模式暂不支持模板创建')
+  },
+
+  // 检查知识库健康状态
+  async getKbHealth(kbPath?: string): Promise<KbHealth> {
+    if (isTauriEnv()) {
+      return invoke('get_kb_health_cmd', { kbPath: kbPath ?? null })
+    }
+    return { path_exists: false, last_open_ok: false, is_git_repo: false }
+  },
+
+  // 获取工作区概览（最近编辑、待整理、导入统计）
+  async getWorkspaceOverview(): Promise<WorkspaceOverview> {
+    if (isTauriEnv()) {
+      return invoke('get_workspace_overview_cmd')
+    }
+    return { recent_edits: [], pending_organize: { no_summary: 0, stale_summary: 0, no_tags: 0, orphan: 0 }, recent_imports: 0 }
+  },
+
+  // 获取最近活动事件
+  async getRecentActivity(limit?: number): Promise<Event[]> {
+    if (isTauriEnv()) {
+      return invoke('get_recent_activity_cmd', { limit: limit ?? 20 })
+    }
+    return []
+  },
+
+  // 获取 Git 概览（分支、ahead/behind、工作区改动）
+  async getGitOverview(): Promise<GitOverview> {
+    if (isTauriEnv()) {
+      return invoke('get_git_overview_cmd')
+    }
+    return { current_branch: '', ahead: 0, behind: 0, working_changes: 0 }
+  },
+
+  // 草稿管理
+  async listDrafts(): Promise<DraftSummary[]> {
+    if (isTauriEnv()) {
+      return invoke('list_drafts_cmd')
+    }
+    return []
+  },
+
+  async getDraftPreview(draftId: string): Promise<DraftPreviewResponse> {
+    if (isTauriEnv()) {
+      return invoke('get_draft_preview_cmd', { draftId })
+    }
+    return { sections_changed: 0, summary_will_be_stale: false, warnings: [], diff_summary: '' }
+  },
+
+  async commitDraft(draftId: string): Promise<CommitDraftResponse> {
+    if (isTauriEnv()) {
+      return invoke('commit_draft_cmd', { draftId })
+    }
+    return { committed: true, path: '', changed_sections: 0, summary_stale: false }
+  },
+
+  async discardDraft(draftId: string): Promise<DiscardDraftResponse> {
+    if (isTauriEnv()) {
+      return invoke('discard_draft_cmd', { draftId })
+    }
+    return { discarded: true, draft_id: draftId }
+  },
+
+  async updateDraftReviewState(
+    draftId: string,
+    state: string,
+    notes?: string
+  ): Promise<UpdateDraftReviewStateResponse> {
+    if (isTauriEnv()) {
+      return invoke('update_draft_review_state_cmd', {
+        draftId,
+        state,
+        notes,
+      })
+    }
+    throw new Error('HTTP mode not supported for draft review updates')
+  },
+
+  // ==================== Inbox Functions ====================
+
+  async listInboxItems(status?: string, limit?: number): Promise<InboxItem[]> {
+    if (isTauriEnv()) {
+      return invoke('list_inbox_items_cmd', { status, limit })
+    }
+    // HTTP mode not supported for inbox yet
+    return []
+  },
+
+  async createInboxItem(
+    title: string,
+    sourceType: string,
+    opts?: CreateInboxItemOptions
+  ): Promise<InboxItem> {
+    if (isTauriEnv()) {
+      return invoke('create_inbox_item_cmd', {
+        title,
+        source_type: sourceType,
+        content_markdown: opts?.content_markdown,
+        proposed_path: opts?.proposed_path,
+        linked_session_id: opts?.linked_session_id,
+      })
+    }
+    throw new Error('HTTP mode not supported for inbox creation')
+  },
+
+  async promoteInboxItemToDraft(
+    inboxItemId: string,
+    draftTitle?: string
+  ): Promise<PromoteInboxItemResult> {
+    if (isTauriEnv()) {
+      return invoke('promote_inbox_item_to_draft_cmd', {
+        inbox_item_id: inboxItemId,
+        draft_title: draftTitle,
+      })
+    }
+    throw new Error('HTTP mode not supported for inbox promotion')
+  },
+
+  async dismissInboxItem(
+    inboxItemId: string,
+    reason?: string
+  ): Promise<InboxItem> {
+    if (isTauriEnv()) {
+      return invoke('dismiss_inbox_item_cmd', {
+        inbox_item_id: inboxItemId,
+        reason,
+      })
+    }
+    throw new Error('HTTP mode not supported for inbox dismissal')
+  },
+
+  // ==================== Session Functions ====================
+
+  async startAgentSession(
+    agentName: string,
+    goal: string,
+    opts?: StartSessionOptions
+  ): Promise<AgentSession> {
+    if (isTauriEnv()) {
+      return invoke('start_agent_session_cmd', {
+        agent_name: agentName,
+        goal,
+        agent_source: opts?.agent_source,
+        context_pack_ids: opts?.context_pack_ids,
+      })
+    }
+    throw new Error('HTTP mode not supported for agent sessions')
+  },
+
+  async appendAgentSessionContext(
+    sessionId: string,
+    contextItem: ContextItem
+  ): Promise<AgentSession> {
+    if (isTauriEnv()) {
+      return invoke('append_agent_session_context_cmd', {
+        session_id: sessionId,
+        context_item: contextItem,
+      })
+    }
+    throw new Error('HTTP mode not supported for session context')
+  },
+
+  async listAgentSessions(
+    status?: string,
+    limit?: number
+  ): Promise<AgentSession[]> {
+    if (isTauriEnv()) {
+      return invoke('list_agent_sessions_cmd', { status, limit })
+    }
+    // HTTP mode not supported for sessions yet
+    return []
+  },
+
+  async getAgentSession(sessionId: string): Promise<AgentSession> {
+    if (isTauriEnv()) {
+      return invoke('get_agent_session_cmd', { session_id: sessionId })
+    }
+    throw new Error('HTTP mode not supported for session retrieval')
+  },
+
+  async completeAgentSession(
+    sessionId: string,
+    opts?: CompleteSessionOptions
+  ): Promise<AgentSession> {
+    if (isTauriEnv()) {
+      return invoke('complete_agent_session_cmd', {
+        session_id: sessionId,
+        result_summary: opts?.result_summary,
+        status: opts?.status,
+      })
+    }
+    throw new Error('HTTP mode not supported for session completion')
+  },
+
+  // ==================== Reliability Functions ====================
+
+  async listReliabilityIssues(severity?: 'low' | 'medium' | 'high', status?: 'open' | 'ignored' | 'resolved', limit?: number): Promise<ReliabilityIssue[]> {
+    if (isTauriEnv()) {
+      return invoke('list_reliability_issues_cmd', { severity, status, limit })
+    }
+    // HTTP mode not supported for reliability yet
+    return []
+  },
+
+  async getReliabilityIssueDetail(issueId: string): Promise<ReliabilityIssue> {
+    if (isTauriEnv()) {
+      return invoke('get_reliability_issue_detail_cmd', { issue_id: issueId })
+    }
+    throw new Error('HTTP mode not supported for reliability')
+  },
+
+  async updateReliabilityIssueStatus(issueId: string, newStatus: 'open' | 'ignored' | 'resolved'): Promise<ReliabilityIssue> {
+    if (isTauriEnv()) {
+      return invoke('update_reliability_issue_status_cmd', { issue_id: issueId, new_status: newStatus })
+    }
+    throw new Error('HTTP mode not supported for reliability')
+  },
+
+  async createFixDraftFromIssue(issueId: string, fixInstructions?: string): Promise<CreateFixDraftResult> {
+    if (isTauriEnv()) {
+      return invoke('create_fix_draft_from_issue_cmd', { issue_id: issueId, fix_instructions: fixInstructions })
+    }
+    throw new Error('HTTP mode not supported for reliability')
+  },
+
+  async scanReliabilityIssues(): Promise<ReliabilityStats> {
+    if (isTauriEnv()) {
+      return invoke('scan_reliability_issues_cmd')
+    }
+    throw new Error('HTTP mode not supported for reliability')
+  },
+
+  async getReliabilityStats(): Promise<ReliabilityStats> {
+    if (isTauriEnv()) {
+      return invoke('get_reliability_stats_cmd')
+    }
+    // HTTP mode not supported for reliability yet
+    return { total: 0, open: 0, ignored: 0, resolved: 0, high_severity: 0, medium_severity: 0, low_severity: 0 }
+  },
+
+  // ==================== Context Pack Functions ====================
+
+  async listContextPacks(scopeType?: 'tag' | 'folder' | 'topic' | 'manual'): Promise<ContextPack[]> {
+    if (isTauriEnv()) {
+      return invoke('list_context_packs_cmd', { scopeType })
+    }
+    // HTTP mode not supported for context packs yet
+    return []
+  },
+
+  async createContextPack(
+    name: string,
+    scopeType: string,
+    scopeValue: string,
+    itemPaths: string[],
+    summary?: string
+  ): Promise<ContextPack> {
+    if (isTauriEnv()) {
+      return invoke('create_context_pack_cmd', {
+        name,
+        scopeType,
+        scopeValue,
+        itemPaths,
+        summary: summary ?? null,
+      })
+    }
+    throw new Error('HTTP mode not supported for context pack creation')
+  },
+
+  async getContextPack(packId: string): Promise<ContextPack> {
+    if (isTauriEnv()) {
+      return invoke('get_context_pack_cmd', { packId })
+    }
+    throw new Error('HTTP mode not supported for context pack retrieval')
+  },
+
+  async exportContextPack(packId: string, format?: string): Promise<any> {
+    if (isTauriEnv()) {
+      return invoke('export_context_pack_cmd', { packId, format })
+    }
+    throw new Error('HTTP mode not supported for context pack export')
+  },
 }
 
-// Event types for frontend
 export interface Event {
   time: string
   source: 'gui' | 'cli' | 'mcp' | 'mcp:claude-code' | 'mcp:codex' | 'mcp:other'
@@ -580,4 +906,52 @@ export interface AgentInfo {
   name: string
   started_at: string
   kb_path: string
+}
+
+// 模板相关类型
+export interface TemplateCategory {
+  name: string
+  path: string
+}
+
+export interface TemplateInfo {
+  id: string
+  name: string
+  description: string
+  categories: TemplateCategory[]
+}
+
+// 知识库健康状态
+export interface KbHealth {
+  path_exists: boolean
+  last_open_ok: boolean
+  is_git_repo: boolean
+}
+
+// 工作区概览类型
+export interface RecentEdit {
+  path: string
+  title: string
+  updated_at: string
+}
+
+export interface PendingOrganize {
+  no_summary: number
+  stale_summary: number
+  no_tags: number
+  orphan: number
+}
+
+export interface WorkspaceOverview {
+  recent_edits: RecentEdit[]
+  pending_organize: PendingOrganize
+  recent_imports: number
+}
+
+// Git 概览类型
+export interface GitOverview {
+  current_branch: string
+  ahead: number
+  behind: number
+  working_changes: number
 }

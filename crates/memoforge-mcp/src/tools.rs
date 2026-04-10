@@ -2,6 +2,8 @@
 //! 参考: 技术实现文档 §4
 
 use memoforge_core::config::load_config;
+use memoforge_core::context_pack::{ContextPack, ContextPackScope};
+use memoforge_core::context_pack_store::ContextPackStore;
 use memoforge_core::events::{log_git_pull, log_git_push};
 use memoforge_core::knowledge::split_sections;
 use memoforge_core::{ErrorCode, EventSource, LoadLevel, MemoError};
@@ -642,6 +644,488 @@ pub fn list_tools() -> Vec<Value> {
                 }
             }),
         ),
+        tool(
+            "read_knowledge",
+            "Unified read interface optimized for AI agents. Returns metadata, content, section list, and staleness info in one call. Recommended workflow: 1) Use list_knowledge to discover entries, 2) Use read_knowledge with level=L1 to see summaries, 3) Use read_knowledge with section parameter to read specific sections progressively. More efficient than separate get_content/get_summary calls.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Knowledge file path relative to KB root"
+                    },
+                    "level": {
+                        "type": "string",
+                        "enum": ["L0", "L1", "L2"],
+                        "description": "Detail level: L0=metadata only, L1=metadata+summary (default), L2=full content"
+                    },
+                    "section": {
+                        "type": "string",
+                        "description": "Optional: read only this section by exact heading title"
+                    },
+                    "include_metadata": {
+                        "type": "boolean",
+                        "description": "Include full frontmatter metadata (default: true)"
+                    },
+                    "include_stale": {
+                        "type": "boolean",
+                        "description": "Include summary staleness check (default: true)"
+                    }
+                },
+                "required": ["path"]
+            }),
+        ),
+        tool(
+            "start_draft",
+            "Start a draft for staged editing. Agents should prefer the draft workflow over direct create/update for writing long content. Drafts support incremental section operations (append, replace, remove), diff preview, and safe commit with conflict detection. The user can review the preview before committing. Workflow: start_draft -> update_draft (multiple) -> preview_draft -> commit_draft.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Target knowledge path. For existing knowledge: provide the path. For new knowledge: omit path (or set to null)."
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "description": "Initial metadata for new knowledge (ignored for existing knowledge)",
+                        "properties": {
+                            "title": { "type": "string", "description": "Title for new knowledge" },
+                            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tags" },
+                            "summary": { "type": "string", "description": "Summary" },
+                            "category": { "type": "string", "description": "Category path" }
+                        }
+                    }
+                }
+            }),
+        ),
+        tool(
+            "update_draft",
+            "Apply a structured operation to a draft. Can be called multiple times to build content incrementally. Each call appends the operation to the draft's history. Use preview_draft to review changes before committing.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "draft_id": {
+                        "type": "string",
+                        "description": "Draft ID returned by start_draft"
+                    },
+                    "op": {
+                        "type": "string",
+                        "enum": ["set_content", "append_section", "replace_section", "remove_section", "update_metadata"],
+                        "description": "Operation type: set_content (replace entire body), append_section (add new ## section), replace_section (replace section body by heading), remove_section (delete section by heading), update_metadata (patch title/tags/summary)"
+                    },
+                    "heading": {
+                        "type": "string",
+                        "description": "Section heading text (required for append_section, replace_section, remove_section)"
+                    },
+                    "level": {
+                        "type": "integer",
+                        "description": "Heading level for append_section (default: 2, i.e. ##)"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Content for set_content, append_section body, or replace_section body"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "description": "Metadata patch for update_metadata op",
+                        "properties": {
+                            "title": { "type": "string" },
+                            "tags": { "type": "array", "items": { "type": "string" } },
+                            "summary": { "type": "string" }
+                        }
+                    }
+                },
+                "required": ["draft_id", "op"]
+            }),
+        ),
+        tool(
+            "preview_draft",
+            "Preview what a draft commit would change. Returns diff summary (sections changed, lines added/removed), whether summary will become stale, and warnings (e.g. conflict detected). Always call this before commit_draft to show the user what will change.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "draft_id": {
+                        "type": "string",
+                        "description": "Draft ID to preview"
+                    }
+                },
+                "required": ["draft_id"]
+            }),
+        ),
+        tool(
+            "commit_draft",
+            "Commit a draft to the knowledge base. Performs conflict detection: if the source file was modified since the draft was created, returns a conflict error with recovery instructions. The draft is preserved on conflict - use read_knowledge to see current content, then start a new draft if needed. On success, the draft is deleted.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "draft_id": {
+                        "type": "string",
+                        "description": "Draft ID to commit"
+                    }
+                },
+                "required": ["draft_id"]
+            }),
+        ),
+        tool(
+            "discard_draft",
+            "Discard a draft without applying any changes. The knowledge file is not modified. Use this to cancel a draft that is no longer needed or after a conflict when you want to start fresh.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "draft_id": {
+                        "type": "string",
+                        "description": "Draft ID to discard"
+                    }
+                },
+                "required": ["draft_id"]
+            }),
+        ),
+        // Sprint 1: Inbox tools
+        tool(
+            "list_inbox_items",
+            "List inbox items (knowledge candidates) with optional filtering. Returns all pending items awaiting review or promotion. Use this to see what AI agents have generated or what has been imported.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["new", "triaged", "drafted", "promoted", "ignored"],
+                        "description": "Filter by inbox item status (optional)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (optional)"
+                    }
+                }
+            }),
+        ),
+        tool(
+            "create_inbox_item",
+            "Create a new inbox item (knowledge candidate). Inbox items flow through a triage process before becoming knowledge entries. Use this when an agent generates content that needs review.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Candidate title for the knowledge entry"
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["agent", "import", "paste", "manual", "reliability"],
+                        "description": "Source type of this inbox item"
+                    },
+                    "content_markdown": {
+                        "type": "string",
+                        "description": "Full candidate content in markdown format (optional)"
+                    },
+                    "proposed_path": {
+                        "type": "string",
+                        "description": "Suggested path for where this should be stored (optional)"
+                    },
+                    "linked_session_id": {
+                        "type": "string",
+                        "description": "ID of the session that created this item (optional)"
+                    }
+                },
+                "required": ["title", "source_type"]
+            }),
+        ),
+        tool(
+            "promote_inbox_item_to_draft",
+            "Promote an inbox item to a draft, transitioning it from candidate to editable state. Creates a Draft, updates inbox status to 'drafted', and writes review metadata to the draft. The draft can then be previewed and committed.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "inbox_item_id": {
+                        "type": "string",
+                        "description": "ID of the inbox item to promote"
+                    },
+                    "draft_title": {
+                        "type": "string",
+                        "description": "Optional title override for the draft (defaults to inbox item title)"
+                    }
+                },
+                "required": ["inbox_item_id"]
+            }),
+        ),
+        tool(
+            "dismiss_inbox_item",
+            "Dismiss an inbox item by marking it as ignored. Ignored items are kept but excluded from normal triage flow. Can be restored later.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "inbox_item_id": {
+                        "type": "string",
+                        "description": "ID of the inbox item to dismiss"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional reason for dismissal (for audit trail)"
+                    }
+                },
+                "required": ["inbox_item_id"]
+            }),
+        ),
+        // Sprint 1: Session tools
+        tool(
+            "start_agent_session",
+            "Start a new agent session to track AI interaction and context consumption. Sessions generate inbox items and drafts. Call this when beginning a multi-step AI task.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "agent_name": {
+                        "type": "string",
+                        "description": "Name of the agent (e.g., 'claude-code', 'opencode')"
+                    },
+                    "goal": {
+                        "type": "string",
+                        "description": "Goal/objective of this session"
+                    },
+                    "agent_source": {
+                        "type": "string",
+                        "description": "Agent source system (optional)"
+                    },
+                    "context_pack_ids": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "IDs of context packs referenced (optional, Sprint 4: validated)"
+                    }
+                },
+                "required": ["agent_name", "goal"]
+            }),
+        ),
+        tool(
+            "append_agent_session_context",
+            "Append a single context item to an agent session. Only allowed when session is in 'running' state. Use this to track what knowledge or resources the agent consumed.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "ID of the session to append context to"
+                    },
+                    "context_item": {
+                        "type": "object",
+                        "description": "Context item to append",
+                        "properties": {
+                            "ref_type": {
+                                "type": "string",
+                                "enum": ["knowledge", "pack", "url", "file"],
+                                "description": "Type of the referenced object"
+                            },
+                            "ref_id": {
+                                "type": "string",
+                                "description": "Stable reference (path, pack_id, url, or file path)"
+                            },
+                            "summary": {
+                                "type": "string",
+                                "description": "Optional summary of the context"
+                            }
+                        },
+                        "required": ["ref_type", "ref_id"]
+                    }
+                },
+                "required": ["session_id", "context_item"]
+            }),
+        ),
+        tool(
+            "list_agent_sessions",
+            "List agent sessions with optional filtering. Returns session metadata including status, goal, and timing. Use this to see active or completed agent work.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["running", "completed", "failed", "cancelled"],
+                        "description": "Filter by session status (optional)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (optional)"
+                    }
+                }
+            }),
+        ),
+        tool(
+            "get_agent_session",
+            "Get full details of an agent session including all context items, draft IDs, and inbox item IDs produced.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "ID of the session to retrieve"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        ),
+        tool(
+            "complete_agent_session",
+            "Complete an agent session, transitioning it from 'running' to a terminal state. Sets finished_at timestamp and optional result summary.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "ID of the session to complete"
+                    },
+                    "result_summary": {
+                        "type": "string",
+                        "description": "Optional summary of the session result"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["completed", "failed", "cancelled"],
+                        "description": "Terminal status to transition to (default: 'completed')"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        ),
+        // Sprint 2: Reliability tools
+        tool(
+            "list_reliability_issues",
+            "List reliability issues with optional filtering by severity, status, and limit. Returns issues sorted by severity (High > Medium > Low) and detection time. Use this to see all detected reliability problems in the knowledge base.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "severity": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "Filter by severity level"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["open", "ignored", "resolved"],
+                        "description": "Filter by issue status"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (optional)"
+                    }
+                },
+                "description": "Returns filtered reliability issues with statistics"
+            }),
+        ),
+        tool(
+            "get_reliability_issue_detail",
+            "Get full details of a specific reliability issue by ID. Returns complete issue information including linked draft ID and timestamps.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "issue_id": {
+                        "type": "string",
+                        "description": "Reliability issue ID"
+                    }
+                },
+                "required": ["issue_id"],
+                "description": "Returns complete issue details"
+            }),
+        ),
+        tool(
+            "create_fix_draft_from_issue",
+            "Create a draft for fixing a reliability issue. Creates a draft targeting the affected knowledge file, links the draft to the issue, and returns the draft ID for editing. Use this workflow: 1) get_reliability_issue_detail to understand the issue, 2) create_fix_draft_from_issue to start a draft, 3) update_draft to make changes, 4) preview_draft and commit_draft to apply the fix.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "issue_id": {
+                        "type": "string",
+                        "description": "Reliability issue ID to fix"
+                    },
+                    "fix_instructions": {
+                        "type": "string",
+                        "description": "Optional fix instructions or notes to include in draft metadata"
+                    }
+                },
+                "required": ["issue_id"],
+                "description": "Creates a draft linked to the issue and returns draft ID and updated issue"
+            }),
+        ),
+        // Sprint 4: Context Pack tools
+        tool(
+            "list_context_packs",
+            "List all context packs with optional filtering by scope type. Returns full pack details including item paths. Use this to discover available context packs for AI agent sessions.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "scope_type": {
+                        "type": "string",
+                        "enum": ["tag", "folder", "topic", "manual"],
+                        "description": "Filter by scope type (optional)"
+                    }
+                },
+                "description": "Returns filtered context packs with full details"
+            }),
+        ),
+        tool(
+            "create_context_pack",
+            "Create a new context pack. Context packs group knowledge items by scope (tag, folder, topic, or manual). They can be referenced in agent sessions to provide targeted context.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Context pack name"
+                    },
+                    "scope_type": {
+                        "type": "string",
+                        "enum": ["tag", "folder", "topic", "manual"],
+                        "description": "Scope type for the pack"
+                    },
+                    "scope_value": {
+                        "type": "string",
+                        "description": "Scope value (e.g., tag name, folder path, topic name, or empty for manual)"
+                    },
+                    "item_paths": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Knowledge paths to include in the pack"
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Optional summary describing the pack"
+                    }
+                },
+                "required": ["name", "scope_type", "scope_value", "item_paths"],
+                "description": "Creates a new context pack and returns the created pack"
+            }),
+        ),
+        tool(
+            "get_context_pack",
+            "Get a context pack by ID with full details including all item paths. Use this to view pack contents before referencing in a session.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "pack_id": {
+                        "type": "string",
+                        "description": "Context pack ID"
+                    }
+                },
+                "required": ["pack_id"],
+                "description": "Returns complete context pack details"
+            }),
+        ),
+        tool(
+            "export_context_pack",
+            "Export a context pack in the specified format. For Sprint 4, only JSON export is supported. Future versions may support ZIP export.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "pack_id": {
+                        "type": "string",
+                        "description": "Context pack ID to export"
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["json"],
+                        "description": "Export format (default: json)"
+                    }
+                },
+                "required": ["pack_id"],
+                "description": "Returns exported pack data and format"
+            }),
+        ),
     ]
 }
 
@@ -690,6 +1174,40 @@ pub fn call_tool(params: Option<Value>, readonly: bool) -> Result<String, MemoEr
         "git_pull" => check_readonly(readonly, || handle_git_pull(arguments)),
         "git_push" => check_readonly(readonly, || handle_git_push(arguments)),
         "git_log" => handle_git_log(arguments),
+        "read_knowledge" => handle_read_knowledge(arguments),
+        "start_draft" => check_readonly(readonly, || handle_start_draft(arguments)),
+        "update_draft" => check_readonly(readonly, || handle_update_draft(arguments)),
+        "preview_draft" => handle_preview_draft(arguments),
+        "commit_draft" => check_readonly(readonly, || handle_commit_draft(arguments)),
+        "discard_draft" => check_readonly(readonly, || handle_discard_draft(arguments)),
+        // Sprint 1: Inbox tools
+        "list_inbox_items" => handle_list_inbox_items(arguments),
+        "create_inbox_item" => check_readonly(readonly, || handle_create_inbox_item(arguments)),
+        "promote_inbox_item_to_draft" => {
+            check_readonly(readonly, || handle_promote_inbox_item_to_draft(arguments))
+        }
+        "dismiss_inbox_item" => check_readonly(readonly, || handle_dismiss_inbox_item(arguments)),
+        // Sprint 1: Session tools
+        "start_agent_session" => check_readonly(readonly, || handle_start_agent_session(arguments)),
+        "append_agent_session_context" => {
+            check_readonly(readonly, || handle_append_agent_session_context(arguments))
+        }
+        "list_agent_sessions" => handle_list_agent_sessions(arguments),
+        "get_agent_session" => handle_get_agent_session(arguments),
+        "complete_agent_session" => {
+            check_readonly(readonly, || handle_complete_agent_session(arguments))
+        }
+        // Sprint 2: Reliability tools
+        "list_reliability_issues" => handle_list_reliability_issues(arguments),
+        "get_reliability_issue_detail" => handle_get_reliability_issue_detail(arguments),
+        "create_fix_draft_from_issue" => {
+            check_readonly(readonly, || handle_create_fix_draft_from_issue(arguments))
+        }
+        // Sprint 4: Context Pack tools
+        "list_context_packs" => handle_list_context_packs(arguments),
+        "create_context_pack" => check_readonly(readonly, || handle_create_context_pack(arguments)),
+        "get_context_pack" => handle_get_context_pack(arguments),
+        "export_context_pack" => handle_export_context_pack(arguments),
         _ => Err(MemoError {
             code: ErrorCode::InvalidPath,
             message: format!("Unknown tool: {}", name),
@@ -1213,8 +1731,13 @@ fn handle_grep(args: Value) -> Result<String, MemoError> {
             .map(|value| value as usize)
     });
 
-    let results =
-        memoforge_core::grep(&kb_path, query, tags.as_deref(), category_id.as_deref(), limit)?;
+    let results = memoforge_core::grep(
+        &kb_path,
+        query,
+        tags.as_deref(),
+        category_id.as_deref(),
+        limit,
+    )?;
     Ok(json!({ "results": results, "total": results.len() }).to_string())
 }
 
@@ -1432,6 +1955,663 @@ fn handle_git_log(args: Value) -> Result<String, MemoError> {
     Ok(json!({ "commits": commits }).to_string())
 }
 
+fn handle_read_knowledge(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let path = required_str_arg(&args, &["path"])?;
+    let level = match optional_str_arg(&args, &["level"]) {
+        Some("L0") => LoadLevel::L0,
+        Some("L1") => LoadLevel::L1,
+        Some("L2") => LoadLevel::L2,
+        _ => LoadLevel::L1,
+    };
+    let section = optional_str_arg(&args, &["section"]);
+    let include_metadata = optional_bool_arg(&args, &["include_metadata"]).unwrap_or(true);
+    let include_stale = optional_bool_arg(&args, &["include_stale"]).unwrap_or(true);
+
+    let result = memoforge_core::read_knowledge_unified(
+        &kb_path,
+        path,
+        level,
+        section,
+        include_metadata,
+        include_stale,
+    )?;
+
+    Ok(json!({
+        "metadata": result.metadata,
+        "content": result.content,
+        "sections": result.sections,
+        "summary_stale": result.summary_stale
+    })
+    .to_string())
+}
+
+fn handle_start_draft(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let path = optional_str_arg(&args, &["path"]);
+    let metadata = args.get("metadata").cloned().filter(|v| v.is_object());
+    let agent_name = get_agent_name();
+
+    let draft_id = memoforge_core::start_draft(&kb_path, path, metadata, &agent_name)?;
+
+    Ok(json!({
+        "draft_id": draft_id,
+        "path": path,
+        "created": true
+    })
+    .to_string())
+}
+
+fn handle_update_draft(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let draft_id = required_str_arg(&args, &["draft_id"])?;
+    let op_type = required_str_arg(&args, &["op"])?;
+
+    let operation = match op_type {
+        "set_content" => {
+            let content = required_str_arg(&args, &["content"])?.to_string();
+            memoforge_core::DraftOperation::SetContent { content }
+        }
+        "append_section" => {
+            let heading = required_str_arg(&args, &["heading"])?.to_string();
+            let level = optional_usize_arg(&args, &["level"]).unwrap_or(2);
+            let body = optional_str_arg(&args, &["content"])
+                .unwrap_or("")
+                .to_string();
+            memoforge_core::DraftOperation::AppendSection {
+                heading,
+                level,
+                body,
+            }
+        }
+        "replace_section" => {
+            let heading = required_str_arg(&args, &["heading"])?.to_string();
+            let new_body = optional_str_arg(&args, &["content"])
+                .unwrap_or("")
+                .to_string();
+            memoforge_core::DraftOperation::ReplaceSection { heading, new_body }
+        }
+        "remove_section" => {
+            let heading = required_str_arg(&args, &["heading"])?.to_string();
+            memoforge_core::DraftOperation::RemoveSection { heading }
+        }
+        "update_metadata" => {
+            let patch = args
+                .get("metadata")
+                .cloned()
+                .filter(|v| v.is_object())
+                .unwrap_or(json!({}));
+            memoforge_core::DraftOperation::UpdateMetadata { patch }
+        }
+        _ => {
+            return Err(MemoError {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "Unknown draft operation '{}'. Supported: set_content, append_section, replace_section, remove_section, update_metadata",
+                    op_type
+                ),
+                retry_after_ms: None,
+                context: None,
+            });
+        }
+    };
+
+    let draft = memoforge_core::update_draft(&kb_path, draft_id, operation)?;
+
+    Ok(json!({
+        "draft_id": draft.draft_id,
+        "ops_applied": draft.ops.len()
+    })
+    .to_string())
+}
+
+fn handle_preview_draft(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let draft_id = required_str_arg(&args, &["draft_id"])?;
+
+    let preview = memoforge_core::preview_draft(&kb_path, draft_id)?;
+
+    Ok(json!({
+        "sections_changed": preview.sections_changed,
+        "summary_will_be_stale": preview.summary_will_be_stale,
+        "warnings": preview.warnings,
+        "diff_summary": preview.diff_summary
+    })
+    .to_string())
+}
+
+fn handle_commit_draft(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let draft_id = required_str_arg(&args, &["draft_id"])?;
+
+    match memoforge_core::commit_draft(&kb_path, draft_id) {
+        Ok(result) => Ok(json!({
+            "committed": true,
+            "path": result.path,
+            "changed_sections": result.changed_sections,
+            "draft_id": result.draft_id
+        })
+        .to_string()),
+        Err(e) if e.code == ErrorCode::ConflictFileLocked => {
+            // Return a user-friendly error with recovery instructions
+            Err(MemoError {
+                code: ErrorCode::ConflictFileLocked,
+                message: format!(
+                    "{}\n\nRecovery: The draft '{}' has been preserved. You can:\n\
+                     1. Use read_knowledge to view the current file content\n\
+                     2. Use discard_draft to cancel this draft\n\
+                     3. Start a new draft with start_draft to re-apply your changes",
+                    e.message, draft_id
+                ),
+                retry_after_ms: None,
+                context: e.context,
+            })
+        }
+        Err(e) => Err(e),
+    }
+}
+
+fn handle_discard_draft(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let draft_id = required_str_arg(&args, &["draft_id"])?;
+
+    memoforge_core::discard_draft(&kb_path, draft_id)?;
+
+    Ok(json!({
+        "discarded": true,
+        "draft_id": draft_id
+    })
+    .to_string())
+}
+
+// Sprint 1: Inbox handlers
+
+fn handle_list_inbox_items(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let status = optional_str_arg(&args, &["status"]).and_then(|s| match s {
+        "new" => Some(memoforge_core::InboxStatus::New),
+        "triaged" => Some(memoforge_core::InboxStatus::Triaged),
+        "drafted" => Some(memoforge_core::InboxStatus::Drafted),
+        "promoted" => Some(memoforge_core::InboxStatus::Promoted),
+        "ignored" => Some(memoforge_core::InboxStatus::Ignored),
+        _ => None,
+    });
+
+    let limit = optional_usize_arg(&args, &["limit"]);
+
+    let store = memoforge_core::InboxStore::new(kb_path);
+    let items = store.list_inbox_items(status, limit)?;
+
+    Ok(json!({ "items": items, "total": items.len() }).to_string())
+}
+
+fn handle_create_inbox_item(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let title = required_str_arg(&args, &["title"])?.to_string();
+    let source_type = match required_str_arg(&args, &["source_type"])? {
+        "agent" => memoforge_core::InboxSourceType::Agent,
+        "import" => memoforge_core::InboxSourceType::Import,
+        "paste" => memoforge_core::InboxSourceType::Paste,
+        "manual" => memoforge_core::InboxSourceType::Manual,
+        "reliability" => memoforge_core::InboxSourceType::Reliability,
+        other => {
+            return Err(MemoError {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "Invalid source_type '{}'. Valid: agent, import, paste, manual, reliability",
+                    other
+                ),
+                retry_after_ms: None,
+                context: None,
+            });
+        }
+    };
+
+    let mut item = memoforge_core::InboxItem::new(source_type, title);
+
+    if let Some(content) = optional_str_arg(&args, &["content_markdown"]) {
+        item.content_markdown = Some(content.to_string());
+    }
+
+    if let Some(proposed_path) = optional_str_arg(&args, &["proposed_path"]) {
+        item.proposed_path = Some(proposed_path.to_string());
+    }
+
+    if let Some(linked_session_id) = optional_str_arg(&args, &["linked_session_id"]) {
+        item.linked_session_id = Some(linked_session_id.to_string());
+    }
+    if item.source_type == memoforge_core::InboxSourceType::Agent {
+        item.source_agent = Some(get_agent_name());
+    }
+
+    if let Some(session_id) = item.linked_session_id.as_deref() {
+        let session_store = memoforge_core::SessionStore::new(kb_path.clone());
+        session_store.get_session(session_id)?;
+    }
+
+    let store = memoforge_core::InboxStore::new(kb_path);
+    let created = store.create_inbox_item(item)?;
+    if let Some(session_id) = created.linked_session_id.as_deref() {
+        let session_store = memoforge_core::SessionStore::new(get_kb_path()?);
+        session_store.get_session(session_id)?;
+        session_store.add_inbox_item_id(session_id, created.id.clone())?;
+    }
+
+    Ok(json!({ "item": created }).to_string())
+}
+
+fn handle_promote_inbox_item_to_draft(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let inbox_item_id = required_str_arg(&args, &["inbox_item_id"])?;
+
+    // Read the inbox item
+    let inbox_store = memoforge_core::InboxStore::new(kb_path.clone());
+    let inbox_item = inbox_store.get_inbox_item(inbox_item_id)?;
+
+    // Validate state transition (must be New or Triaged)
+    if !inbox_item.can_transition_to(&memoforge_core::InboxStatus::Drafted) {
+        return Err(MemoError {
+            code: ErrorCode::InvalidArgument,
+            message: format!(
+                "Cannot promote inbox item in {:?} state. Only 'new' or 'triaged' items can be promoted.",
+                inbox_item.status
+            ),
+            retry_after_ms: None,
+            context: None,
+        });
+    }
+
+    let draft_title = optional_str_arg(&args, &["draft_title"]);
+    let agent_name = get_agent_name();
+    let draft_id = memoforge_core::start_draft_from_inbox_item(
+        &kb_path,
+        &inbox_item,
+        draft_title,
+        &agent_name,
+    )?;
+
+    // Update inbox item status to Drafted
+    let mut updated_inbox =
+        inbox_store.update_inbox_status(inbox_item_id, memoforge_core::InboxStatus::Drafted)?;
+    updated_inbox.linked_draft_id = Some(draft_id.clone());
+    let updated_inbox = inbox_store.update_inbox_item(updated_inbox)?;
+    if let Some(session_id) = updated_inbox.linked_session_id.as_deref() {
+        let session_store = memoforge_core::SessionStore::new(kb_path.clone());
+        session_store.add_draft_id(session_id, draft_id.clone())?;
+    }
+
+    Ok(json!({
+        "draft_id": draft_id,
+        "inbox_item": updated_inbox
+    })
+    .to_string())
+}
+
+fn handle_dismiss_inbox_item(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let inbox_item_id = required_str_arg(&args, &["inbox_item_id"])?;
+
+    let store = memoforge_core::InboxStore::new(kb_path);
+    let item = store.dismiss_inbox_item(inbox_item_id)?;
+
+    Ok(json!({ "item": item }).to_string())
+}
+
+// Sprint 1: Session handlers
+
+fn handle_start_agent_session(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let agent_name = required_str_arg(&args, &["agent_name"])?.to_string();
+    let goal = required_str_arg(&args, &["goal"])?.to_string();
+    let agent_source = optional_str_arg(&args, &["agent_source"]).map(String::from);
+
+    // Validate context_pack_ids if provided
+    let context_pack_ids = optional_string_array_arg(&args, &["context_pack_ids"]);
+    if let Some(ref pack_ids) = context_pack_ids {
+        let pack_store = ContextPackStore::new(&kb_path);
+        for pack_id in pack_ids {
+            pack_store.get(pack_id).map_err(|_| MemoError {
+                code: ErrorCode::InvalidArgument,
+                message: format!("Context pack not found: {}", pack_id),
+                retry_after_ms: None,
+                context: None,
+            })?;
+        }
+    }
+
+    let mut session = memoforge_core::AgentSession::new(agent_name, goal);
+    session.agent_source = agent_source;
+    if let Some(pack_ids) = context_pack_ids {
+        session.context_pack_ids = pack_ids;
+    }
+
+    let store = memoforge_core::SessionStore::new(kb_path);
+    let created = store.create_session(session)?;
+
+    Ok(json!({ "session": created }).to_string())
+}
+
+fn handle_append_agent_session_context(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let session_id = required_str_arg(&args, &["session_id"])?;
+
+    let context_obj = args
+        .get("context_item")
+        .ok_or_else(|| missing_arg("context_item"))?;
+
+    let ref_type = match context_obj.get("ref_type").and_then(Value::as_str) {
+        Some("knowledge") => memoforge_core::ContextRefType::Knowledge,
+        Some("pack") => memoforge_core::ContextRefType::Pack,
+        Some("url") => memoforge_core::ContextRefType::Url,
+        Some("file") => memoforge_core::ContextRefType::File,
+        Some(other) => {
+            return Err(MemoError {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "Invalid ref_type '{}'. Valid: knowledge, pack, url, file",
+                    other
+                ),
+                retry_after_ms: None,
+                context: None,
+            });
+        }
+        None => {
+            return Err(missing_arg("context_item.ref_type"));
+        }
+    };
+
+    let ref_id = context_obj
+        .get("ref_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| missing_arg("context_item.ref_id"))?
+        .to_string();
+
+    let summary = context_obj
+        .get("summary")
+        .and_then(Value::as_str)
+        .map(String::from);
+
+    let context_item = memoforge_core::ContextItem {
+        ref_type,
+        ref_id,
+        accessed_at: chrono::Utc::now().to_rfc3339(),
+        summary,
+    };
+
+    let store = memoforge_core::SessionStore::new(kb_path);
+    let updated = store.append_context(session_id, context_item)?;
+
+    Ok(json!({ "session": updated }).to_string())
+}
+
+fn handle_list_agent_sessions(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let status = optional_str_arg(&args, &["status"]).and_then(|s| match s {
+        "running" => Some(memoforge_core::SessionStatus::Running),
+        "completed" => Some(memoforge_core::SessionStatus::Completed),
+        "failed" => Some(memoforge_core::SessionStatus::Failed),
+        "cancelled" => Some(memoforge_core::SessionStatus::Cancelled),
+        _ => None,
+    });
+
+    let limit = optional_usize_arg(&args, &["limit"]);
+
+    let store = memoforge_core::SessionStore::new(kb_path);
+    let sessions = store.list_sessions(status, limit)?;
+
+    Ok(json!({ "sessions": sessions, "total": sessions.len() }).to_string())
+}
+
+fn handle_get_agent_session(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let session_id = required_str_arg(&args, &["session_id"])?;
+
+    let store = memoforge_core::SessionStore::new(kb_path);
+    let session = store.get_session(session_id)?;
+
+    Ok(json!({ "session": session }).to_string())
+}
+
+fn handle_complete_agent_session(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let session_id = required_str_arg(&args, &["session_id"])?;
+    let result_summary = optional_str_arg(&args, &["result_summary"]).map(String::from);
+
+    let status_target = optional_str_arg(&args, &["status"]).unwrap_or("completed");
+
+    let store = memoforge_core::SessionStore::new(kb_path);
+    let updated = match status_target {
+        "completed" => store.complete_session(session_id, result_summary)?,
+        "failed" => store.fail_session(session_id, result_summary)?,
+        "cancelled" => store.cancel_session(session_id)?,
+        other => {
+            return Err(MemoError {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "Invalid status '{}'. Valid: completed, failed, cancelled",
+                    other
+                ),
+                retry_after_ms: None,
+                context: None,
+            });
+        }
+    };
+
+    Ok(json!({ "session": updated }).to_string())
+}
+
+// Sprint 2: Reliability handlers
+
+fn handle_list_reliability_issues(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let severity = optional_str_arg(&args, &["severity"]).and_then(|s| match s {
+        "high" => Some(memoforge_core::IssueSeverity::High),
+        "medium" => Some(memoforge_core::IssueSeverity::Medium),
+        "low" => Some(memoforge_core::IssueSeverity::Low),
+        _ => None,
+    });
+
+    let status = optional_str_arg(&args, &["status"]).and_then(|s| match s {
+        "open" => Some(memoforge_core::IssueStatus::Open),
+        "ignored" => Some(memoforge_core::IssueStatus::Ignored),
+        "resolved" => Some(memoforge_core::IssueStatus::Resolved),
+        _ => None,
+    });
+
+    let limit = optional_usize_arg(&args, &["limit"]);
+
+    let store = memoforge_core::ReliabilityStore::new(kb_path);
+    let stats = store.get_stats()?;
+    let issues = store.list_issues(memoforge_core::ListFilter {
+        severity,
+        status,
+        limit,
+        ..Default::default()
+    })?;
+
+    Ok(json!({ "issues": issues, "stats": stats, "total": issues.len() }).to_string())
+}
+
+fn handle_get_reliability_issue_detail(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let issue_id = required_str_arg(&args, &["issue_id"])?;
+
+    let store = memoforge_core::ReliabilityStore::new(kb_path);
+    let issue = store.get_issue(issue_id)?;
+
+    Ok(serde_json::to_string_pretty(&issue).unwrap())
+}
+
+fn handle_create_fix_draft_from_issue(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let issue_id = required_str_arg(&args, &["issue_id"])?;
+    let fix_instructions = optional_str_arg(&args, &["fix_instructions"]).map(String::from);
+
+    // Get issue details first
+    let store = memoforge_core::ReliabilityStore::new(kb_path.clone());
+    let issue = store.get_issue(issue_id)?;
+
+    // Check if issue already has a linked draft
+    if issue.linked_draft_id.is_some() {
+        return Err(MemoError {
+            code: ErrorCode::InvalidArgument,
+            message: format!(
+                "Issue '{}' already has a linked draft: {}",
+                issue_id,
+                issue.linked_draft_id.unwrap()
+            ),
+            retry_after_ms: None,
+            context: None,
+        });
+    }
+
+    // Create draft for the knowledge file
+    let agent_name = get_agent_name();
+    let draft_metadata = if let Some(instructions) = fix_instructions {
+        json!({
+            "fix_issue_id": issue_id,
+            "fix_instructions": instructions
+        })
+    } else {
+        json!({
+            "fix_issue_id": issue_id
+        })
+    };
+
+    let draft_id = memoforge_core::start_draft(
+        &kb_path,
+        Some(&issue.knowledge_path),
+        Some(draft_metadata),
+        &agent_name,
+    )?;
+
+    // Link draft to issue
+    let updated_issue = store.link_draft(issue_id, draft_id.clone())?;
+
+    Ok(json!({
+        "draft_id": draft_id,
+        "issue": updated_issue
+    })
+    .to_string())
+}
+
+// Sprint 4: Context Pack handlers
+
+fn handle_list_context_packs(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let scope_type = optional_str_arg(&args, &["scope_type"]).and_then(|s| match s {
+        "tag" => Some(ContextPackScope::Tag),
+        "folder" => Some(ContextPackScope::Folder),
+        "topic" => Some(ContextPackScope::Topic),
+        "manual" => Some(ContextPackScope::Manual),
+        _ => None,
+    });
+
+    let store = ContextPackStore::new(&kb_path);
+    let packs = store.list(scope_type, None)?;
+
+    Ok(json!({ "packs": packs }).to_string())
+}
+
+fn handle_create_context_pack(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let name = required_str_arg(&args, &["name"])?.to_string();
+    let scope_type = match required_str_arg(&args, &["scope_type"])? {
+        "tag" => ContextPackScope::Tag,
+        "folder" => ContextPackScope::Folder,
+        "topic" => ContextPackScope::Topic,
+        "manual" => ContextPackScope::Manual,
+        other => {
+            return Err(MemoError {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "Invalid scope_type '{}'. Valid: tag, folder, topic, manual",
+                    other
+                ),
+                retry_after_ms: None,
+                context: None,
+            });
+        }
+    };
+    let scope_value = required_str_arg(&args, &["scope_value"])?.to_string();
+
+    let item_paths =
+        optional_string_array_arg(&args, &["item_paths"]).ok_or_else(|| MemoError {
+            code: ErrorCode::InvalidArgument,
+            message: "Missing 'item_paths' parameter".to_string(),
+            retry_after_ms: None,
+            context: None,
+        })?;
+
+    let mut pack = ContextPack::new(name, scope_type, scope_value);
+
+    for path in item_paths {
+        pack.add_item_path(path);
+    }
+
+    if let Some(summary) = optional_str_arg(&args, &["summary"]) {
+        pack.update_summary(Some(summary.to_string()));
+    }
+
+    let store = ContextPackStore::new(&kb_path);
+    let created = store.create(pack)?;
+
+    Ok(json!({ "pack": created }).to_string())
+}
+
+fn handle_get_context_pack(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let pack_id = required_str_arg(&args, &["pack_id"])?;
+
+    let store = ContextPackStore::new(&kb_path);
+    let pack = store.get(pack_id)?;
+
+    Ok(json!({ "pack": pack }).to_string())
+}
+
+fn handle_export_context_pack(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let pack_id = required_str_arg(&args, &["pack_id"])?;
+    let format = optional_str_arg(&args, &["format"]).unwrap_or("json");
+
+    if format != "json" {
+        return Err(MemoError {
+            code: ErrorCode::InvalidArgument,
+            message: format!(
+                "Unsupported export format '{}'. Only 'json' is supported in Sprint 4",
+                format
+            ),
+            retry_after_ms: None,
+            context: None,
+        });
+    }
+
+    let store = ContextPackStore::new(&kb_path);
+    let pack = store.get(pack_id)?;
+
+    Ok(json!({
+        "pack": pack,
+        "export_format": format
+    })
+    .to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1463,10 +2643,7 @@ mod tests {
         assert!(description.contains("Preferred docs-style call"));
 
         let schema = create_tool.get("inputSchema").unwrap();
-        let one_of = schema
-            .get("oneOf")
-            .and_then(Value::as_array)
-            .unwrap();
+        let one_of = schema.get("oneOf").and_then(Value::as_array).unwrap();
         assert!(one_of.contains(&json!({ "required": ["path"] })));
         assert!(one_of.contains(&json!({ "required": ["title"] })));
     }

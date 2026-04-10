@@ -272,8 +272,8 @@ export const SearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
       {/* Search Top Bar - 64px */}
       <div className="h-16 flex items-center gap-4 px-6 border-b" style={{ borderColor: '#E5E5E5' }}>
-        <div className="flex-1 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border-2" style={{ backgroundColor: '#FAFAFA', borderColor: '#6366F1' }}>
-          <Search className="h-5 w-5" style={{ color: '#6366F1' }} />
+        <div className="flex-1 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border-2" style={{ backgroundColor: '#FAFAFA', borderColor: 'var(--brand-primary)' }}>
+          <Search className="h-5 w-5" style={{ color: 'var(--brand-primary)' }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -305,8 +305,8 @@ export const SearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           onClick={() => setSearchType('all')}
           className="px-3.5 py-1.5 rounded-md text-xs font-medium border"
           style={{
-            borderColor: searchType === 'all' ? '#6366F1' : 'transparent',
-            color: searchType === 'all' ? '#6366F1' : '#737373',
+            borderColor: searchType === 'all' ? 'var(--brand-primary)' : 'transparent',
+            color: searchType === 'all' ? 'var(--brand-primary)' : '#737373',
             backgroundColor: searchType === 'all' ? 'white' : 'transparent'
           }}
         >
@@ -316,8 +316,8 @@ export const SearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           onClick={() => setSearchType('tags')}
           className="px-3.5 py-1.5 rounded-md text-xs font-medium border"
           style={{
-            borderColor: searchType === 'tags' ? '#6366F1' : 'transparent',
-            color: searchType === 'tags' ? '#6366F1' : '#737373',
+            borderColor: searchType === 'tags' ? 'var(--brand-primary)' : 'transparent',
+            color: searchType === 'tags' ? 'var(--brand-primary)' : '#737373',
             backgroundColor: searchType === 'tags' ? 'white' : 'transparent'
           }}
         >
@@ -327,8 +327,8 @@ export const SearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           onClick={() => setSearchType('category')}
           className="px-3.5 py-1.5 rounded-md text-xs font-medium border"
           style={{
-            borderColor: searchType === 'category' ? '#6366F1' : 'transparent',
-            color: searchType === 'category' ? '#6366F1' : '#737373',
+            borderColor: searchType === 'category' ? 'var(--brand-primary)' : 'transparent',
+            color: searchType === 'category' ? 'var(--brand-primary)' : '#737373',
             backgroundColor: searchType === 'category' ? 'white' : 'transparent'
           }}
         >
@@ -395,7 +395,7 @@ export const SearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   className="px-4 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50"
                   onClick={() => void openKnowledge(group.id)}
                 >
-                  <FileText className="h-4 w-4" style={{ color: '#6366F1' }} />
+                  <FileText className="h-4 w-4" style={{ color: 'var(--brand-primary)' }} />
                   <span className="font-semibold text-sm">{group.title}</span>
                   <span className="text-xs" style={{ color: '#A3A3A3' }}>
                     {group.matches.length} 处匹配
@@ -475,7 +475,7 @@ export const SearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <button
                   onClick={() => void openKnowledge(selectedMatch.id)}
                   className="px-4 py-2 rounded-md text-white text-xs font-medium"
-                  style={{ backgroundColor: '#6366F1' }}
+                  style={{ backgroundColor: 'var(--brand-primary)' }}
                 >
                   打开文档
                 </button>

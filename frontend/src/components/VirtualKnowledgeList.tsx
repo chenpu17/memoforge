@@ -66,7 +66,7 @@ const ListRow = ({
         <button
           onClick={onLoadMore}
           className="w-full py-2 text-sm font-medium text-center rounded-lg border hover:bg-gray-50 transition-colors"
-          style={{ color: '#6366F1', borderColor: '#E5E7EB' }}
+          style={{ color: 'var(--brand-primary)', borderColor: '#E5E7EB' }}
         >
           加载更多
         </button>

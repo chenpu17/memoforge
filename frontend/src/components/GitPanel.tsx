@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { tauriService } from '../services/tauri'
-import { GitBranch, Upload, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
+import { GitBranch, Upload, ArrowDown, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
 interface GitPanelProps {
   compact?: boolean
@@ -19,6 +19,8 @@ export const GitPanel: React.FC<GitPanelProps> = ({
   const [status, setStatus] = useState('')
   const [commitMessage, setCommitMessage] = useState('')
   const [isExpanded, setIsExpanded] = useState(true)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [pullConfirm, setPullConfirm] = useState(false)
   const statusLines = status ? status.split('\n').filter(Boolean) : []
   const statusPreview = statusLines.slice(0, 6).join('\n')
   const statusSummary = statusLines.reduce((summary, line) => {
@@ -50,36 +52,100 @@ export const GitPanel: React.FC<GitPanelProps> = ({
     if (!commitMessage.trim()) return
 
     try {
+      setActionError(null)
       await tauriService.gitCommit(commitMessage)
       setCommitMessage('')
       await loadStatus()
     } catch (error) {
       console.error('Commit failed:', error)
+      setActionError(String(error))
     }
   }
 
   const handlePush = async () => {
     try {
+      setActionError(null)
       await tauriService.gitPush()
       await loadStatus()
     } catch (error) {
       console.error('Push failed:', error)
+      const message = String(error)
+      if (message.includes('rejected') || message.includes('non-fast-forward') || message.includes('behind')) {
+        setActionError('推送失败：远程有新变更。请先 Pull 拉取最新代码后再推送。')
+      } else {
+        setActionError(message)
+      }
     }
   }
 
   const handlePull = async () => {
+    // Check if there are working changes that might conflict
+    if (statusLines.length > 0 && !pullConfirm) {
+      setPullConfirm(true)
+      return
+    }
+
     try {
+      setActionError(null)
+      setPullConfirm(false)
       await tauriService.gitPull()
       await loadStatus()
       await onRepoChanged?.()
     } catch (error) {
       console.error('Pull failed:', error)
+      setActionError(String(error))
+      setPullConfirm(false)
     }
   }
 
   useEffect(() => {
     void loadStatus()
   }, [refreshToken])
+
+  const renderError = () => {
+    if (!actionError) return null
+    return (
+      <div
+        className="rounded-md border px-2.5 py-2 text-[11px]"
+        style={{ borderColor: '#FECACA', backgroundColor: '#FEF2F2', color: '#991B1B' }}
+      >
+        {actionError}
+      </div>
+    )
+  }
+
+  const renderPullConfirm = () => {
+    if (!pullConfirm) return null
+    return (
+      <div
+        className="rounded-md border px-2.5 py-2"
+        style={{ borderColor: '#FDE68A', backgroundColor: '#FFFBEB' }}
+      >
+        <div className="flex items-start gap-1.5">
+          <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: '#B45309' }} />
+          <div className="text-[11px]" style={{ color: '#92400E' }}>
+            <p>本地有 <strong>{statusLines.length}</strong> 个未提交改动，Pull 可能导致冲突。</p>
+            <div className="flex gap-2 mt-1.5">
+              <button
+                onClick={handlePull}
+                className="px-2 py-0.5 rounded text-[11px] font-medium"
+                style={{ backgroundColor: '#B45309', color: '#FFFFFF' }}
+              >
+                仍然 Pull
+              </button>
+              <button
+                onClick={() => setPullConfirm(false)}
+                className="px-2 py-0.5 rounded text-[11px] border"
+                style={{ borderColor: '#E5E5E5', color: '#525252' }}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // 紧凑模式（右侧面板内）
   if (compact) {
@@ -129,6 +195,9 @@ export const GitPanel: React.FC<GitPanelProps> = ({
                 )}
               </div>
 
+              {renderPullConfirm()}
+              {renderError()}
+
               <div className="side-panel-section">
                 <div className="side-panel-heading">提交信息</div>
                 <input
@@ -171,6 +240,9 @@ export const GitPanel: React.FC<GitPanelProps> = ({
       <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-32">
         {status || '无变更'}
       </pre>
+
+      {renderPullConfirm()}
+      {renderError()}
 
       <input
         type="text"

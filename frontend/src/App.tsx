@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { Search, Plus, Save, ChevronRight, MoreHorizontal, Trash2, FolderOpen, AlertCircle, Database, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Search, Plus, Save, ChevronRight, MoreHorizontal, Trash2, AlertCircle, Database, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle } from 'react-resizable-panels'
 import { shallow } from 'zustand/shallow'
 import { CurrentKnowledgeEditorPane } from './components/CurrentKnowledgeEditorPane'
@@ -11,15 +11,20 @@ import { ImportModal } from './components/ImportModal'
 import { ToastNotifications } from './components/ToastNotifications'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ReadOnlyBanner } from './components/ReadOnlyBanner'
-import { Input } from './components/ui/Input'
 import { KbSwitcher } from './components/KbSwitcher'
 import { RightPanel } from './components/RightPanel'
 import { SettingsModal } from './components/SettingsModal'
-import { useAppStore } from './stores/appStore'
+import { WelcomeFlow } from './components/WelcomeFlow'
+import { useAutoSave } from './hooks/useAutoSave'
+import { useAppStore, type AgentPanel } from './stores/appStore'
 import { tauriService, DeletePreview, getErrorMessage } from './services/tauri'
 import { useKnowledgeNavigation } from './hooks/useKnowledgeNavigation'
 import { hasKnowledgeUnsavedChanges } from './lib/knowledgeChanges'
 import { clearKnowledgeDraft } from './lib/knowledgeDrafts'
+import {
+  getAutoSaveInterval,
+  SETTINGS_CHANGED_EVENT,
+} from './lib/settings'
 import {
   buildKnowledgeTreeRoot,
   findFolderNode,
@@ -32,6 +37,26 @@ import {
 const KnowledgeGraphPanel = lazy(async () => {
   const module = await import('./components/KnowledgeGraphPanel')
   return { default: module.KnowledgeGraphPanel }
+})
+
+const InboxPanel = lazy(async () => {
+  const module = await import('./components/InboxPanel')
+  return { default: module.InboxPanel }
+})
+
+const AgentSessionPanel = lazy(async () => {
+  const module = await import('./components/AgentSessionPanel')
+  return { default: module.AgentSessionPanel }
+})
+
+const ReliabilityDashboardPanel = lazy(async () => {
+  const module = await import('./components/ReliabilityDashboardPanel')
+  return { default: module.ReliabilityDashboardPanel }
+})
+
+const ContextPackPanel = lazy(async () => {
+  const module = await import('./components/ContextPackPanel')
+  return { default: module.ContextPackPanel }
 })
 
 const isMacOS = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')
@@ -125,9 +150,9 @@ const getEditorModeBadgeStyle = (mode: 'read' | 'markdown' | 'rich') => {
   switch (mode) {
     case 'markdown':
       return {
-        backgroundColor: '#EEF2FF',
-        border: '1px solid #C7D2FE',
-        color: '#4338CA',
+        backgroundColor: 'var(--brand-primary-soft)',
+        border: '1px solid var(--brand-primary-border)',
+        color: 'var(--brand-primary-strong)',
       }
     case 'rich':
       return {
@@ -213,7 +238,6 @@ function App() {
   const [initialized, setInitialized] = useState(false)
   const [readonly, setReadonly] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [kbPath, setKbPath] = useState('')
   const [currentKbName, setCurrentKbName] = useState('')
   const [sortMode, setSortMode] = useState<'recent' | 'title'>('recent')
   const [pendingChangesCount, setPendingChangesCount] = useState(0)
@@ -223,6 +247,7 @@ function App() {
   const [knowledgeListCollapsed, setKnowledgeListCollapsed] = useState(() => getStoredBoolean(LIST_COLLAPSED_KEY))
   const [knowledgeQuery, setKnowledgeQuery] = useState('')
   const [saveFeedback, setSaveFeedback] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [autoSaveInterval, setAutoSaveInterval] = useState(() => getAutoSaveInterval())
   const [listDensity, setListDensity] = useState<'compact' | 'comfortable'>(() => {
     if (typeof window === 'undefined') return 'compact'
     const stored = window.localStorage.getItem(LIST_DENSITY_KEY)
@@ -252,6 +277,8 @@ function App() {
     editorSelection,
     hasCurrentKnowledge,
     hasUnsavedChanges,
+    activeAgentPanel,
+    setActiveAgentPanel,
   } = useAppStore((state) => ({
     setCurrentKnowledge: state.setCurrentKnowledge,
     knowledgeList: state.knowledgeList,
@@ -276,6 +303,8 @@ function App() {
       state.currentKnowledgeBaseline,
       state.currentKnowledgeContent,
     ),
+    activeAgentPanel: state.activeAgentPanel,
+    setActiveAgentPanel: state.setActiveAgentPanel,
   }), shallow)
 
   const deferredKnowledgeQuery = useDeferredValue(knowledgeQuery)
@@ -400,6 +429,21 @@ function App() {
     void checkInit()
   }, [])
 
+  useEffect(() => {
+    const handleSettingsChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; value?: unknown }>).detail
+      if (!detail?.key) return
+
+      if (detail.key === 'autoSaveInterval') {
+        const nextValue = Number(detail.value)
+        setAutoSaveInterval(Number.isFinite(nextValue) ? nextValue : 0)
+      }
+    }
+
+    window.addEventListener(SETTINGS_CHANGED_EVENT, handleSettingsChanged)
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, handleSettingsChanged)
+  }, [])
+
   // 定期刷新 MCP 连接数量（每 5 秒）
   useEffect(() => {
     if (!initialized) return
@@ -490,7 +534,7 @@ function App() {
             console.log('Auto-opening last knowledge base:', lastKb)
             await tauriService.initKb(lastKb, 'open')
             setInitialized(true)
-            setReadonly(false)
+            setReadonly(!!status.readonly)
             await loadData()
             await loadCurrentKbName()
           }
@@ -514,35 +558,6 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to load KB name:', error)
-    }
-  }
-
-  const handleInit = async () => {
-    if (!kbPath.trim()) return
-
-    try {
-      await tauriService.initKb(kbPath, 'open')
-      setInitError(null)
-      setInitialized(true)
-      setReadonly(false)
-      await loadData()
-      await loadCurrentKbName()
-    } catch (error) {
-      console.error('Init failed:', error)
-      setInitError(getErrorMessage(error))
-    }
-  }
-
-  const handleSelectFolder = async () => {
-    try {
-      const selectedPath = await tauriService.selectFolder()
-      if (selectedPath) {
-        setKbPath(selectedPath)
-        setInitError(null)
-      }
-    } catch (error) {
-      console.error('Failed to select folder:', error)
-      setInitError(getErrorMessage(error))
     }
   }
 
@@ -745,6 +760,11 @@ function App() {
     })
   }, [categoryPathSet, openNewKnowledgeModal, selectedFolderCreateHint, treeSelection])
 
+  const handleOpenAgentPanel = useCallback((panel: AgentPanel) => {
+    if (!confirmDiscardIfNeeded()) return
+    setActiveAgentPanel(panel)
+  }, [confirmDiscardIfNeeded, setActiveAgentPanel])
+
   const handleExternalKnowledgeChange = useCallback(async (events: import('./services/tauri').Event[]) => {
     await loadData()
 
@@ -894,6 +914,17 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleSave, readonly])
 
+  useAutoSave({
+    enabled: !readonly && initialized && hasUnsavedChanges,
+    intervalSeconds: autoSaveInterval,
+    activeKey: currentKnowledgeId,
+    dirtyToken: `${currentKnowledgeId ?? 'none'}:${currentKnowledgeContent}`,
+    isSaving,
+    onSave: () => {
+      void handleSave()
+    },
+  })
+
   const handleDelete = async () => {
     const latestKnowledge = useAppStore.getState().currentKnowledge
     if (!latestKnowledge?.id) return
@@ -929,59 +960,31 @@ function App() {
 
   if (!initialized) {
     return (
-      <div className="app-container flex items-center justify-center">
-        <div className="w-96 p-6 border rounded-lg bg-white" style={{ borderColor: '#E5E5E5' }}>
-          <h2 className="text-xl font-bold mb-4">初始化知识库</h2>
-          <div className="flex gap-2 mb-4">
-            <Input
-              value={kbPath}
-              onChange={(event) => setKbPath(event.target.value)}
-              placeholder="输入知识库路径，如: ~/memoforge-demo"
-              className="flex-1"
-            />
-            <button
-              onClick={handleSelectFolder}
-              className="px-3 py-2 border rounded-md hover:bg-gray-50"
-              style={{ borderColor: '#E5E5E5' }}
-              title="选择目录"
-            >
-              <FolderOpen className="h-4 w-4" style={{ color: '#737373' }} />
-            </button>
-          </div>
-          <button
-            onClick={handleInit}
-            disabled={!kbPath.trim()}
-            className="w-full bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50"
+      <>
+        <WelcomeFlow
+          readonly={readonly}
+          onKbReady={async (_kbPath) => {
+            setInitError(null)
+            setInitialized(true)
+            await loadData()
+            await loadCurrentKbName()
+          }}
+        />
+        {showKbSwitcher && (
+          <KbSwitcher
+            onClose={() => setShowKbSwitcher(false)}
+            onSwitch={handleKbSwitch}
+          />
+        )}
+        {initError && (
+          <div
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-md border px-4 py-2 text-sm z-50"
+            style={{ borderColor: '#FECACA', backgroundColor: '#FEF2F2', color: '#991B1B' }}
           >
-            打开或初始化知识库
-          </button>
-          <p className="mt-2 text-xs" style={{ color: '#737373' }}>
-            选择空目录时会自动初始化为新的 MemoForge 知识库。
-          </p>
-          {initError && (
-            <div
-              className="mt-3 rounded-md border px-3 py-2 text-sm"
-              style={{ borderColor: '#FECACA', backgroundColor: '#FEF2F2', color: '#991B1B' }}
-            >
-              {initError}
-            </div>
-          )}
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setShowKbSwitcher(true)}
-              className="text-sm text-indigo-600 hover:underline"
-            >
-              或选择历史知识库
-            </button>
+            {initError}
           </div>
-          {showKbSwitcher && (
-            <KbSwitcher
-              onClose={() => setShowKbSwitcher(false)}
-              onSwitch={handleKbSwitch}
-            />
-          )}
-        </div>
-      </div>
+        )}
+      </>
     )
   }
 
@@ -1004,7 +1007,7 @@ function App() {
         />
         {isMacOS ? (
           <span className="text-[13px] font-medium select-none" style={{ color: '#737373' }} data-tauri-drag-region>
-            MemoForge
+            ForgeNerve
           </span>
         ) : (
           <div className="flex-1" />
@@ -1058,6 +1061,8 @@ function App() {
               onOpenSettings={() => setShowSettings(true)}
               onOpenKnowledgeGraph={() => setShowKnowledgeGraph(true)}
               onOpenImport={!readonly ? () => setShowImportModal(true) : undefined}
+              onOpenAgentPanel={handleOpenAgentPanel}
+              activeAgentPanel={activeAgentPanel}
             />
           </Panel>
 
@@ -1075,7 +1080,15 @@ function App() {
             <div className="flex h-full min-w-0 flex-col bg-white">
               <div className="h-12 flex-shrink-0 flex items-center gap-2 px-4 border-b overflow-visible relative z-20" style={{ borderColor: '#E5E5E5' }}>
                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  {treeSelection.type === 'folder' ? (
+                  {activeAgentPanel ? (
+                    <>
+                      <span className="text-[13px]" style={{ color: '#A3A3A3' }}>Agent 工作台</span>
+                      <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#D4D4D4' }} />
+                      <span className="text-[13px] font-medium truncate" style={{ color: '#0A0A0A' }}>
+                        {activeAgentPanel === 'inbox' ? 'Inbox 收件箱' : activeAgentPanel === 'sessions' ? 'Sessions 会话' : activeAgentPanel === 'review' ? 'Review 审阅' : activeAgentPanel === 'reliability' ? 'Reliability 可靠性' : 'Packs 打包'}
+                      </span>
+                    </>
+                  ) : treeSelection.type === 'folder' ? (
                     <>
                       {treeSelection.path && (
                         <>
@@ -1095,7 +1108,7 @@ function App() {
                       {knowledgeQuery.trim() && (
                         <span
                           className="hidden max-w-[180px] truncate rounded-full px-2 py-1 text-[10px] font-medium md:inline-flex"
-                          style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+                          style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-strong)' }}
                           title={`当前搜索：${knowledgeQuery}`}
                         >
                           搜索：{knowledgeQuery}
@@ -1115,7 +1128,7 @@ function App() {
                   )}
                 </div>
 
-                {treeSelection.type === 'folder' && (
+                {!activeAgentPanel && treeSelection.type === 'folder' && (
                   <div className="flex items-center gap-1.5 rounded-xl border px-2 py-1.5" style={{ borderColor: '#E5E5E5', backgroundColor: '#FAFAFA' }}>
                     <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ backgroundColor: '#FFFFFF' }}>
                       <button
@@ -1123,8 +1136,8 @@ function App() {
                         onClick={() => setSortMode('recent')}
                         className="rounded-md px-2 py-1 text-[11px] font-medium"
                         style={{
-                          backgroundColor: sortMode === 'recent' ? '#EEF2FF' : 'transparent',
-                          color: sortMode === 'recent' ? '#4338CA' : '#737373',
+                          backgroundColor: sortMode === 'recent' ? 'var(--brand-primary-soft)' : 'transparent',
+                          color: sortMode === 'recent' ? 'var(--brand-primary-strong)' : '#737373',
                         }}
                       >
                         最近
@@ -1134,8 +1147,8 @@ function App() {
                         onClick={() => setSortMode('title')}
                         className="rounded-md px-2 py-1 text-[11px] font-medium"
                         style={{
-                          backgroundColor: sortMode === 'title' ? '#EEF2FF' : 'transparent',
-                          color: sortMode === 'title' ? '#4338CA' : '#737373',
+                          backgroundColor: sortMode === 'title' ? 'var(--brand-primary-soft)' : 'transparent',
+                          color: sortMode === 'title' ? 'var(--brand-primary-strong)' : '#737373',
                         }}
                       >
                         标题
@@ -1148,8 +1161,8 @@ function App() {
                         onClick={() => setListDensity('compact')}
                         className="rounded-md px-2 py-1 text-[11px] font-medium"
                         style={{
-                          backgroundColor: listDensity === 'compact' ? '#EEF2FF' : 'transparent',
-                          color: listDensity === 'compact' ? '#4338CA' : '#737373',
+                          backgroundColor: listDensity === 'compact' ? 'var(--brand-primary-soft)' : 'transparent',
+                          color: listDensity === 'compact' ? 'var(--brand-primary-strong)' : '#737373',
                         }}
                       >
                         紧凑
@@ -1159,8 +1172,8 @@ function App() {
                         onClick={() => setListDensity('comfortable')}
                         className="rounded-md px-2 py-1 text-[11px] font-medium"
                         style={{
-                          backgroundColor: listDensity === 'comfortable' ? '#EEF2FF' : 'transparent',
-                          color: listDensity === 'comfortable' ? '#4338CA' : '#737373',
+                          backgroundColor: listDensity === 'comfortable' ? 'var(--brand-primary-soft)' : 'transparent',
+                          color: listDensity === 'comfortable' ? 'var(--brand-primary-strong)' : '#737373',
                         }}
                       >
                         预览
@@ -1181,7 +1194,7 @@ function App() {
                         openNewKnowledgeModal()
                       }}
                       className="inline-flex h-8 items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-white"
-                      style={{ backgroundColor: '#6366F1' }}
+                      style={{ backgroundColor: 'var(--brand-primary)' }}
                       title="新建知识"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -1254,7 +1267,7 @@ function App() {
                     disabled={isSaving || !hasCurrentKnowledge || !hasUnsavedChanges}
                     className="flex-shrink-0 flex h-8 items-center gap-1 px-2.5 py-1 rounded-md text-white text-xs font-medium"
                     style={{
-                      backgroundColor: saveFeedback === 'error' ? '#DC2626' : '#6366F1',
+                      backgroundColor: saveFeedback === 'error' ? '#DC2626' : 'var(--brand-primary)',
                       opacity: isSaving || !hasCurrentKnowledge || !hasUnsavedChanges ? 0.7 : 1,
                       cursor: isSaving || !hasCurrentKnowledge || !hasUnsavedChanges ? 'not-allowed' : 'pointer',
                     }}
@@ -1271,7 +1284,25 @@ function App() {
               </div>
 
               <div className="flex-1 min-h-0 flex overflow-hidden">
-                {treeSelection.type === 'folder' ? (
+                {activeAgentPanel ? (
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <Suspense fallback={(
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-xs" style={{ color: '#737373' }}>加载中...</div>
+                      </div>
+                    )}>
+                      {activeAgentPanel === 'inbox' && <InboxPanel />}
+                      {activeAgentPanel === 'sessions' && <AgentSessionPanel />}
+                      {activeAgentPanel === 'review' && (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-xs" style={{ color: '#737373' }}>Review 面板由 Worker 2 负责</div>
+                        </div>
+                      )}
+                      {activeAgentPanel === 'reliability' && <ReliabilityDashboardPanel />}
+                      {activeAgentPanel === 'packs' && <ContextPackPanel />}
+                    </Suspense>
+                  </div>
+                ) : treeSelection.type === 'folder' ? (
                   <div className="flex-1 min-w-0 overflow-hidden">
                     <DirectoryKnowledgeBrowser
                       title={selectedFolderTitle}
@@ -1304,17 +1335,19 @@ function App() {
                   </div>
                 )}
 
-                <RightPanel
-                  readonly={readonly}
-                  isGitRepo={isGitRepo}
-                  hasKnowledge={treeSelection.type === 'knowledge' && hasCurrentKnowledge}
-                  folderMode={treeSelection.type === 'folder'}
-                  pendingChangesCount={pendingChangesCount}
-                  onGitStatusChange={setPendingChangesCount}
-                  onRepoChanged={() => {
-                    void loadData()
-                  }}
-                />
+                {!activeAgentPanel && (
+                  <RightPanel
+                    readonly={readonly}
+                    isGitRepo={isGitRepo}
+                    hasKnowledge={treeSelection.type === 'knowledge' && hasCurrentKnowledge}
+                    folderMode={treeSelection.type === 'folder'}
+                    pendingChangesCount={pendingChangesCount}
+                    onGitStatusChange={setPendingChangesCount}
+                    onRepoChanged={() => {
+                      void loadData()
+                    }}
+                  />
+                )}
               </div>
             </div>
           </Panel>
@@ -1326,7 +1359,19 @@ function App() {
         style={{ borderColor: '#E5E5E5', backgroundColor: '#FAFAFA', color: '#737373' }}
       >
         <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-          {treeSelection.type === 'knowledge' && hasCurrentKnowledge ? (
+          {activeAgentPanel ? (
+            <>
+              <span className="truncate font-medium" style={{ color: '#404040' }}>
+                {activeAgentPanel === 'inbox' ? 'Inbox 收件箱' : activeAgentPanel === 'sessions' ? 'Sessions 会话' : activeAgentPanel === 'review' ? 'Review 审阅' : activeAgentPanel === 'reliability' ? 'Reliability 可靠性' : 'Packs 打包'}
+              </span>
+              <span
+                className="rounded-full px-2 py-0.5"
+                style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-strong)' }}
+              >
+                Agent 工作台
+              </span>
+            </>
+          ) : treeSelection.type === 'knowledge' && hasCurrentKnowledge ? (
             <>
               <span className="truncate font-medium" style={{ color: '#404040' }}>{currentKnowledgeTitle}</span>
               {currentKnowledgeFolderPath && (
@@ -1340,7 +1385,7 @@ function App() {
               {statusSelectionLabel && (
                 <span
                   className="hidden rounded-full px-2 py-0.5 md:inline-flex"
-                  style={{ backgroundColor: '#EEF2FF', color: '#4338CA' }}
+                  style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary-strong)' }}
                 >
                   {statusSelectionLabel}
                 </span>
@@ -1366,7 +1411,7 @@ function App() {
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-2 overflow-hidden">
-          {treeSelection.type === 'knowledge' && hasCurrentKnowledge ? (
+          {!activeAgentPanel && treeSelection.type === 'knowledge' && hasCurrentKnowledge ? (
             <>
               <span>行 {currentDocumentLineCount}</span>
               <span className="hidden sm:inline">词 {currentDocumentWordCount}</span>
@@ -1384,9 +1429,13 @@ function App() {
             </>
           ) : (
             <>
-              {knowledgeQuery.trim() && <span className="hidden md:inline">筛选：{knowledgeQuery}</span>}
-              <span>{sortMode === 'recent' ? '按最近更新' : '按标题'}</span>
-              <span className="hidden sm:inline">{listDensity === 'compact' ? '紧凑视图' : '预览视图'}</span>
+              {!activeAgentPanel && treeSelection.type === 'folder' && (
+                <>
+                  {knowledgeQuery.trim() && <span className="hidden md:inline">筛选：{knowledgeQuery}</span>}
+                  <span>{sortMode === 'recent' ? '按最近更新' : '按标题'}</span>
+                  <span className="hidden sm:inline">{listDensity === 'compact' ? '紧凑视图' : '预览视图'}</span>
+                </>
+              )}
             </>
           )}
         </div>

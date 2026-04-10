@@ -24,7 +24,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const styleMap = {
     danger: { bg: '#EF4444', hover: '#DC2626' },
     warning: { bg: '#F59E0B', hover: '#D97706' },
-    primary: { bg: '#6366F1', hover: '#4F46E5' },
+    primary: { bg: 'var(--brand-primary)', hover: 'var(--brand-primary-hover)' },
   }
 
   return (

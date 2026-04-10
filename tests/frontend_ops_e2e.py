@@ -125,7 +125,7 @@ def run_readonly_smoke(web_port: int) -> None:
         def tree_button(text: str):
             return tree_nav.locator("button").filter(has_text=re.compile(text)).first
 
-        expect(page.get_by_text("Web 访问仅限只读")).to_be_visible()
+        expect(page.get_by_text("当前为只读模式")).to_be_visible()
         expect(page.get_by_role("button", name="新建")).to_have_count(0)
         expect(page.get_by_role("button", name="保存")).to_have_count(0)
         expect(page.locator('button[title="导入 Markdown"]')).to_have_count(0)

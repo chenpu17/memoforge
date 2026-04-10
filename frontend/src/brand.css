@@ -1,0 +1,28 @@
+:root {
+  --brand-primary: #6366F1;
+  --brand-primary-hover: #4F46E5;
+  --brand-primary-strong: #4338CA;
+  --brand-primary-stronger: #3730A3;
+  --brand-primary-soft: #EEF2FF;
+  --brand-primary-soft-alt: #E0E7FF;
+  --brand-primary-surface: #F8FAFF;
+  --brand-primary-surface-alt: #F8FBFF;
+  --brand-primary-border: #C7D2FE;
+  --brand-primary-border-strong: #A5B4FC;
+  --brand-primary-panel-border: #DBEAFE;
+  --brand-primary-glow: rgba(99, 102, 241, 0.12);
+  --brand-primary-glow-strong: rgba(99, 102, 241, 0.14);
+  --brand-primary-hover-shadow: rgba(79, 70, 229, 0.16);
+  --brand-primary-shadow-soft: rgba(99, 102, 241, 0.08);
+  --brand-primary-shadow-subtle: rgba(79, 70, 229, 0.08);
+  --brand-primary-shadow-medium: rgba(79, 70, 229, 0.12);
+  --brand-primary-shadow-strong: rgba(79, 70, 229, 0.14);
+  --brand-primary-shadow-stronger: rgba(79, 70, 229, 0.16);
+  --brand-primary-separator: rgba(99, 102, 241, 0.04);
+  --brand-primary-hero: rgba(99, 102, 241, 0.14);
+  --brand-primary-hero-soft: rgba(99, 102, 241, 0.06);
+  --brand-primary-fill-20: rgba(99, 102, 241, 0.2);
+  --brand-primary-ring: rgba(99, 102, 241, 0.28);
+  --brand-primary-ring-soft: rgba(99, 102, 241, 0.3);
+  --brand-primary-ring-strong: rgba(99, 102, 241, 0.32);
+}

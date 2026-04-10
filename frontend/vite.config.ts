@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -14,6 +15,12 @@ export default defineConfig({
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        landing: resolve(__dirname, 'landing.html'),
+        richEditorPreview: resolve(__dirname, 'rich-editor-preview.html'),
+        test: resolve(__dirname, 'test.html'),
+      },
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) {

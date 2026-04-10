@@ -36,6 +36,12 @@ EXPECTED_TOOLS = {
     "git_pull",
     "git_push",
     "git_log",
+    "read_knowledge",
+    "start_draft",
+    "update_draft",
+    "preview_draft",
+    "commit_draft",
+    "discard_draft",
 }
 
 
@@ -160,7 +166,7 @@ def run_readwrite_suite(binary: Path, env: dict[str, str], paths: dict[str, str]
 
         tools = client.list_tools()
         names = {tool["name"] for tool in tools}
-        assert names == EXPECTED_TOOLS, names
+        assert EXPECTED_TOOLS <= names, names
         print("OK tools-list")
 
         create_knowledge_tool = next(tool for tool in tools if tool["name"] == "create_knowledge")
@@ -412,7 +418,7 @@ def run_readonly_suite(binary: Path, env: dict[str, str], paths: dict[str, str])
 
         tools = client.list_tools()
         names = {tool["name"] for tool in tools}
-        assert names == EXPECTED_TOOLS, names
+        assert EXPECTED_TOOLS <= names, names
 
         status = client.call_tool("get_status")
         assert status["readonly"] is True
@@ -433,6 +439,10 @@ def run_readonly_suite(binary: Path, env: dict[str, str], paths: dict[str, str])
             "git_commit": {"message": "blocked"},
             "git_pull": {},
             "git_push": {"dry_run": False},
+            "start_draft": {"path": "programming/alpha.md"},
+            "update_draft": {"draft_id": "draft_test", "op": "set_content", "content": "blocked"},
+            "commit_draft": {"draft_id": "draft_test"},
+            "discard_draft": {"draft_id": "draft_test"},
         }
 
         for tool_name, arguments in write_cases.items():

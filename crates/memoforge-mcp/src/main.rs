@@ -1,10 +1,8 @@
 //! MemoForge MCP Server
 //! 参考: 技术实现文档 §4
 
-mod sse;
-mod tools;
-
 use clap::Parser;
+use memoforge_mcp::tools;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
@@ -46,6 +44,12 @@ struct JsonRpcRequest {
     id: Option<Value>,
     method: String,
     params: Option<Value>,
+}
+
+impl JsonRpcRequest {
+    fn is_json_rpc_2(&self) -> bool {
+        self.jsonrpc == "2.0"
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -159,6 +163,10 @@ fn run_server_follow_mode(allow_stale_kb: bool, readonly: bool, agent_name: &str
             Err(_) => continue,
         };
 
+        if !request.is_json_rpc_2() {
+            continue;
+        }
+
         if let Some(response) = handle_request(request, "follow", readonly) {
             if let Ok(json) = serde_json::to_string(&response) {
                 let _ = writeln!(stdout, "{}", json);
@@ -207,6 +215,10 @@ fn run_server_bound_mode(knowledge_path: std::path::PathBuf, readonly: bool, age
             Err(_) => continue,
         };
 
+        if !request.is_json_rpc_2() {
+            continue;
+        }
+
         if let Some(response) = handle_request(request, "bound", readonly) {
             if let Ok(json) = serde_json::to_string(&response) {
                 let _ = writeln!(stdout, "{}", json);
@@ -219,7 +231,11 @@ fn run_server_bound_mode(knowledge_path: std::path::PathBuf, readonly: bool, age
     memoforge_core::unregister_agent(&knowledge_path);
 }
 
-fn handle_request(req: JsonRpcRequest, mode: &str, force_readonly: bool) -> Option<JsonRpcResponse> {
+fn handle_request(
+    req: JsonRpcRequest,
+    mode: &str,
+    force_readonly: bool,
+) -> Option<JsonRpcResponse> {
     match req.method.as_str() {
         "initialize" => Some(JsonRpcResponse {
             jsonrpc: "2.0".to_string(),

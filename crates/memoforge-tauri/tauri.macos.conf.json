@@ -2,7 +2,7 @@
   "app": {
     "windows": [
       {
-        "title": "MemoForge",
+        "title": "ForgeNerve",
         "width": 1440,
         "height": 900,
         "decorations": true,

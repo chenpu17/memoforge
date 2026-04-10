@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import type { Category, Knowledge, GrepMatch } from '../types'
+import type { WorkspaceOverview } from '../services/tauri'
 
 export type EditorMode = 'read' | 'markdown' | 'rich'
+export type AgentPanel = 'inbox' | 'sessions' | 'review' | 'reliability' | 'packs' | null
 
 interface TagWithCount {
   tag: string
@@ -30,6 +32,10 @@ interface AppState {
   // Pagination state
   hasMore: boolean
   offset: number
+  // Workspace overview
+  workspaceOverview: WorkspaceOverview | null
+  // Agent panel state
+  activeAgentPanel: AgentPanel
 
   setKnowledgeList: (list: Knowledge[]) => void
   appendKnowledgeList: (items: Knowledge[]) => void
@@ -47,6 +53,8 @@ interface AppState {
   clearEditorSelection: () => void
   setAllTags: (tags: TagWithCount[]) => void
   toggleTag: (tag: string) => void
+  setWorkspaceOverview: (overview: WorkspaceOverview) => void
+  setActiveAgentPanel: (panel: AgentPanel) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -64,6 +72,8 @@ export const useAppStore = create<AppState>((set) => ({
   selectedTags: [],
   hasMore: false,
   offset: 0,
+  workspaceOverview: null,
+  activeAgentPanel: null,
 
   setKnowledgeList: (list) => set({ knowledgeList: list }),
   appendKnowledgeList: (items) => set((state) => ({
@@ -101,4 +111,6 @@ export const useAppStore = create<AppState>((set) => ({
       ? state.selectedTags.filter(t => t !== tag)
       : [...state.selectedTags, tag]
   })),
+  setWorkspaceOverview: (overview) => set({ workspaceOverview: overview }),
+  setActiveAgentPanel: (panel) => set({ activeAgentPanel: panel }),
 }))

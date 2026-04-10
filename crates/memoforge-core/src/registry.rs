@@ -44,7 +44,9 @@ impl KnowledgeBaseRegistry {
                 context: None,
             })?;
 
-        Ok(PathBuf::from(home).join(".memoforge").join(REGISTRY_FILE_NAME))
+        Ok(PathBuf::from(home)
+            .join(".memoforge")
+            .join(REGISTRY_FILE_NAME))
     }
 
     fn registry_dir() -> Result<PathBuf, MemoError> {
@@ -120,7 +122,11 @@ impl KnowledgeBaseRegistry {
         let registry_dir = Self::registry_dir()?;
         fs::create_dir_all(&registry_dir).map_err(|e| MemoError {
             code: ErrorCode::InvalidPath,
-            message: format!("Failed to create registry directory {}: {}", registry_dir.display(), e),
+            message: format!(
+                "Failed to create registry directory {}: {}",
+                registry_dir.display(),
+                e
+            ),
             retry_after_ms: None,
             context: None,
         })?;

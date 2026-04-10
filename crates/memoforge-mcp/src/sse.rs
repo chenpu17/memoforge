@@ -28,6 +28,7 @@ use tower_http::cors::{Any, CorsLayer};
 pub struct McpServerConfig {
     pub port: u16,
     pub host: String,
+    pub readonly: bool,
 }
 
 impl Default for McpServerConfig {
@@ -41,6 +42,16 @@ impl Default for McpServerConfig {
         Self {
             port,
             host: "127.0.0.1".to_string(),
+            readonly: std::env::var("MEMOFORGE_READONLY")
+                .ok()
+                .map(|value| {
+                    let normalized = value.trim().to_ascii_lowercase();
+                    normalized == "1"
+                        || normalized == "true"
+                        || normalized == "yes"
+                        || normalized == "on"
+                })
+                .unwrap_or(false),
         }
     }
 }
@@ -438,7 +449,7 @@ fn handle_tools_call(
 
     // 其他工具复用 tools.rs 的实现
     // 注意：SSE 模式嵌入在 Tauri 进程中，tools::set_kb_path 已由 Tauri 设置
-    match crate::tools::call_tool(Some(params), false) {
+    match crate::tools::call_tool(Some(params), state.config.readonly) {
         Ok(result) => json_rpc_success(
             id,
             json!({
@@ -491,6 +502,7 @@ mod tests {
         let config = McpServerConfig::default();
         assert_eq!(config.port, 31415);
         assert_eq!(config.host, "127.0.0.1");
+        assert!(!config.readonly);
     }
 
     #[test]

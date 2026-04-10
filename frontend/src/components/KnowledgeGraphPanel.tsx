@@ -35,7 +35,7 @@ export const convertToReactFlow = (data: GraphData): { nodes: Node[]; edges: Edg
     },
     style: {
       background: getCategoryColor(node.category_id),
-      border: '1px solid #6366F1',
+      border: '1px solid var(--brand-primary)',
       borderRadius: '8px',
       padding: '10px',
       fontSize: '12px',
@@ -63,7 +63,7 @@ export const convertToReactFlow = (data: GraphData): { nodes: Node[]; edges: Edg
 // 根据分类获取颜色
 const getCategoryColor = (categoryId: string | null): string => {
   const colors: Record<string, string> = {
-    'programming': '#EEF2FF',
+    'programming': 'var(--brand-primary-soft)',
     'system-design': '#FEF3C7',
     'tools': '#DCFCE7',
     'rust': '#FEE2E2',
@@ -76,7 +76,7 @@ const getCategoryColor = (categoryId: string | null): string => {
 const getEdgeColor = (relation: string): string => {
   switch (relation) {
     case 'WikiLink':
-      return '#6366F1'
+      return 'var(--brand-primary)'
     case 'SharedTag':
       return '#10B981'
     case 'SameCategory':
@@ -220,7 +220,7 @@ export const KnowledgeGraphPanel: React.FC<KnowledgeGraphPanelProps> = ({
         <div className="px-4 py-2 border-t flex items-center gap-4 text-xs" style={{ borderColor: '#E5E5E5', color: '#737373' }}>
           <span>关系类型:</span>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-0.5 rounded" style={{ background: '#6366F1' }} />
+            <div className="w-3 h-0.5 rounded" style={{ background: 'var(--brand-primary)' }} />
             <span>Wiki 链接</span>
           </div>
           <div className="flex items-center gap-1">

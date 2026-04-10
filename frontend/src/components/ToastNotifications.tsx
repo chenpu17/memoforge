@@ -29,7 +29,7 @@ const getActionIcon = (action: Event['action']) => {
       return <FileText className="h-4 w-4" style={{ color: '#22C55E' }} />
     case 'update':
     case 'update_metadata':
-      return <Edit className="h-4 w-4" style={{ color: '#6366F1' }} />
+      return <Edit className="h-4 w-4" style={{ color: 'var(--brand-primary)' }} />
     case 'delete':
       return <Trash2 className="h-4 w-4" style={{ color: '#EF4444' }} />
     case 'git_commit':

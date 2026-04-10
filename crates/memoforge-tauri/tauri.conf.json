@@ -1,5 +1,5 @@
 {
-  "productName": "MemoForge",
+  "productName": "ForgeNerve",
   "version": "0.1.0",
   "identifier": "com.memoforge.app",
   "build": {
@@ -19,8 +19,8 @@
       "icons/icon.ico"
     ],
     "category": "Utility",
-    "shortDescription": "AI-driven personal knowledge management",
-    "longDescription": "MemoForge is an AI-driven personal knowledge management application with Git-native storage.",
+    "shortDescription": "Agent knowledge OS for developers",
+    "longDescription": "ForgeNerve is an AI-driven knowledge workspace for developers with Git-native storage.",
     "macOS": {
       "minimumSystemVersion": "10.13"
     },
@@ -38,7 +38,7 @@
   "app": {
     "windows": [
       {
-        "title": "MemoForge",
+        "title": "ForgeNerve",
         "width": 1440,
         "height": 900,
         "decorations": false,

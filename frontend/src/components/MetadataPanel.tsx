@@ -262,9 +262,9 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ readonly = false }
                   onClick={() => updateField('category', category.id)}
                   className="rounded-md border px-2 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   style={{
-                    borderColor: currentKnowledge.category === category.id ? '#C7D2FE' : '#E5E7EB',
-                    backgroundColor: currentKnowledge.category === category.id ? '#EEF2FF' : '#FFFFFF',
-                    color: currentKnowledge.category === category.id ? '#4338CA' : '#737373',
+                    borderColor: currentKnowledge.category === category.id ? 'var(--brand-primary-border)' : '#E5E7EB',
+                    backgroundColor: currentKnowledge.category === category.id ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                    color: currentKnowledge.category === category.id ? 'var(--brand-primary-strong)' : '#737373',
                   }}
                 >
                   {category.name}
@@ -292,7 +292,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ readonly = false }
               <span
                 key={tag}
                 className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs"
-                style={{ backgroundColor: '#EEF2FF', color: '#6366F1' }}
+                style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary)' }}
               >
                 {tag}
                 {!readonly && (

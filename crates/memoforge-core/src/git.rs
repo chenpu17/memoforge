@@ -68,7 +68,7 @@ pub fn git_commit(path: &Path, message: &str) -> Result<(), MemoError> {
     // 创建提交
     let tree_id = index.write_tree().map_err(git_error)?;
     let tree = repo.find_tree(tree_id).map_err(git_error)?;
-    let sig = Signature::now("MemoForge", "memoforge@local").map_err(git_error)?;
+    let sig = Signature::now("ForgeNerve", "memoforge@local").map_err(git_error)?;
 
     let parent_commit = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
 

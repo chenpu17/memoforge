@@ -6,6 +6,10 @@ pub mod agent;
 pub mod api;
 pub mod cache;
 pub mod config;
+pub mod context_pack;
+pub mod context_pack_store;
+pub mod document_ops;
+pub mod draft;
 pub mod editor_state;
 pub mod error;
 pub mod events;
@@ -13,12 +17,19 @@ pub mod frontmatter;
 pub mod fs;
 pub mod git;
 pub mod import;
+pub mod inbox;
+pub mod inbox_store;
 pub mod init;
 pub mod knowledge;
 pub mod links;
 pub mod lock;
 pub mod models;
 pub mod registry;
+pub mod reliability;
+pub mod reliability_rules;
+pub mod reliability_store;
+pub mod session;
+pub mod session_store;
 pub mod store;
 pub mod template;
 pub mod watcher;
@@ -34,6 +45,18 @@ pub use api::{
     ReferenceInfo,
 };
 pub use cache::{KnowledgeCache, L0Data, L1Data, L2Data};
+pub use context_pack::{ContextPack, ContextPackScope};
+pub use context_pack_store::ContextPackStore;
+pub use document_ops::{
+    append_section, apply_metadata_patch, generate_diff_summary, read_sections, remove_section,
+    replace_section, DiffSummary, SectionInfo,
+};
+pub use draft::{
+    cleanup_expired_drafts, commit_draft, discard_draft, preview_draft, read_knowledge_unified,
+    start_draft, start_draft_from_inbox_item, update_draft, update_draft_review_state,
+    CommitResult, DraftFile, DraftId, DraftOperation, DraftPreview, DraftTarget,
+    ReadKnowledgeResult,
+};
 pub use editor_state::{
     editor_state_path, load_editor_state, save_editor_state, CurrentKb, CurrentKnowledge,
     DesktopState, EditorMode, EditorState, Selection, SELECTED_TEXT_MAX_LENGTH,
@@ -49,12 +72,14 @@ pub use fs::{read_knowledge_file, write_knowledge_file};
 pub use import::{
     import_markdown_folder, preview_import, ImportOptions, ImportResult, ImportStats,
 };
+pub use inbox::{InboxItem, InboxSourceType, InboxStatus};
+pub use inbox_store::InboxStore;
 pub use knowledge::load_knowledge;
 pub use links::{
     build_knowledge_graph, build_knowledge_graph_with_options, get_backlinks, get_outgoing_links,
-    get_related, parse_wiki_links, update_references, AffectedFile, BacklinksResult, GraphEdge,
-    GraphNode, GraphOptions, GraphRelationType, KnowledgeGraph, LinkInfo, RelatedKnowledge,
-    RelatedResult, RelationType, UpdateReferencesResult,
+    get_related, parse_wiki_links, resolve_link_to_knowledge_id, update_references, AffectedFile,
+    BacklinksResult, GraphEdge, GraphNode, GraphOptions, GraphRelationType, KnowledgeGraph,
+    LinkInfo, RelatedKnowledge, RelatedResult, RelationType, UpdateReferencesResult,
 };
 pub use lock::{FileLock, GlobalWriteLock, LockManager};
 pub use models::{Category, Frontmatter, Knowledge, KnowledgeWithStale, LoadLevel};
@@ -62,6 +87,11 @@ pub use registry::{
     get_current_kb, get_last_kb, get_recent_kbs, list_knowledge_bases, register_kb, switch_kb,
     unregister_kb, KnowledgeBaseInfo, KnowledgeBaseRegistry,
 };
+pub use reliability::{IssueSeverity, IssueStatus, ReliabilityIssue, RuleKey};
+pub use reliability_rules::{scan_file, scan_kb, scan_kb_with_options, ScanOptions};
+pub use reliability_store::{ListFilter, ReliabilityStats, ReliabilityStore};
+pub use session::{AgentSession, ContextItem, ContextRefType, SessionStatus};
+pub use session_store::SessionStore;
 pub use store::{close_store, get_store, init_store, KnowledgeStore, StoreGuard};
 
 /// MemoForge 版本

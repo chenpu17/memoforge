@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { Info, GitBranch, Link2, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Info, GitBranch, Link2, Bot, ChevronsLeft, ChevronsRight } from 'lucide-react'
 
 const GitPanel = lazy(async () => {
   const module = await import('./GitPanel')
@@ -16,7 +16,17 @@ const BacklinksPanel = lazy(async () => {
   return { default: module.BacklinksPanel }
 })
 
-type TabType = 'metadata' | 'git' | 'backlinks'
+const AgentDraftPanel = lazy(async () => {
+  const module = await import('./AgentDraftPanel')
+  return { default: module.AgentDraftPanel }
+})
+
+const DraftPreviewModal = lazy(async () => {
+  const module = await import('./DraftPreviewModal')
+  return { default: module.DraftPreviewModal }
+})
+
+type TabType = 'metadata' | 'git' | 'backlinks' | 'agent'
 
 interface RightPanelProps {
   readonly: boolean
@@ -76,6 +86,9 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
   const [lastKnowledgeTab, setLastKnowledgeTab] = usePersistentState<'metadata' | 'backlinks'>('rightPanel.lastKnowledgeTab', 'metadata')
   const [railTooltip, setRailTooltip] = useState<{ label: string; top: number; left: number } | null>(null)
   const previousFolderModeRef = useRef(folderMode)
+  const [draftCount, setDraftCount] = useState(0)
+  const [previewDraftId, setPreviewDraftId] = useState<string | null>(null)
+  const [draftRefreshToken, setDraftRefreshToken] = useState(0)
 
   const handleIconClick = (tab: TabType) => {
     if (isOpen && activeTab === tab) {
@@ -107,7 +120,7 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
   }
 
   useEffect(() => {
-    if (activeTab !== 'git') {
+    if (activeTab === 'metadata' || activeTab === 'backlinks') {
       setLastKnowledgeTab(activeTab)
     }
   }, [activeTab, setLastKnowledgeTab])
@@ -184,6 +197,27 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
       >
         <Link2 className="h-4 w-4" />
       </button>
+      <button
+        onClick={() => handleIconClick('agent')}
+        className={`right-panel-rail-button relative ${activeTab === 'agent' && isOpen ? 'right-panel-rail-button--active' : ''}`}
+        title="AI 草稿"
+        aria-label="AI 草稿"
+        data-label="AI 草稿"
+        onMouseEnter={(event) => showRailTooltip('AI 草稿', event.currentTarget)}
+        onMouseLeave={hideRailTooltip}
+        onFocus={(event) => showRailTooltip('AI 草稿', event.currentTarget)}
+        onBlur={hideRailTooltip}
+      >
+        <Bot className="h-4 w-4" />
+        {draftCount > 0 && (
+          <span
+            className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+            style={{ backgroundColor: '#EF4444', padding: '0 3px' }}
+          >
+            {draftCount > 9 ? '9+' : draftCount}
+          </span>
+        )}
+      </button>
     </div>
   )
 
@@ -259,6 +293,20 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
           >
             反向链接
           </button>
+          <button
+            onClick={() => setActiveTab('agent')}
+            className={`right-panel-tab ${activeTab === 'agent' ? 'right-panel-tab--active' : ''}`}
+          >
+            AI
+            {draftCount > 0 && (
+              <span
+                className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                style={{ backgroundColor: '#EF4444', padding: '0 3px' }}
+              >
+                {draftCount}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="flex-1 min-h-0">
@@ -277,7 +325,14 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
             {activeTab === 'backlinks' && !folderMode && hasKnowledge && (
               <BacklinksPanel />
             )}
-            {folderMode && activeTab !== 'git' && (
+            {activeTab === 'agent' && (
+              <AgentDraftPanel
+                onSelectDraft={(draftId) => setPreviewDraftId(draftId)}
+                onCountChange={setDraftCount}
+                refreshToken={draftRefreshToken}
+              />
+            )}
+            {folderMode && activeTab !== 'git' && activeTab !== 'agent' && (
               <div className="side-panel-body">
                 <div className="side-panel-empty">
                   目录浏览时仅保留 Git 面板，打开文档后会自动恢复元数据与反向链接。
@@ -287,6 +342,24 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
           </Suspense>
         </div>
       </div>
+
+      {/* Draft Preview Modal */}
+      {previewDraftId && (
+        <Suspense fallback={null}>
+          <DraftPreviewModal
+            draftId={previewDraftId}
+            onCommit={() => {
+              setPreviewDraftId(null)
+              setDraftRefreshToken((current) => current + 1)
+            }}
+            onDiscard={() => {
+              setPreviewDraftId(null)
+              setDraftRefreshToken((current) => current + 1)
+            }}
+            onClose={() => { setPreviewDraftId(null) }}
+          />
+        </Suspense>
+      )}
     </div>
   )
 })

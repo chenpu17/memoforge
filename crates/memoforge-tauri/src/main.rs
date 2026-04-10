@@ -19,29 +19,35 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use memoforge_core::draft;
 use memoforge_core::{
     agent::{get_active_agents, get_agent_count, AgentInfo},
     api::{get_knowledge_graph, PaginatedKnowledge},
-    close_store, complete_knowledge_links, create_category, create_knowledge, delete_category,
-    delete_knowledge, get_knowledge_by_id, get_knowledge_with_stale, get_tags,
-    get_tags_with_counts,
+    close_store, commit_draft, complete_knowledge_links, create_category, create_knowledge,
+    delete_category, delete_knowledge, discard_draft, get_knowledge_by_id,
+    get_knowledge_with_stale, get_tags, get_tags_with_counts,
     git::{git_commit, git_diff, git_log, git_pull, git_push, git_status, is_git_repo, GitCommit},
     grep,
     import::{import_markdown_folder, preview_import, ImportOptions, ImportStats},
-    init::{init_new, init_open, is_initialized},
+    init::{init_clone, init_new, init_open, is_initialized},
     init_store,
     links::{
         get_backlinks, get_outgoing_links, get_related, BacklinksResult, KnowledgeGraph, LinkInfo,
         RelatedResult,
     },
-    list_categories, list_knowledge, move_knowledge, preview_delete_knowledge,
+    list_categories, list_knowledge, move_knowledge, preview_delete_knowledge, preview_draft,
     preview_move_knowledge, read_recent_events,
     registry::{
         get_current_kb, get_last_kb, get_recent_kbs, list_knowledge_bases, register_kb, switch_kb,
         unregister_kb, KnowledgeBaseInfo,
     },
-    search_knowledge, update_category, update_knowledge, Category, DeletePreview, Event, GrepMatch,
-    Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, LoadLevel, MemoError, MovePreview,
+    reliability::{IssueSeverity, IssueStatus},
+    reliability_rules::scan_kb,
+    search_knowledge, update_category, update_knowledge, Category, CommitResult, ContextPack,
+    ContextPackScope, ContextPackStore, DeletePreview, DraftFile, DraftPreview, Event, EventAction,
+    GrepMatch, InboxItem, InboxSourceType, InboxStatus, InboxStore, Knowledge,
+    KnowledgeLinkCompletion, KnowledgeWithStale, LoadLevel, MemoError, MovePreview,
+    ReliabilityStore, SessionStatus, SessionStore,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -75,6 +81,7 @@ struct KnowledgePatch {
 struct StatusResponse {
     initialized: bool,
     kb_path: Option<String>,
+    readonly: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -420,6 +427,23 @@ fn get_kb_path() -> Result<PathBuf, String> {
         .ok_or_else(|| "Knowledge base not initialized".to_string())
 }
 
+fn is_readonly_mode() -> bool {
+    std::env::var("MEMOFORGE_READONLY")
+        .ok()
+        .map(|value| {
+            let normalized = value.trim().to_ascii_lowercase();
+            normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on"
+        })
+        .unwrap_or(false)
+}
+
+fn ensure_writable() -> Result<(), String> {
+    if is_readonly_mode() {
+        return Err("Write operations not allowed in readonly mode".to_string());
+    }
+    Ok(())
+}
+
 fn sanitize_log_message(message: &str) -> String {
     message
         .replace('\n', " \\n ")
@@ -519,11 +543,12 @@ fn prepare_kb_for_open(kb_path: &Path) -> Result<Option<&'static str>, String> {
     }
 
     if is_empty_directory(kb_path)? {
+        ensure_writable()?;
         init_new(kb_path, false).map_err(to_tauri_error)?;
         return Ok(Some("empty_dir_auto_initialized"));
     }
 
-    Err("Selected directory is not an initialized MemoForge knowledge base. Empty directories can be auto-initialized; otherwise import Markdown first or choose an existing MemoForge directory.".to_string())
+    Err("所选目录还不是 ForgeNerve 知识库。空目录会自动初始化；如果目录里已有文件，请先导入 Markdown，或选择一个已初始化目录。".to_string())
 }
 
 fn sanitize_asset_file_name(file_name: &str) -> String {
@@ -947,6 +972,9 @@ fn init_kb_cmd(
     path: String,
     mode: String,
 ) -> Result<(), String> {
+    if mode == "new" {
+        ensure_writable()?;
+    }
     let kb_path = PathBuf::from(&path);
 
     let init_result = match mode.as_str() {
@@ -1040,6 +1068,7 @@ fn get_status_cmd() -> Result<StatusResponse, String> {
     Ok(StatusResponse {
         initialized: kb_path.is_some(),
         kb_path: kb_path.map(|p| p.to_string_lossy().to_string()),
+        readonly: is_readonly_mode(),
     })
 }
 
@@ -1096,12 +1125,14 @@ fn create_knowledge_cmd(
     category_id: Option<String>,
     summary: Option<String>,
 ) -> Result<String, String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     create_knowledge(&kb_path, &title, &content, tags, category_id, summary).map_err(to_tauri_error)
 }
 
 #[tauri::command]
 fn update_knowledge_cmd(id: String, patch: KnowledgePatch) -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     update_knowledge(
         &kb_path,
@@ -1117,12 +1148,14 @@ fn update_knowledge_cmd(id: String, patch: KnowledgePatch) -> Result<(), String>
 
 #[tauri::command]
 fn delete_knowledge_cmd(id: String) -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     delete_knowledge(&kb_path, &id).map_err(to_tauri_error)
 }
 
 #[tauri::command]
 fn move_knowledge_cmd(id: String, new_category_id: String) -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     move_knowledge(&kb_path, &id, &new_category_id).map_err(to_tauri_error)
 }
@@ -1197,6 +1230,7 @@ fn create_category_cmd(
     parent_id: Option<String>,
     description: Option<String>,
 ) -> Result<String, String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     create_category(&kb_path, &name, parent_id, description).map_err(to_tauri_error)
 }
@@ -1207,12 +1241,14 @@ fn update_category_cmd(
     name: Option<String>,
     description: Option<String>,
 ) -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     update_category(&kb_path, &id, name.as_deref(), description.as_deref()).map_err(to_tauri_error)
 }
 
 #[tauri::command]
 fn delete_category_cmd(id: String, force: bool) -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     delete_category(&kb_path, &id, force).map_err(to_tauri_error)
 }
@@ -1220,6 +1256,7 @@ fn delete_category_cmd(id: String, force: bool) -> Result<(), String> {
 // Git 鍛戒护
 #[tauri::command]
 fn git_pull_cmd() -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     git_pull(&kb_path).map_err(to_tauri_error)
 }
@@ -1238,12 +1275,14 @@ fn is_git_repo_cmd() -> Result<bool, String> {
 
 #[tauri::command]
 fn git_push_cmd() -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     git_push(&kb_path).map_err(to_tauri_error)
 }
 
 #[tauri::command]
 fn git_commit_cmd(message: String) -> Result<(), String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     git_commit(&kb_path, &message).map_err(to_tauri_error)
 }
@@ -1288,6 +1327,9 @@ fn import_folder_cmd(
     auto_categories: bool,
     dry_run: bool,
 ) -> Result<ImportStats, String> {
+    if !dry_run {
+        ensure_writable()?;
+    }
     let kb_path = get_kb_path()?;
     let options = ImportOptions {
         generate_frontmatter,
@@ -1417,6 +1459,7 @@ fn import_assets_cmd(
     knowledge_id: String,
     assets: Vec<AssetPayload>,
 ) -> Result<Vec<ImportedAsset>, String> {
+    ensure_writable()?;
     let kb_path = get_kb_path()?;
     let knowledge_path = kb_path.join(&knowledge_id);
     let knowledge_parent = knowledge_path.parent().unwrap_or(kb_path.as_path());
@@ -1675,6 +1718,1157 @@ fn clear_memory_knowledge_cmd(memory_state: tauri::State<MemoryState>) -> Result
     Ok(())
 }
 
+// ==================== Epic A: Clone / Template / Health ====================
+
+#[derive(Debug, Serialize)]
+struct KbPathResponse {
+    path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TemplateCategory {
+    name: String,
+    path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TemplateInfo {
+    id: String,
+    name: String,
+    description: String,
+    categories: Vec<TemplateCategory>,
+}
+
+#[derive(Debug, Serialize)]
+struct KbHealthResponse {
+    path_exists: bool,
+    last_open_ok: bool,
+    is_git_repo: bool,
+}
+
+#[tauri::command]
+fn clone_kb_cmd(
+    publisher: tauri::State<StatePublisher>,
+    memory_state: tauri::State<MemoryState>,
+    repo_url: String,
+    local_path: String,
+) -> Result<KbPathResponse, String> {
+    ensure_writable()?;
+    let kb_path = PathBuf::from(&local_path);
+
+    if kb_path.exists() && !is_empty_directory(&kb_path)? {
+        return Err(format!("目标路径已存在且非空: {}", kb_path.display()));
+    }
+
+    init_clone(&repo_url, &kb_path).map_err(to_tauri_error)?;
+    init_store(kb_path.clone()).map_err(to_tauri_error)?;
+
+    let canonical_kb_path = std::fs::canonicalize(&kb_path).unwrap_or(kb_path.clone());
+    *KB_PATH.lock().unwrap() = Some(canonical_kb_path.clone());
+
+    memoforge_mcp::tools::set_kb_path(canonical_kb_path.clone());
+    memoforge_mcp::tools::set_mode("sse".to_string());
+
+    let _ = register_kb(&canonical_kb_path, None);
+    sync_kb_state(&publisher, &memory_state, canonical_kb_path)?;
+
+    append_app_log(
+        "INFO",
+        "clone_kb",
+        &format!("Cloned knowledge base from {} to {}", repo_url, local_path),
+    );
+
+    Ok(KbPathResponse { path: local_path })
+}
+
+#[tauri::command]
+fn list_templates_cmd() -> Result<Vec<TemplateInfo>, String> {
+    let templates = vec![
+        TemplateInfo {
+            id: "developer-kb".to_string(),
+            name: "开发者知识库".to_string(),
+            description: "面向开发者的技术知识管理，预置开发分类和示例文档".to_string(),
+            categories: vec![TemplateCategory {
+                name: "开发".to_string(),
+                path: "开发".to_string(),
+            }],
+        },
+        TemplateInfo {
+            id: "project-retrospective".to_string(),
+            name: "项目复盘".to_string(),
+            description: "项目经验总结与复盘，预置复盘、问题、决策分类".to_string(),
+            categories: vec![
+                TemplateCategory {
+                    name: "复盘".to_string(),
+                    path: "复盘".to_string(),
+                },
+                TemplateCategory {
+                    name: "问题".to_string(),
+                    path: "问题".to_string(),
+                },
+                TemplateCategory {
+                    name: "决策".to_string(),
+                    path: "决策".to_string(),
+                },
+            ],
+        },
+        TemplateInfo {
+            id: "tech-reading".to_string(),
+            name: "技术阅读笔记".to_string(),
+            description: "技术文章与书籍阅读笔记，预置阅读、笔记、收藏分类".to_string(),
+            categories: vec![
+                TemplateCategory {
+                    name: "阅读".to_string(),
+                    path: "阅读".to_string(),
+                },
+                TemplateCategory {
+                    name: "笔记".to_string(),
+                    path: "笔记".to_string(),
+                },
+                TemplateCategory {
+                    name: "收藏".to_string(),
+                    path: "收藏".to_string(),
+                },
+            ],
+        },
+    ];
+
+    Ok(templates)
+}
+
+#[tauri::command]
+fn create_kb_from_template_cmd(
+    publisher: tauri::State<StatePublisher>,
+    memory_state: tauri::State<MemoryState>,
+    template_id: String,
+    target_path: String,
+    kb_name: Option<String>,
+) -> Result<KbPathResponse, String> {
+    ensure_writable()?;
+    let kb_path = PathBuf::from(&target_path);
+
+    if kb_path.exists() && !is_empty_directory(&kb_path)? {
+        return Err(format!("目标路径已存在且非空: {}", kb_path.display()));
+    }
+
+    // 查找模板，决定是否使用内置模板
+    let known_templates = ["developer-kb", "project-retrospective", "tech-reading"];
+    let use_builtin_template = template_id == "developer-kb";
+
+    if !known_templates.contains(&template_id.as_str()) {
+        return Err(format!("未知模板: {}", template_id));
+    }
+
+    // 创建目录并初始化
+    std::fs::create_dir_all(&kb_path).map_err(|e| format!("创建目录失败: {}", e))?;
+    init_new(&kb_path, use_builtin_template).map_err(to_tauri_error)?;
+
+    // 如果不是内置模板，手动创建分类目录和更新配置
+    if !use_builtin_template {
+        let template = list_templates_cmd()?
+            .into_iter()
+            .find(|t| t.id == template_id)
+            .unwrap();
+
+        for cat in &template.categories {
+            std::fs::create_dir_all(kb_path.join(&cat.path))
+                .map_err(|e| format!("创建分类目录失败: {}", e))?;
+        }
+
+        // 更新 config.yaml 注册分类
+        let categories_yaml = template
+            .categories
+            .iter()
+            .map(|c| format!("  - path: \"{}\"\n    name: \"{}\"", c.path, c.name))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let config = format!(
+            "# ForgeNerve 配置文件\nversion: \"1.0\"\ncategories:\n{}\n",
+            categories_yaml
+        );
+        std::fs::write(kb_path.join(".memoforge/config.yaml"), config)
+            .map_err(|e| format!("写入配置失败: {}", e))?;
+    }
+
+    init_store(kb_path.clone()).map_err(to_tauri_error)?;
+
+    let canonical_kb_path = std::fs::canonicalize(&kb_path).unwrap_or(kb_path.clone());
+    *KB_PATH.lock().unwrap() = Some(canonical_kb_path.clone());
+
+    memoforge_mcp::tools::set_kb_path(canonical_kb_path.clone());
+    memoforge_mcp::tools::set_mode("sse".to_string());
+
+    let _ = register_kb(&canonical_kb_path, kb_name.as_deref());
+    let _ = switch_kb(&canonical_kb_path.to_string_lossy());
+
+    sync_kb_state(&publisher, &memory_state, canonical_kb_path)?;
+
+    append_app_log(
+        "INFO",
+        "create_kb_from_template",
+        &format!(
+            "Created knowledge base from template '{}' at {}",
+            template_id, target_path
+        ),
+    );
+
+    Ok(KbPathResponse { path: target_path })
+}
+
+#[tauri::command]
+fn get_kb_health_cmd(kb_path: Option<String>) -> Result<KbHealthResponse, String> {
+    let path = match kb_path {
+        Some(p) => PathBuf::from(p),
+        None => get_kb_path()?,
+    };
+
+    let path_exists = path.exists();
+    let is_initialized_kb = is_initialized(&path);
+    let is_git = is_git_repo(&path);
+
+    // last_open_ok: check if the path is in the registry and was previously accessible
+    let last_open_ok = if !path_exists {
+        false
+    } else {
+        // If it's initialized and exists, consider it last_open_ok
+        is_initialized_kb
+    };
+
+    Ok(KbHealthResponse {
+        path_exists,
+        last_open_ok,
+        is_git_repo: is_git,
+    })
+}
+
+// ==================== Epic B/C: Workspace Overview + Git Overview + Activity ======
+
+#[derive(Debug, Serialize)]
+struct RecentEdit {
+    path: String,
+    title: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Serialize)]
+struct PendingOrganize {
+    no_summary: usize,
+    stale_summary: usize,
+    no_tags: usize,
+    orphan: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct WorkspaceOverview {
+    recent_edits: Vec<RecentEdit>,
+    pending_organize: PendingOrganize,
+    recent_imports: usize,
+}
+
+#[tauri::command]
+fn get_workspace_overview_cmd() -> Result<WorkspaceOverview, String> {
+    let kb_path = get_kb_path()?;
+
+    // recent_edits: aggregate last 10 Update/Create events
+    let events = read_recent_events(&kb_path, 200).map_err(|e| e.to_string())?;
+    let mut recent_edits: Vec<RecentEdit> = events
+        .iter()
+        .filter(|e| {
+            matches!(
+                e.action,
+                EventAction::Update | EventAction::Create | EventAction::UpdateMetadata
+            )
+        })
+        .filter_map(|e| {
+            e.path.as_ref().map(|p| RecentEdit {
+                path: p.clone(),
+                title: e.detail.clone(),
+                updated_at: e.time.to_rfc3339(),
+            })
+        })
+        .take(10)
+        .collect();
+
+    // Deduplicate by path (keep the most recent)
+    let mut seen = std::collections::HashSet::new();
+    recent_edits.retain(|e| seen.insert(e.path.clone()));
+
+    // pending_organize: scan all knowledge entries
+    let all_knowledge =
+        list_knowledge(&kb_path, LoadLevel::L1, None, None, None, None).map_err(to_tauri_error)?;
+
+    let categories: Vec<String> = list_categories(&kb_path)
+        .map_err(to_tauri_error)?
+        .iter()
+        .map(|c| c.id.clone())
+        .collect();
+
+    let mut no_summary = 0usize;
+    let mut stale_summary = 0usize;
+    let mut no_tags = 0usize;
+    let mut orphan = 0usize;
+
+    for k in &all_knowledge.items {
+        if k.summary.is_none() || k.summary.as_ref().map_or(true, |s| s.is_empty()) {
+            no_summary += 1;
+        }
+        if k.summary_stale.unwrap_or(false) {
+            stale_summary += 1;
+        }
+        if k.tags.is_empty() {
+            no_tags += 1;
+        }
+        if k.category.is_none()
+            || k.category
+                .as_ref()
+                .map_or(true, |c| !categories.contains(c))
+        {
+            orphan += 1;
+        }
+    }
+
+    // recent_imports: count Import events in last 200 events
+    let recent_imports = events
+        .iter()
+        .filter(|e| matches!(e.action, EventAction::Create))
+        .filter(|e| e.detail.contains("import") || e.detail.contains("Import"))
+        .count();
+
+    Ok(WorkspaceOverview {
+        recent_edits,
+        pending_organize: PendingOrganize {
+            no_summary,
+            stale_summary,
+            no_tags,
+            orphan,
+        },
+        recent_imports,
+    })
+}
+
+#[derive(Debug, Serialize)]
+struct GitOverview {
+    current_branch: String,
+    ahead: usize,
+    behind: usize,
+    working_changes: usize,
+}
+
+#[tauri::command]
+fn get_git_overview_cmd() -> Result<GitOverview, String> {
+    let kb_path = get_kb_path()?;
+
+    if !is_git_repo(&kb_path) {
+        return Ok(GitOverview {
+            current_branch: String::new(),
+            ahead: 0,
+            behind: 0,
+            working_changes: 0,
+        });
+    }
+
+    // Get current branch via git command
+    let current_branch = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(&kb_path)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                String::from_utf8(o.stdout).ok()
+            } else {
+                None
+            }
+        })
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    // Get ahead/behind via git rev-list
+    let (ahead, behind) = if current_branch != "unknown" && current_branch != "HEAD" {
+        let output = std::process::Command::new("git")
+            .args([
+                "rev-list",
+                "--left-right",
+                "--count",
+                &format!("{}...@{{u}}", current_branch),
+            ])
+            .current_dir(&kb_path)
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    String::from_utf8(o.stdout).ok()
+                } else {
+                    None
+                }
+            });
+
+        match output {
+            Some(s) => {
+                let parts: Vec<&str> = s.trim().split_whitespace().collect();
+                let a = parts
+                    .first()
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .unwrap_or(0);
+                let b = parts
+                    .get(1)
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .unwrap_or(0);
+                (a, b)
+            }
+            None => (0, 0),
+        }
+    } else {
+        (0, 0)
+    };
+
+    // Working changes from existing API
+    let working_changes = git_status(&kb_path).map_err(to_tauri_error)?.len();
+
+    Ok(GitOverview {
+        current_branch,
+        ahead,
+        behind,
+        working_changes,
+    })
+}
+
+#[tauri::command]
+fn get_recent_activity_cmd(limit: Option<usize>) -> Result<Vec<Event>, String> {
+    let kb_path = get_kb_path()?;
+    read_recent_events(&kb_path, limit.unwrap_or(20)).map_err(|e| e.to_string())
+}
+
+// ==================== Epic D: Draft Commands ==================================
+
+#[derive(Debug, Serialize)]
+struct DraftSummary {
+    draft_id: String,
+    target_path: Option<String>,
+    updated_at: String,
+    source_agent: String,
+    ops_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    review_state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    review_notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_inbox_item_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DraftPreviewResponse {
+    sections_changed: usize,
+    summary_will_be_stale: bool,
+    warnings: Vec<String>,
+    diff_summary: String,
+}
+
+#[derive(Debug, Serialize)]
+struct CommitDraftResponse {
+    committed: bool,
+    path: String,
+    changed_sections: usize,
+    summary_stale: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct DiscardDraftResponse {
+    discarded: bool,
+    draft_id: String,
+}
+
+#[derive(Debug, Serialize)]
+struct UpdateDraftReviewStateResponse {
+    draft_id: String,
+    review_state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    review_notes: Option<String>,
+}
+
+#[tauri::command]
+fn list_drafts_cmd() -> Result<Vec<DraftSummary>, String> {
+    let kb_path = get_kb_path()?;
+    let drafts_dir = kb_path.join(".memoforge/drafts");
+
+    if !drafts_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut drafts = Vec::new();
+    let entries = std::fs::read_dir(&drafts_dir).map_err(|e| e.to_string())?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let draft: DraftFile = match serde_json::from_str(&content) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+
+        let review = draft.metadata.as_ref().and_then(|m| m.get("review"));
+        let review_state = review
+            .and_then(|r| r.get("state"))
+            .and_then(|s| s.as_str())
+            .map(String::from);
+        let review_notes = review
+            .and_then(|r| r.get("notes"))
+            .and_then(|s| s.as_str())
+            .map(String::from);
+        let source_session_id = review
+            .and_then(|r| r.get("source_session_id"))
+            .and_then(|s| s.as_str())
+            .map(String::from);
+        let source_inbox_item_id = review
+            .and_then(|r| r.get("source_inbox_item_id"))
+            .and_then(|s| s.as_str())
+            .map(String::from);
+
+        drafts.push(DraftSummary {
+            draft_id: draft.draft_id,
+            target_path: draft.target.path,
+            updated_at: draft.updated_at.to_rfc3339(),
+            source_agent: draft.source_agent,
+            ops_count: draft.ops.len(),
+            review_state,
+            review_notes,
+            source_session_id,
+            source_inbox_item_id,
+        });
+    }
+
+    // Sort by updated_at descending
+    drafts.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
+    Ok(drafts)
+}
+
+#[tauri::command]
+fn get_draft_preview_cmd(draft_id: String) -> Result<DraftPreviewResponse, String> {
+    let kb_path = get_kb_path()?;
+    let preview: DraftPreview = preview_draft(&kb_path, &draft_id).map_err(to_tauri_error)?;
+
+    Ok(DraftPreviewResponse {
+        sections_changed: preview.sections_changed,
+        summary_will_be_stale: preview.summary_will_be_stale,
+        warnings: preview.warnings,
+        diff_summary: format!("{:?}", preview.diff_summary),
+    })
+}
+
+#[tauri::command]
+fn commit_draft_cmd(draft_id: String) -> Result<CommitDraftResponse, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let result: CommitResult = commit_draft(&kb_path, &draft_id).map_err(to_tauri_error)?;
+    let summary_stale = get_knowledge_with_stale(&kb_path, &result.path)
+        .map(|knowledge| knowledge.summary_stale)
+        .unwrap_or(false);
+
+    Ok(CommitDraftResponse {
+        committed: true,
+        path: result.path,
+        changed_sections: result.changed_sections,
+        summary_stale,
+    })
+}
+
+#[tauri::command]
+fn discard_draft_cmd(draft_id: String) -> Result<DiscardDraftResponse, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    discard_draft(&kb_path, &draft_id).map_err(to_tauri_error)?;
+
+    Ok(DiscardDraftResponse {
+        discarded: true,
+        draft_id,
+    })
+}
+
+#[tauri::command]
+fn update_draft_review_state_cmd(
+    draft_id: String,
+    state: String,
+    notes: Option<String>,
+) -> Result<UpdateDraftReviewStateResponse, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let draft =
+        draft::update_draft_review_state(&kb_path, &draft_id, &state, notes.clone(), None, None)
+            .map_err(to_tauri_error)?;
+    let review_state = draft
+        .metadata
+        .as_ref()
+        .and_then(|meta| meta.get("review"))
+        .and_then(|review| review.get("state"))
+        .and_then(|value| value.as_str())
+        .unwrap_or(&state)
+        .to_string();
+
+    Ok(UpdateDraftReviewStateResponse {
+        draft_id,
+        review_state,
+        review_notes: notes,
+    })
+}
+
+// ==================== Epic E: Inbox Commands ==================================
+
+#[tauri::command]
+fn list_inbox_items_cmd(
+    status: Option<String>,
+    limit: Option<usize>,
+) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = InboxStore::new(kb_path);
+
+    // Parse status string to InboxStatus if provided
+    let status_filter: Option<InboxStatus> = status.and_then(|s| match s.to_lowercase().as_str() {
+        "new" => Some(InboxStatus::New),
+        "triaged" => Some(InboxStatus::Triaged),
+        "drafted" => Some(InboxStatus::Drafted),
+        "promoted" => Some(InboxStatus::Promoted),
+        "ignored" => Some(InboxStatus::Ignored),
+        _ => None,
+    });
+
+    let items = store
+        .list_inbox_items(status_filter, limit)
+        .map_err(|e: MemoError| e.to_string())?;
+    Ok(serde_json::to_value(items).unwrap_or(serde_json::json!([])))
+}
+
+#[tauri::command]
+fn create_inbox_item_cmd(
+    title: String,
+    source_type: String,
+    content_markdown: Option<String>,
+    proposed_path: Option<String>,
+    linked_session_id: Option<String>,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = InboxStore::new(kb_path.clone());
+
+    // Parse source type string to InboxSourceType
+    let source_type_enum = match source_type.to_lowercase().as_str() {
+        "agent" => InboxSourceType::Agent,
+        "import" => InboxSourceType::Import,
+        "paste" => InboxSourceType::Paste,
+        "manual" => InboxSourceType::Manual,
+        "reliability" => InboxSourceType::Reliability,
+        _ => return Err(format!("Invalid source type: {}", source_type)),
+    };
+
+    let mut item = InboxItem::new(source_type_enum, title);
+    item.content_markdown = content_markdown;
+    item.proposed_path = proposed_path;
+    item.linked_session_id = linked_session_id;
+    if let Some(session_id) = item.linked_session_id.as_deref() {
+        let session_store = SessionStore::new(kb_path.clone());
+        session_store
+            .get_session(session_id)
+            .map_err(|e: MemoError| e.to_string())?;
+    }
+
+    let created = store
+        .create_inbox_item(item)
+        .map_err(|e: MemoError| e.to_string())?;
+    if let Some(session_id) = created.linked_session_id.as_deref() {
+        let session_store = SessionStore::new(kb_path.clone());
+        session_store
+            .get_session(session_id)
+            .map_err(|e: MemoError| e.to_string())?;
+        session_store
+            .add_inbox_item_id(session_id, created.id.clone())
+            .map_err(|e: MemoError| e.to_string())?;
+    }
+    Ok(serde_json::to_value(created).unwrap())
+}
+
+#[tauri::command]
+fn promote_inbox_item_to_draft_cmd(
+    inbox_item_id: String,
+    draft_title: Option<String>,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = InboxStore::new(kb_path.clone());
+
+    // Get the inbox item
+    let item = store
+        .get_inbox_item(&inbox_item_id)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    if !item.can_transition_to(&InboxStatus::Drafted) {
+        return Err(format!(
+            "Cannot promote inbox item in {:?} state. Only 'new' or 'triaged' items can be promoted.",
+            item.status
+        ));
+    }
+
+    let draft_id =
+        draft::start_draft_from_inbox_item(&kb_path, &item, draft_title.as_deref(), "inbox")
+            .map_err(|e: MemoError| e.to_string())?;
+
+    let mut updated_item = store
+        .update_inbox_status(&inbox_item_id, InboxStatus::Drafted)
+        .map_err(|e: MemoError| e.to_string())?;
+    updated_item.linked_draft_id = Some(draft_id.clone());
+    let updated_item = store
+        .update_inbox_item(updated_item)
+        .map_err(|e: MemoError| e.to_string())?;
+    if let Some(session_id) = updated_item.linked_session_id.as_deref() {
+        let session_store = SessionStore::new(kb_path.clone());
+        session_store
+            .add_draft_id(session_id, draft_id.clone())
+            .map_err(|e: MemoError| e.to_string())?;
+    }
+
+    Ok(serde_json::json!({
+        "draft_id": draft_id,
+        "inbox_item": updated_item,
+    }))
+}
+
+#[tauri::command]
+fn dismiss_inbox_item_cmd(
+    inbox_item_id: String,
+    reason: Option<String>,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = InboxStore::new(kb_path.clone());
+
+    let mut item = store
+        .get_inbox_item(&inbox_item_id)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    // Store reason in metadata if provided
+    if let Some(r) = reason {
+        if item.metadata.is_null() {
+            item.metadata = serde_json::json!({});
+        }
+        if let Some(obj) = item.metadata.as_object_mut() {
+            obj.insert("dismiss_reason".to_string(), serde_json::Value::String(r));
+        }
+        item.touch();
+        store
+            .update_inbox_item(item.clone())
+            .map_err(|e: MemoError| e.to_string())?;
+    }
+
+    // Dismiss the item
+    let dismissed = store
+        .dismiss_inbox_item(&inbox_item_id)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    Ok(serde_json::to_value(dismissed).unwrap())
+}
+
+// ==================== Epic G: Reliability Commands ==================================
+
+#[derive(Debug, Serialize)]
+struct ReliabilityStatsResponse {
+    total: usize,
+    open: usize,
+    ignored: usize,
+    resolved: usize,
+    high_severity: usize,
+    medium_severity: usize,
+    low_severity: usize,
+}
+
+#[tauri::command]
+fn list_reliability_issues_cmd(
+    severity: Option<String>,
+    status: Option<String>,
+    limit: Option<usize>,
+) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = ReliabilityStore::new(kb_path);
+
+    // Build filter
+    let mut filter = memoforge_core::reliability_store::ListFilter::default();
+
+    if let Some(s) = severity {
+        filter.severity = match s.to_lowercase().as_str() {
+            "high" => Some(IssueSeverity::High),
+            "medium" => Some(IssueSeverity::Medium),
+            "low" => Some(IssueSeverity::Low),
+            _ => None,
+        };
+    }
+
+    if let Some(s) = status {
+        filter.status = match s.to_lowercase().as_str() {
+            "open" => Some(IssueStatus::Open),
+            "ignored" => Some(IssueStatus::Ignored),
+            "resolved" => Some(IssueStatus::Resolved),
+            _ => None,
+        };
+    }
+
+    filter.limit = limit;
+
+    let issues = store
+        .list_issues(filter)
+        .map_err(|e: MemoError| e.to_string())?;
+    Ok(serde_json::to_value(issues).unwrap_or(serde_json::json!([])))
+}
+
+#[tauri::command]
+fn get_reliability_issue_detail_cmd(issue_id: String) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = ReliabilityStore::new(kb_path);
+
+    let issue = store
+        .get_issue(&issue_id)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    Ok(serde_json::to_value(issue).unwrap())
+}
+
+#[tauri::command]
+fn update_reliability_issue_status_cmd(
+    issue_id: String,
+    new_status: String,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = ReliabilityStore::new(kb_path);
+
+    let status = match new_status.to_lowercase().as_str() {
+        "open" => IssueStatus::Open,
+        "ignored" => IssueStatus::Ignored,
+        "resolved" => IssueStatus::Resolved,
+        _ => return Err(format!("Invalid status: {}", new_status)),
+    };
+
+    let issue = store
+        .update_issue_status(&issue_id, status)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    Ok(serde_json::to_value(issue).unwrap())
+}
+
+#[tauri::command]
+fn create_fix_draft_from_issue_cmd(
+    issue_id: String,
+    _fix_instructions: Option<String>,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = ReliabilityStore::new(kb_path.clone());
+
+    // Get the issue
+    let issue = store
+        .get_issue(&issue_id)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    // Create a draft for the knowledge file
+    let draft_id = draft::start_draft(&kb_path, Some(&issue.knowledge_path), None, "reliability")
+        .map_err(|e: MemoError| e.to_string())?;
+
+    // Link the draft to the issue
+    let _updated_issue = store
+        .link_draft(&issue_id, draft_id.clone())
+        .map_err(|e: MemoError| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "draft_id": draft_id,
+        "issue_id": issue_id,
+    }))
+}
+
+#[tauri::command]
+fn scan_reliability_issues_cmd() -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+
+    // Scan the knowledge base for reliability issues
+    let issues = scan_kb(&kb_path).map_err(|e| e.to_string())?;
+
+    // Save the issues
+    let store = ReliabilityStore::new(kb_path);
+    store
+        .save_issues(issues)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    // Return statistics
+    let stats = store.get_stats().map_err(|e: MemoError| e.to_string())?;
+
+    Ok(serde_json::to_value(ReliabilityStatsResponse {
+        total: stats.total,
+        open: stats.open,
+        ignored: stats.ignored,
+        resolved: stats.resolved,
+        high_severity: stats.high_severity,
+        medium_severity: stats.medium_severity,
+        low_severity: stats.low_severity,
+    })
+    .unwrap())
+}
+
+#[tauri::command]
+fn get_reliability_stats_cmd() -> Result<ReliabilityStatsResponse, String> {
+    let kb_path = get_kb_path()?;
+    let store = ReliabilityStore::new(kb_path);
+
+    let stats = store.get_stats().map_err(|e: MemoError| e.to_string())?;
+
+    Ok(ReliabilityStatsResponse {
+        total: stats.total,
+        open: stats.open,
+        ignored: stats.ignored,
+        resolved: stats.resolved,
+        high_severity: stats.high_severity,
+        medium_severity: stats.medium_severity,
+        low_severity: stats.low_severity,
+    })
+}
+
+// ==================== Context Pack Commands ====================
+
+#[tauri::command]
+fn list_context_packs_cmd(
+    scope_type: Option<String>,
+    limit: Option<usize>,
+) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = ContextPackStore::new(&kb_path);
+
+    // Parse scope_type if provided
+    let scope_filter = scope_type.and_then(|s| match s.to_lowercase().as_str() {
+        "tag" => Some(ContextPackScope::Tag),
+        "folder" => Some(ContextPackScope::Folder),
+        "topic" => Some(ContextPackScope::Topic),
+        "manual" => Some(ContextPackScope::Manual),
+        _ => None,
+    });
+
+    let packs = store
+        .list(scope_filter, limit)
+        .map_err(|e: MemoError| e.to_string())?;
+
+    Ok(serde_json::to_value(packs).unwrap_or(serde_json::json!([])))
+}
+
+#[tauri::command]
+fn create_context_pack_cmd(
+    name: String,
+    scope_type: String,
+    scope_value: String,
+    item_paths: Vec<String>,
+    summary: Option<String>,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = ContextPackStore::new(&kb_path);
+
+    // Parse scope_type
+    let scope = match scope_type.to_lowercase().as_str() {
+        "tag" => ContextPackScope::Tag,
+        "folder" => ContextPackScope::Folder,
+        "topic" => ContextPackScope::Topic,
+        "manual" => ContextPackScope::Manual,
+        _ => return Err(format!("Invalid scope_type: {}", scope_type)),
+    };
+
+    // Create pack
+    let mut pack = ContextPack::new(name, scope, scope_value);
+
+    // Add item paths
+    for path in item_paths {
+        pack.add_item_path(path);
+    }
+
+    // Set summary if provided
+    if let Some(s) = summary {
+        pack.update_summary(Some(s));
+    }
+
+    let created = store.create(pack).map_err(|e: MemoError| e.to_string())?;
+    Ok(serde_json::to_value(created).unwrap())
+}
+
+#[tauri::command]
+fn get_context_pack_cmd(pack_id: String) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = ContextPackStore::new(&kb_path);
+
+    let pack = store.get(&pack_id).map_err(|e: MemoError| e.to_string())?;
+
+    Ok(serde_json::to_value(pack).unwrap())
+}
+
+#[tauri::command]
+fn export_context_pack_cmd(
+    pack_id: String,
+    format: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = ContextPackStore::new(&kb_path);
+
+    let pack = store.get(&pack_id).map_err(|e: MemoError| e.to_string())?;
+
+    // Return pack data for export
+    // The format parameter is reserved for future extensions (e.g., markdown export)
+    let _format = format.unwrap_or_else(|| "json".to_string());
+
+    Ok(serde_json::json!({
+        "pack": pack,
+        "format": _format,
+        "exported_at": Utc::now().to_rfc3339(),
+    }))
+}
+
+// ==================== Epic F: Session Commands ==================================
+
+#[tauri::command]
+fn start_agent_session_cmd(
+    agent_name: String,
+    goal: String,
+    agent_source: Option<String>,
+    context_pack_ids: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = SessionStore::new(kb_path.clone());
+
+    let mut session = memoforge_core::AgentSession::new(agent_name.clone(), goal);
+    if let Some(source) = agent_source {
+        session.agent_source = Some(source);
+    }
+    if let Some(packs) = context_pack_ids {
+        session.context_pack_ids = packs;
+    }
+
+    let created = store
+        .create_session(session)
+        .map_err(|e: MemoError| e.to_string())?;
+    Ok(serde_json::to_value(created).unwrap())
+}
+
+#[tauri::command]
+fn append_agent_session_context_cmd(
+    session_id: String,
+    context_item: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = SessionStore::new(kb_path.clone());
+
+    // Parse context item from JSON
+    let ref_type_str = context_item
+        .get("ref_type")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing ref_type field")?;
+
+    let ref_id = context_item
+        .get("ref_id")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing ref_id field")?
+        .to_string();
+
+    let ref_type = match ref_type_str.to_lowercase().as_str() {
+        "knowledge" => memoforge_core::ContextRefType::Knowledge,
+        "pack" => memoforge_core::ContextRefType::Pack,
+        "url" => memoforge_core::ContextRefType::Url,
+        "file" => memoforge_core::ContextRefType::File,
+        _ => return Err(format!("Invalid ref_type: {}", ref_type_str)),
+    };
+
+    let mut ctx_item = memoforge_core::ContextItem::new(ref_type, ref_id);
+
+    // Add summary if provided
+    if let Some(summary) = context_item.get("summary").and_then(|v| v.as_str()) {
+        ctx_item.summary = Some(summary.to_string());
+    }
+
+    // Update accessed_at if provided
+    if let Some(accessed_at) = context_item.get("accessed_at").and_then(|v| v.as_str()) {
+        ctx_item.accessed_at = accessed_at.to_string();
+    }
+
+    let updated = store
+        .append_context(&session_id, ctx_item)
+        .map_err(|e: MemoError| e.to_string())?;
+    Ok(serde_json::to_value(updated).unwrap())
+}
+
+#[tauri::command]
+fn list_agent_sessions_cmd(
+    status: Option<String>,
+    limit: Option<usize>,
+) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = SessionStore::new(kb_path.clone());
+
+    // Parse status string to SessionStatus if provided
+    let status_filter: Option<SessionStatus> =
+        status.and_then(|s| match s.to_lowercase().as_str() {
+            "running" => Some(SessionStatus::Running),
+            "completed" => Some(SessionStatus::Completed),
+            "failed" => Some(SessionStatus::Failed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        });
+
+    let sessions = store
+        .list_sessions(status_filter, limit)
+        .map_err(|e: MemoError| e.to_string())?;
+    Ok(serde_json::to_value(sessions).unwrap_or(serde_json::json!([])))
+}
+
+#[tauri::command]
+fn get_agent_session_cmd(session_id: String) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = SessionStore::new(kb_path.clone());
+
+    let session = store
+        .get_session(&session_id)
+        .map_err(|e: MemoError| e.to_string())?;
+    Ok(serde_json::to_value(session).unwrap())
+}
+
+#[tauri::command]
+fn complete_agent_session_cmd(
+    session_id: String,
+    result_summary: Option<String>,
+    status: Option<String>,
+) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let store = SessionStore::new(kb_path.clone());
+
+    // If status is explicitly set to "failed", use fail_session
+    if let Some(s) = status {
+        if s.to_lowercase() == "failed" {
+            let session = store
+                .fail_session(&session_id, result_summary)
+                .map_err(|e| e.to_string())?;
+            return Ok(serde_json::to_value(session).unwrap());
+        }
+    }
+
+    let session = store
+        .complete_session(&session_id, result_summary)
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(session).unwrap())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
     bootstrap_kb_from_env();
@@ -1709,6 +2903,10 @@ fn main() {
     let automation_publisher = Arc::clone(&state_publisher.0);
     let automation_memory_state = Arc::clone(&memory_state);
     let automation_server_state = Arc::clone(&server_state);
+    let setup_publisher = Arc::clone(&state_publisher.0);
+    let setup_memory_state = Arc::clone(&memory_state);
+    let focus_publisher = Arc::clone(&state_publisher.0);
+    let focus_memory_state = Arc::clone(&memory_state);
 
     // 鍚姩 SSE MCP Server锛堝湪鍚庡彴绾跨▼锛?
     let memory_state_for_sse = Arc::clone(&memory_state);
@@ -1746,6 +2944,14 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .on_window_event(move |_window, event| {
+            if let tauri::WindowEvent::Focused(focused) = event {
+                if let Ok(mut publisher) = focus_publisher.lock() {
+                    publisher.set_focus(*focused);
+                }
+                focus_memory_state.set_focus(*focused);
+            }
+        })
         .manage(state_publisher)
         .manage(managed_memory_state)
         .manage(McpServer(server_state))
@@ -1765,6 +2971,11 @@ fn main() {
             // 鏄剧ず涓荤獥鍙ｏ紙閰嶇疆涓?visible: false锛岄渶瑕佹墜鍔ㄦ樉绀猴級
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
+                let focused = window.is_focused().unwrap_or(true);
+                if let Ok(mut publisher) = setup_publisher.lock() {
+                    publisher.set_focus(focused);
+                }
+                setup_memory_state.set_focus(focused);
             }
             Ok(())
         })
@@ -1830,6 +3041,44 @@ fn main() {
             update_memory_knowledge_cmd,
             update_memory_selection_cmd,
             clear_memory_knowledge_cmd,
+            // Epic A: Clone / Template / Health
+            clone_kb_cmd,
+            list_templates_cmd,
+            create_kb_from_template_cmd,
+            get_kb_health_cmd,
+            // Epic B/C: Workspace Overview + Git Overview + Activity
+            get_workspace_overview_cmd,
+            get_git_overview_cmd,
+            get_recent_activity_cmd,
+            // Epic D: Draft Commands
+            list_drafts_cmd,
+            get_draft_preview_cmd,
+            commit_draft_cmd,
+            discard_draft_cmd,
+            update_draft_review_state_cmd,
+            // Epic E: Inbox Commands
+            list_inbox_items_cmd,
+            create_inbox_item_cmd,
+            promote_inbox_item_to_draft_cmd,
+            dismiss_inbox_item_cmd,
+            // Epic F: Session Commands
+            start_agent_session_cmd,
+            append_agent_session_context_cmd,
+            list_agent_sessions_cmd,
+            get_agent_session_cmd,
+            complete_agent_session_cmd,
+            // Epic G: Reliability Commands
+            list_reliability_issues_cmd,
+            get_reliability_issue_detail_cmd,
+            update_reliability_issue_status_cmd,
+            create_fix_draft_from_issue_cmd,
+            scan_reliability_issues_cmd,
+            get_reliability_stats_cmd,
+            // Epic H: Context Pack Commands
+            list_context_packs_cmd,
+            create_context_pack_cmd,
+            get_context_pack_cmd,
+            export_context_pack_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1917,7 +3166,6 @@ mod tests {
         assert_eq!(found.as_deref(), Some(existing.as_path()));
     }
 }
-
 
 
 

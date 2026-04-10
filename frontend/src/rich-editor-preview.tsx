@@ -47,7 +47,7 @@ function PreviewApp() {
       style={{
         minHeight: '100vh',
         padding: '32px',
-        background: 'linear-gradient(180deg, #F8FAFC 0%, #EEF2FF 100%)',
+        background: 'linear-gradient(180deg, #F8FAFC 0%, var(--brand-primary-soft) 100%)',
       }}
     >
       <div

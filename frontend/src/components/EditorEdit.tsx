@@ -1058,7 +1058,7 @@ export const EditorEdit: React.FC<EditorProps> = ({
               backgroundColor: '#F8FAFC',
             },
             '.cm-activeLine': {
-              backgroundColor: 'rgba(99, 102, 241, 0.04)',
+              backgroundColor: 'var(--brand-primary-separator)',
             },
             '.cm-searchMatch': {
               backgroundColor: 'rgba(251, 191, 36, 0.24)',
@@ -1066,8 +1066,8 @@ export const EditorEdit: React.FC<EditorProps> = ({
               borderRadius: '3px',
             },
             '.cm-searchMatch.cm-searchMatch-selected': {
-              backgroundColor: 'rgba(99, 102, 241, 0.2)',
-              boxShadow: 'inset 0 0 0 1px rgba(99, 102, 241, 0.26)',
+              backgroundColor: 'var(--brand-primary-fill-20)',
+              boxShadow: 'inset 0 0 0 1px var(--brand-primary-ring)',
             },
           }),
           autocompletion({
@@ -1358,7 +1358,7 @@ export const EditorEdit: React.FC<EditorProps> = ({
           <div className="min-w-0 flex-1">
             <div>{assetNotice.message}</div>
             {assetNotice.detail && (
-              <div className="mt-1 truncate text-[11px]" style={{ color: '#6366F1' }}>
+              <div className="mt-1 truncate text-[11px]" style={{ color: 'var(--brand-primary)' }}>
                 {assetNotice.detail}
               </div>
             )}

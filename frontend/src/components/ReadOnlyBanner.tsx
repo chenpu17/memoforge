@@ -8,7 +8,7 @@ export const ReadOnlyBanner: React.FC = () => {
       style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
     >
       <Lock className="h-3.5 w-3.5" />
-      <span>Web 访问仅限只读</span>
+      <span>当前为只读模式</span>
     </div>
   )
 }

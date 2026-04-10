@@ -25,6 +25,8 @@ src-tauri/target/
 .env
 .env.local
 *.log
+tests/__pycache__/
+frontend/tmp-screenshots/
 
 # 讨论文档（不纳入版本控制）
 docs/discussion/

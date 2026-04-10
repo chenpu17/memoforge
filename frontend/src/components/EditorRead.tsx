@@ -9,6 +9,7 @@ import {
   isExternalUrl,
   remarkWikiLinks,
 } from '../lib/wikiLinks'
+import { getShowLineNumbersSetting, SETTINGS_CHANGED_EVENT } from '../lib/settings'
 import {
   buildWorkflowOutline,
   parseWorkflowNodes,
@@ -378,11 +379,11 @@ function getWorkflowToneStyles(tone: WorkflowPresentation['tone']) {
     case 'indigo':
     default:
       return {
-        badgeBg: '#EEF2FF',
-        badgeFg: '#4338CA',
-        iconBg: '#EEF2FF',
-        iconFg: '#6366F1',
-        border: '#C7D2FE',
+        badgeBg: 'var(--brand-primary-soft)',
+        badgeFg: 'var(--brand-primary-strong)',
+        iconBg: 'var(--brand-primary-soft)',
+        iconFg: 'var(--brand-primary)',
+        border: 'var(--brand-primary-border)',
       }
   }
 }
@@ -685,7 +686,7 @@ const WorkflowBlock: React.FC<{ text: string }> = ({ text }) => {
                   ? 'translateX(4px) scale(1.01)'
                   : (isRelatedBranch ? 'translateX(2px)' : (isSelectionMode ? 'translateX(-2px) scale(0.985)' : 'translateX(0)')),
                 boxShadow: isPrimarySelected
-                  ? '0 18px 38px rgba(79, 70, 229, 0.14)'
+                  ? '0 18px 38px var(--brand-primary-shadow-strong)'
                   : (isRelatedBranch
                     ? '0 12px 28px rgba(15, 23, 42, 0.08)'
                     : (displayAsBranch ? '0 6px 18px rgba(15, 23, 42, 0.04)' : 'none')),
@@ -784,14 +785,20 @@ function loadMermaid() {
   if (!mermaidLoader) {
     mermaidLoader = import('mermaid').then((module) => {
       const mermaid = module.default as MermaidModule
+      const getBrandColor = (name: string, fallback: string) => {
+        if (typeof window === 'undefined') return fallback
+        const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+        return value || fallback
+      }
+
       mermaid.initialize({
         startOnLoad: false,
         securityLevel: 'strict',
         theme: 'base',
         themeVariables: {
-          primaryColor: '#EEF2FF',
+          primaryColor: getBrandColor('--brand-primary-soft', '#EEF2FF'),
           primaryTextColor: '#0F172A',
-          primaryBorderColor: '#C7D2FE',
+          primaryBorderColor: getBrandColor('--brand-primary-border', '#C7D2FE'),
           lineColor: '#64748B',
           secondaryColor: '#F8FAFC',
           tertiaryColor: '#FFFFFF',
@@ -848,7 +855,8 @@ const LazySyntaxCodeBlock: React.FC<{
   const [loaded, setLoaded] = useState<LoadedSyntaxHighlighter | null>(null)
   const [languageReady, setLanguageReady] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [showLineNumbers, setShowLineNumbers] = useState(() => codeLineCount > 4)
+  const [defaultShowLineNumbers, setDefaultShowLineNumbers] = useState(() => getShowLineNumbersSetting())
+  const [showLineNumbers, setShowLineNumbers] = useState(() => getShowLineNumbersSetting())
   const [wrapLongLines, setWrapLongLines] = useState(false)
   const [expanded, setExpanded] = useState(() => codeLineCount <= 16)
   const isLongCodeBlock = codeLineCount > 16
@@ -897,9 +905,22 @@ const LazySyntaxCodeBlock: React.FC<{
   }, [blockId, codeText, downloadBaseName, language])
 
   useEffect(() => {
-    setShowLineNumbers(codeLineCount > 4)
+    setShowLineNumbers(defaultShowLineNumbers)
     setExpanded(codeLineCount <= 16)
-  }, [codeLineCount])
+  }, [codeLineCount, defaultShowLineNumbers])
+
+  useEffect(() => {
+    const handleSettingsChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; value?: unknown }>).detail
+      if (detail?.key !== 'showLineNumbers') return
+      const nextValue = Boolean(detail.value)
+      setDefaultShowLineNumbers(nextValue)
+      setShowLineNumbers(nextValue)
+    }
+
+    window.addEventListener(SETTINGS_CHANGED_EVENT, handleSettingsChanged)
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, handleSettingsChanged)
+  }, [])
 
   if (!loaded || !languageReady) {
     return (
@@ -1688,10 +1709,10 @@ const EditorReadInner: React.FC<EditorProps> = ({
               <span
                 className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors"
                 style={{
-                  borderColor: checked ? '#A5B4FC' : '#CBD5E1',
-                  backgroundColor: checked ? '#EEF2FF' : '#FFFFFF',
-                  color: checked ? '#4338CA' : '#CBD5E1',
-                  boxShadow: readOnly ? 'none' : '0 0 0 0 rgba(99, 102, 241, 0)',
+                  borderColor: checked ? 'var(--brand-primary-border-strong)' : '#CBD5E1',
+                  backgroundColor: checked ? 'var(--brand-primary-soft)' : '#FFFFFF',
+                  color: checked ? 'var(--brand-primary-strong)' : '#CBD5E1',
+                  boxShadow: readOnly ? 'none' : '0 0 0 0 transparent',
                 }}
               >
                 {checked ? <Check className="h-3 w-3" /> : null}
@@ -2069,8 +2090,8 @@ const EditorReadInner: React.FC<EditorProps> = ({
                     className="block w-full truncate rounded-xl px-2.5 py-1.5 text-left text-sm hover:bg-white"
                     style={{
                       paddingLeft: `${(heading.level - 1) * 12 + 10}px`,
-                      color: activeHeadingId === heading.id ? '#4338CA' : '#475569',
-                      backgroundColor: activeHeadingId === heading.id ? '#EEF2FF' : 'transparent',
+                      color: activeHeadingId === heading.id ? 'var(--brand-primary-strong)' : '#475569',
+                      backgroundColor: activeHeadingId === heading.id ? 'var(--brand-primary-soft)' : 'transparent',
                       fontWeight: activeHeadingId === heading.id ? 600 : 400,
                     }}
                   >
@@ -2102,8 +2123,8 @@ const EditorReadInner: React.FC<EditorProps> = ({
                   className="block w-full truncate rounded-md px-2 py-1 text-left text-sm hover:bg-white"
                   style={{
                     paddingLeft: `${(heading.level - 1) * 12 + 8}px`,
-                    color: activeHeadingId === heading.id ? '#4338CA' : '#475569',
-                    backgroundColor: activeHeadingId === heading.id ? '#EEF2FF' : 'transparent',
+                    color: activeHeadingId === heading.id ? 'var(--brand-primary-strong)' : '#475569',
+                    backgroundColor: activeHeadingId === heading.id ? 'var(--brand-primary-soft)' : 'transparent',
                     fontWeight: activeHeadingId === heading.id ? 600 : 400,
                   }}
                 >

@@ -31,7 +31,7 @@ pub fn copy_template(dest: &Path) -> Result<(), MemoError> {
     }
 
     // 更新配置文件注册分类
-    let config = r#"# MemoForge 配置文件
+    let config = r#"# ForgeNerve 配置文件
 version: "1.0"
 categories:
   - path: "开发"

@@ -1347,7 +1347,7 @@ export const EditorRich: React.FC<EditorProps> = ({
           <div className="min-w-0 flex-1">
             <div>{assetNotice.message}</div>
             {assetNotice.detail && (
-              <div className="mt-1 truncate text-[11px]" style={{ color: '#6366F1' }}>
+              <div className="mt-1 truncate text-[11px]" style={{ color: 'var(--brand-primary)' }}>
                 {assetNotice.detail}
               </div>
             )}

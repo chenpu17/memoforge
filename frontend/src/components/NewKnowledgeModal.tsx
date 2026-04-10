@@ -83,19 +83,19 @@ export const NewKnowledgeModal: React.FC<NewKnowledgeModalProps> = ({
         <div className="px-6 py-5 space-y-5">
           {/* Step Indicator */}
           <div className="flex items-center justify-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${step >= 1 ? 'text-white' : ''}`} style={{ backgroundColor: step >= 1 ? '#6366F1' : '#E5E5E5' }}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${step >= 1 ? 'text-white' : ''}`} style={{ backgroundColor: step >= 1 ? 'var(--brand-primary)' : '#E5E5E5' }}>
               1
             </div>
-            <div className="w-12 h-0.5" style={{ backgroundColor: step >= 2 ? '#6366F1' : '#E5E5E5' }} />
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${step >= 2 ? 'text-white' : ''}`} style={{ backgroundColor: step >= 2 ? '#6366F1' : '#E5E5E5', color: step < 2 ? '#A3A3A3' : '' }}>
+            <div className="w-12 h-0.5" style={{ backgroundColor: step >= 2 ? 'var(--brand-primary)' : '#E5E5E5' }} />
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${step >= 2 ? 'text-white' : ''}`} style={{ backgroundColor: step >= 2 ? 'var(--brand-primary)' : '#E5E5E5', color: step < 2 ? '#A3A3A3' : '' }}>
               2
             </div>
           </div>
 
           {/* Step Labels */}
           <div className="flex justify-center gap-16 text-xs">
-            <span style={{ color: step >= 1 ? '#6366F1' : '#A3A3A3' }}>基本信息</span>
-            <span style={{ color: step >= 2 ? '#6366F1' : '#A3A3A3' }}>分类标签</span>
+            <span style={{ color: step >= 1 ? 'var(--brand-primary)' : '#A3A3A3' }}>基本信息</span>
+            <span style={{ color: step >= 2 ? 'var(--brand-primary)' : '#A3A3A3' }}>分类标签</span>
           </div>
 
           {/* Form */}
@@ -134,7 +134,7 @@ export const NewKnowledgeModal: React.FC<NewKnowledgeModalProps> = ({
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: '#737373' }}>标签</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {tags.map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs" style={{ backgroundColor: '#EEF2FF', color: '#6366F1' }}>
+                    <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs" style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary)' }}>
                       {tag}
                       <button onClick={() => setTags(tags.filter(t => t !== tag))}>
                         <X className="h-3 w-3" />
@@ -175,7 +175,7 @@ export const NewKnowledgeModal: React.FC<NewKnowledgeModalProps> = ({
               onClick={() => step === 1 ? setStep(2) : handleCreate()}
               disabled={step === 1 && !title.trim()}
               className="px-5 py-2 text-sm rounded-lg text-white font-medium disabled:opacity-50"
-              style={{ backgroundColor: '#6366F1' }}
+              style={{ backgroundColor: 'var(--brand-primary)' }}
             >
               {step === 1 ? '下一步' : '创建'}
             </button>

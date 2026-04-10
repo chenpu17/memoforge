@@ -131,7 +131,7 @@ export const DirectoryKnowledgeBrowser: React.FC<DirectoryKnowledgeBrowserProps>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <FolderOpen className="h-4 w-4 shrink-0" style={{ color: '#4F46E5' }} />
+                          <FolderOpen className="h-4 w-4 shrink-0" style={{ color: 'var(--brand-primary-hover)' }} />
                           <span className="truncate text-sm font-semibold" style={{ color: '#171717' }}>
                             {folder.label}
                           </span>
