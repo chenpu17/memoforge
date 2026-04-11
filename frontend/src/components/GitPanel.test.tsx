@@ -73,7 +73,7 @@ describe('GitPanel', () => {
     })
   })
 
-  it('refreshes repository state after pull', async () => {
+  it('confirms pull when working tree is dirty, then refreshes repository state', async () => {
     const onRepoChanged = vi.fn()
     gitStatusMock.mockResolvedValue(['M programming/alpha.md'])
 
@@ -89,11 +89,21 @@ describe('GitPanel', () => {
     fireEvent.click(pullButton as HTMLElement)
 
     await waitFor(() => {
+      expect(screen.getByText('仍然 Pull')).toBeInTheDocument()
+    })
+
+    expect(gitPullMock).not.toHaveBeenCalled()
+
+    gitStatusMock.mockResolvedValue([])
+    fireEvent.click(screen.getByRole('button', { name: '仍然 Pull' }))
+
+    await waitFor(() => {
       expect(gitPullMock).toHaveBeenCalledTimes(1)
     })
     await waitFor(() => {
       expect(gitStatusMock).toHaveBeenCalledTimes(2)
       expect(onRepoChanged).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText('仍然 Pull')).not.toBeInTheDocument()
     })
   })
 })

@@ -66,6 +66,16 @@ GitHub Actions 手动运行 `CI` workflow 时支持 `ci_scope`：
   - 原因是官方 Tauri WebDriver 当前没有可用的 WKWebView driver
   - 这不是业务代码失败
 
+## Python 依赖注意事项
+
+`tests/tauri_desktop_e2e.py` 虽然直接使用的是 `selenium`，但它复用了 `tests/frontend_e2e.py` 里的测试夹具与种子函数。
+因此桌面 E2E job 的 Python 环境必须同时安装：
+
+- `selenium`
+- `playwright`
+
+否则脚本在 import `frontend_e2e` 时就会因为缺少 `playwright.sync_api` 提前失败，根本跑不到桌面断言。
+
 ## 本地复现建议
 
 如果 CI 上某个桌面场景失败，建议按顺序复现：
