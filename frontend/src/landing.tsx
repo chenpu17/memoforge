@@ -3,6 +3,22 @@ import ReactDOM from 'react-dom/client'
 import { ForgeNerveLogo } from './components/ForgeNerveLogo'
 import './landing.css'
 
+const releaseUrl = 'https://github.com/chenpu17/memoforge/releases/tag/v0.1.0'
+const releaseNotesUrl = 'https://github.com/chenpu17/memoforge/blob/main/RELEASE_NOTES.md'
+const readmeUrl = 'https://github.com/chenpu17/memoforge#readme'
+
+type DownloadCard = {
+  title: string
+  description: string
+  assets: { name: string; url: string }[]
+}
+
+type McpConfigCard = {
+  title: string
+  targetFile: string
+  snippet: string
+}
+
 const proofItems = [
   ['Tauri desktop app', 'Local workspace, welcome flow, dashboard, graph, editor, settings, and Git integration.'],
   ['SSE + stdio MCP', 'Desktop-embedded SSE plus CLI fallback for CI, remote, and bound knowledge-base workflows.'],
@@ -27,6 +43,65 @@ const problemCards = [
   ],
 ]
 
+const downloadCards: DownloadCard[] = [
+  {
+    title: 'Windows',
+    description: 'Recommended for most users. Choose the installer, MSI, or portable build directly from the official v0.1.0 release.',
+    assets: [
+      { name: 'ForgeNerve_0.1.0_x64-setup.exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe' },
+      { name: 'ForgeNerve_0.1.0_x64_en-US.msi', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64_en-US.msi' },
+      { name: 'ForgeNerve_x64_portable.exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_x64_portable.exe' },
+    ],
+  },
+  {
+    title: 'macOS',
+    description: 'Use the matching DMG for Apple Silicon or Intel. App tarballs are also published for advanced packaging workflows.',
+    assets: [
+      { name: 'ForgeNerve_0.1.0_aarch64.dmg', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg' },
+      { name: 'ForgeNerve_0.1.0_x64.dmg', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64.dmg' },
+    ],
+  },
+  {
+    title: 'Linux + MCP CLI',
+    description: 'Desktop bundles ship as AppImage / deb / rpm. MCP users can download the standalone memoforge binaries for all major targets.',
+    assets: [
+      { name: 'ForgeNerve_0.1.0_amd64.AppImage', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage' },
+      { name: 'memoforge-linux-x64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-linux-x64' },
+      { name: 'memoforge-darwin-arm64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-darwin-arm64' },
+      { name: 'memoforge-windows-x64.exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-windows-x64.exe' },
+    ],
+  },
+]
+
+const mcpConfigCards: McpConfigCard[] = [
+  {
+    title: 'Claude Code',
+    targetFile: '~/.claude/mcp.json',
+    snippet: `{
+  "mcpServers": {
+    "memoforge": {
+      "type": "sse",
+      "url": "http://127.0.0.1:31415/mcp"
+    }
+  }
+}`,
+  },
+  {
+    title: 'OpenCode',
+    targetFile: '~/.config/opencode/opencode.json',
+    snippet: `{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "memoforge": {
+      "type": "remote",
+      "url": "http://127.0.0.1:31415/mcp",
+      "enabled": true
+    }
+  }
+}`,
+  },
+]
+
 const LandingPage = () => (
   <main className="landing-page">
     <div className="landing-shell">
@@ -35,6 +110,7 @@ const LandingPage = () => (
           <ForgeNerveLogo size={30} withWordmark wordmarkClassName="landing-brand-text" />
         </div>
         <nav className="landing-nav-links" aria-label="Sections">
+          <a href="#download">Download</a>
           <a href="#why">Why</a>
           <a href="#workflow">Workflow</a>
           <a href="#proof">Proof</a>
@@ -55,8 +131,8 @@ const LandingPage = () => (
             with MCP access, draft-based writing, desktop review, and local-first control.
           </p>
           <div className="landing-cta-row">
-            <a className="landing-button primary" href="#workflow">Get Started</a>
-            <a className="landing-button secondary" href="#proof">View Product Proof</a>
+            <a className="landing-button primary" href={releaseUrl} target="_blank" rel="noreferrer">Download v0.1.0</a>
+            <a className="landing-button secondary" href={releaseNotesUrl} target="_blank" rel="noreferrer">Read Release Notes</a>
             <a className="landing-button secondary" href="#mcp">Connect via MCP</a>
           </div>
           <div className="landing-chip-row" aria-label="Capabilities">
@@ -81,14 +157,17 @@ const LandingPage = () => (
               <span>SSE MCP server running at `http://127.0.0.1:31415/mcp`</span>
             </div>
 
-            <pre className="landing-code" id="mcp">{`{
-  "mcpServers": {
-    "memoforge": {
-      "type": "sse",
-      "url": "http://127.0.0.1:31415/mcp"
-    }
-  }
-}`}</pre>
+            <div className="landing-config-grid" id="mcp">
+              {mcpConfigCards.map((card) => (
+                <article key={card.title} className="landing-config-card">
+                  <div className="landing-config-card-header">
+                    <strong>{card.title}</strong>
+                    <span>{card.targetFile}</span>
+                  </div>
+                  <pre className="landing-code">{card.snippet}</pre>
+                </article>
+              ))}
+            </div>
 
             <div className="landing-step-list" id="workflow">
               <article className="landing-step">
@@ -106,6 +185,36 @@ const LandingPage = () => (
             </div>
           </div>
         </section>
+      </section>
+
+      <section className="landing-section" id="download">
+        <h2>Download ForgeNerve v0.1.0</h2>
+        <p className="landing-section-lead">
+          The first public ForgeNerve release is live. Use the official GitHub release page for the latest desktop bundles,
+          portable executables, and standalone MCP binaries.
+        </p>
+        <div className="landing-grid landing-grid-3">
+          {downloadCards.map((card) => (
+            <article key={card.title} className="landing-card">
+              <h3>{card.title}</h3>
+              <p>{card.description}</p>
+              <div className="landing-asset-list">
+                {card.assets.map((asset) => (
+                  <a key={asset.name} className="landing-asset-pill" href={asset.url} target="_blank" rel="noreferrer">
+                    {asset.name}
+                  </a>
+                ))}
+              </div>
+              <div className="landing-card-actions">
+                <a className="landing-button secondary" href={releaseUrl} target="_blank" rel="noreferrer">Open Release Assets</a>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="landing-callout">
+          New here? Start with the desktop bundle for your platform. If you are wiring Claude Code or OpenCode into MCP,
+          the release also ships standalone `memoforge-*` binaries and the desktop app exposes SSE at `http://127.0.0.1:31415/mcp`.
+        </div>
       </section>
 
       <section className="landing-section" id="why">
@@ -163,7 +272,12 @@ const LandingPage = () => (
 
       <footer className="landing-footer">
         <div>ForgeNerve — The Agent Knowledge OS for Developers</div>
-        <div>This page is a production-ready landing entry for branding, launch previews, and future website hosting.</div>
+        <div>
+          Download the current release from{' '}
+          <a href={releaseUrl} target="_blank" rel="noreferrer">GitHub Releases</a>
+          {' '}or read the setup guide in the{' '}
+          <a href={readmeUrl} target="_blank" rel="noreferrer">README</a>.
+        </div>
       </footer>
     </div>
   </main>

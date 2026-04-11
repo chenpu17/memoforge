@@ -81,6 +81,13 @@
         padding: 14px; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         overflow: auto;
       }
+      .config-grid { display: grid; gap: 12px; }
+      .config-card { display: grid; gap: 10px; }
+      .config-card-header {
+        display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+        color: var(--muted); font-size: 12px;
+      }
+      .config-card-header strong { color: var(--text); font-size: 13px; }
       .steps { display: grid; gap: 10px; }
       .step {
         border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; background: white;
@@ -97,6 +104,18 @@
       }
       .card h3 { margin: 0 0 10px; font-size: 17px; }
       .card p { margin: 0; color: var(--muted); line-height: 1.7; font-size: 14px; }
+      .card code, .asset-pill {
+        display: inline-flex;
+        margin: 6px 8px 0 0;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 6px 8px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .card-actions { margin-top: 16px; }
 
       .proof {
         display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
@@ -125,6 +144,7 @@
       <nav class="nav">
         <div class="brand">ForgeNerve</div>
         <div class="nav-links">
+          <span>Download</span>
           <span>Why</span>
           <span>Workflow</span>
           <span>Proof</span>
@@ -142,9 +162,9 @@
             with MCP access, draft-based writing, desktop review, and local-first control.
           </div>
           <div class="cta-row">
-            <a class="btn primary" href="#">Get Started</a>
-            <a class="btn secondary" href="#">View on GitHub</a>
-            <a class="btn secondary" href="#">Connect via MCP</a>
+            <a class="btn primary" href="https://github.com/chenpu17/memoforge/releases/tag/v0.1.0">Download v0.1.0</a>
+            <a class="btn secondary" href="https://github.com/chenpu17/memoforge/blob/main/RELEASE_NOTES.md">Read Release Notes</a>
+            <a class="btn secondary" href="https://github.com/chenpu17/memoforge#readme">Setup Guide</a>
           </div>
           <div class="chips">
             <span class="chip">Local-first</span>
@@ -161,7 +181,13 @@
           </div>
           <div class="panel-body">
             <div class="status"><span class="dot"></span><span>SSE MCP server running at `http://127.0.0.1:31415/mcp`</span></div>
-            <div class="code">{
+            <div class="config-grid">
+              <div class="config-card">
+                <div class="config-card-header">
+                  <strong>Claude Code</strong>
+                  <span>~/.claude/mcp.json</span>
+                </div>
+                <div class="code">{
   "mcpServers": {
     "memoforge": {
       "type": "sse",
@@ -169,6 +195,24 @@
     }
   }
 }</div>
+              </div>
+              <div class="config-card">
+                <div class="config-card-header">
+                  <strong>OpenCode</strong>
+                  <span>~/.config/opencode/opencode.json</span>
+                </div>
+                <div class="code">{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "memoforge": {
+      "type": "remote",
+      "url": "http://127.0.0.1:31415/mcp",
+      "enabled": true
+    }
+  }
+}</div>
+              </div>
+            </div>
             <div class="steps">
               <div class="step">
                 <strong>1. Connect your agent</strong>
@@ -184,6 +228,56 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Download ForgeNerve v0.1.0</h2>
+        <p class="lead">
+          The first public ForgeNerve release is live. Use the official GitHub release page for desktop bundles, portable executables,
+          and standalone MCP binaries.
+        </p>
+        <div class="grid-3">
+          <div class="card">
+            <h3>Windows</h3>
+            <p>Choose the installer, MSI, or portable build directly from the official release.</p>
+            <div>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe">ForgeNerve_0.1.0_x64-setup.exe</a>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64_en-US.msi">ForgeNerve_0.1.0_x64_en-US.msi</a>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_x64_portable.exe">ForgeNerve_x64_portable.exe</a>
+            </div>
+            <div class="card-actions">
+              <a class="btn secondary" href="https://github.com/chenpu17/memoforge/releases/tag/v0.1.0">Open Release Assets</a>
+            </div>
+          </div>
+          <div class="card">
+            <h3>macOS</h3>
+            <p>Use the matching DMG for Apple Silicon or Intel. App tarballs remain available for advanced packaging flows.</p>
+            <div>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg">ForgeNerve_0.1.0_aarch64.dmg</a>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64.dmg">ForgeNerve_0.1.0_x64.dmg</a>
+            </div>
+            <div class="card-actions">
+              <a class="btn secondary" href="https://github.com/chenpu17/memoforge/releases/tag/v0.1.0">Open Release Assets</a>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Linux + MCP CLI</h3>
+            <p>Desktop bundles ship as AppImage / deb / rpm. MCP users can download standalone memoforge binaries for major targets.</p>
+            <div>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage">ForgeNerve_0.1.0_amd64.AppImage</a>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-linux-x64">memoforge-linux-x64</a>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-darwin-arm64">memoforge-darwin-arm64</a>
+              <a class="asset-pill" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-windows-x64.exe">memoforge-windows-x64.exe</a>
+            </div>
+            <div class="card-actions">
+              <a class="btn secondary" href="https://github.com/chenpu17/memoforge/releases/tag/v0.1.0">Open Release Assets</a>
+            </div>
+          </div>
+        </div>
+        <div class="callout">
+          New here? Start with the desktop bundle for your platform. If you are connecting Claude Code or OpenCode,
+          the same release also publishes standalone <code>memoforge-*</code> binaries and the desktop app exposes SSE at <code>http://127.0.0.1:31415/mcp</code>.
         </div>
       </section>
 

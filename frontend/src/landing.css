@@ -238,6 +238,30 @@ a {
   white-space: pre;
 }
 
+.landing-config-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.landing-config-card {
+  display: grid;
+  gap: 10px;
+}
+
+.landing-config-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--landing-muted);
+  font-size: 12px;
+}
+
+.landing-config-card-header strong {
+  color: var(--landing-text);
+  font-size: 13px;
+}
+
 .landing-step-list {
   display: grid;
   gap: 10px;
@@ -306,6 +330,29 @@ a {
   font-size: 17px;
 }
 
+.landing-card code {
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #f8fafc;
+  border: 1px solid var(--landing-border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: var(--landing-text);
+}
+
+.landing-asset-pill {
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #f8fafc;
+  border: 1px solid var(--landing-border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: var(--landing-text);
+}
+
+.landing-asset-pill:hover {
+  border-color: var(--landing-primary);
+  color: var(--landing-primary);
+}
+
 .landing-card p,
 .landing-proof span {
   margin: 0;
@@ -318,6 +365,25 @@ a {
   display: block;
   font-size: 14px;
   margin-bottom: 8px;
+}
+
+.landing-asset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.landing-card-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.landing-footer a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .landing-callout {
