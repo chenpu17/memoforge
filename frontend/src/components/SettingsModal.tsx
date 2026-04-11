@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { X, FolderOpen, Copy, MessageSquare, CheckCircle2, Inbox, Package } from 'lucide-react'
+import { X, FolderOpen, Copy, MessageSquare, CheckCircle2, Inbox, Package, Download, ExternalLink } from 'lucide-react'
 import { AppDiagnostics, getErrorMessage, tauriService } from '../services/tauri'
 import { ForgeNerveLogo } from './ForgeNerveLogo'
 import {
@@ -19,6 +19,39 @@ interface SettingsModalProps {
 const MCP_ENDPOINT = 'http://127.0.0.1:31415/mcp'
 const OPEN_CODE_CONFIG_PATH = '~/.config/opencode/opencode.json'
 const CLAUDE_CONFIG_PATH = '~/.claude/mcp.json'
+const RELEASE_URL = 'https://github.com/chenpu17/memoforge/releases/tag/v0.1.0'
+const RELEASE_NOTES_URL = 'https://github.com/chenpu17/memoforge/blob/main/RELEASE_NOTES.md'
+const README_URL = 'https://github.com/chenpu17/memoforge#readme'
+
+const DOWNLOAD_GROUPS = [
+  {
+    title: 'Windows',
+    description: '安装版、MSI 和便携版都在正式版 release 中。',
+    assets: [
+      { label: 'Setup .exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe' },
+      { label: 'MSI', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64_en-US.msi' },
+      { label: 'Portable', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_x64_portable.exe' },
+    ],
+  },
+  {
+    title: 'macOS / Linux',
+    description: '桌面端提供 macOS DMG 与 Linux AppImage。',
+    assets: [
+      { label: 'macOS arm64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg' },
+      { label: 'macOS x64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64.dmg' },
+      { label: 'Linux AppImage', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage' },
+    ],
+  },
+  {
+    title: 'Standalone MCP',
+    description: '只接 MCP 时，可直接下载 memoforge CLI 二进制。',
+    assets: [
+      { label: 'memoforge-windows-x64.exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-windows-x64.exe' },
+      { label: 'memoforge-linux-x64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-linux-x64' },
+      { label: 'memoforge-darwin-arm64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-darwin-arm64' },
+    ],
+  },
+]
 
 const OPEN_CODE_CONFIG = `{
   "$schema": "https://opencode.ai/config.json",
@@ -396,6 +429,77 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <div className="mt-1">1. 先确认桌面应用正在运行。</div>
                 <div className="mt-1">2. 访问 <code>http://127.0.0.1:31415/health</code> 检查服务是否可达。</div>
                 <div className="mt-1">3. 如果你改过端口，例如用 <code>MEMOFORGE_MCP_PORT=3030 cargo tauri dev</code> 启动，记得同步修改上面的 URL。</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 下载与发布 */}
+          <div className="pb-4 border-b" style={{ borderColor: '#E5E5E5' }}>
+            <h3 className="text-xs font-medium mb-2" style={{ color: '#737373' }}>下载与发布</h3>
+
+            <div className="rounded-lg border p-3" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={RELEASE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm"
+                  style={{ backgroundColor: 'var(--brand-primary)', color: '#FFFFFF' }}
+                >
+                  <Download className="h-4 w-4" />
+                  下载 v0.1.0
+                </a>
+                <a
+                  href={RELEASE_NOTES_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm"
+                  style={{ backgroundColor: '#F5F5F5', color: '#0A0A0A' }}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Release Notes
+                </a>
+                <a
+                  href={README_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm"
+                  style={{ backgroundColor: '#F5F5F5', color: '#0A0A0A' }}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  安装与配置说明
+                </a>
+              </div>
+
+              <div className="mt-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: '#E5E7EB', backgroundColor: '#FAFAFA', color: '#525252' }}>
+                首页与 GitHub Release 页面都能找到桌面安装包、便携版，以及独立的 <code>memoforge-*</code> MCP 二进制。
+              </div>
+
+              <div className="mt-3 grid gap-3">
+                {DOWNLOAD_GROUPS.map((group) => (
+                  <div
+                    key={group.title}
+                    className="rounded-lg border p-3"
+                    style={{ borderColor: '#E5E7EB', backgroundColor: '#FCFCFD' }}
+                  >
+                    <div className="text-sm font-medium" style={{ color: '#0A0A0A' }}>{group.title}</div>
+                    <div className="mt-1 text-xs" style={{ color: '#737373' }}>{group.description}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {group.assets.map((asset) => (
+                        <a
+                          key={asset.label}
+                          href={asset.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md border px-2 py-1 text-[11px]"
+                          style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', color: '#0A0A0A' }}
+                        >
+                          {asset.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

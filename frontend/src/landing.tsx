@@ -19,6 +19,12 @@ type McpConfigCard = {
   snippet: string
 }
 
+type QuickDownloadLink = {
+  label: string
+  hint: string
+  url: string
+}
+
 const proofItems = [
   ['Tauri desktop app', 'Local workspace, welcome flow, dashboard, graph, editor, settings, and Git integration.'],
   ['SSE + stdio MCP', 'Desktop-embedded SSE plus CLI fallback for CI, remote, and bound knowledge-base workflows.'],
@@ -102,6 +108,29 @@ const mcpConfigCards: McpConfigCard[] = [
   },
 ]
 
+const heroQuickDownloads: QuickDownloadLink[] = [
+  {
+    label: 'Windows',
+    hint: 'Setup .exe',
+    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe',
+  },
+  {
+    label: 'macOS',
+    hint: 'Apple Silicon DMG',
+    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg',
+  },
+  {
+    label: 'Linux',
+    hint: 'AppImage',
+    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage',
+  },
+  {
+    label: 'MCP CLI',
+    hint: 'memoforge-windows-x64.exe',
+    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-windows-x64.exe',
+  },
+]
+
 const LandingPage = () => (
   <main className="landing-page">
     <div className="landing-shell">
@@ -134,6 +163,20 @@ const LandingPage = () => (
             <a className="landing-button primary" href={releaseUrl} target="_blank" rel="noreferrer">Download v0.1.0</a>
             <a className="landing-button secondary" href={releaseNotesUrl} target="_blank" rel="noreferrer">Read Release Notes</a>
             <a className="landing-button secondary" href="#mcp">Connect via MCP</a>
+          </div>
+          <div className="landing-quick-downloads" aria-label="Quick platform downloads">
+            {heroQuickDownloads.map((item) => (
+              <a
+                key={item.label}
+                className="landing-quick-download"
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <strong>{item.label}</strong>
+                <span>{item.hint}</span>
+              </a>
+            ))}
           </div>
           <div className="landing-chip-row" aria-label="Capabilities">
             <span>Local-first</span>

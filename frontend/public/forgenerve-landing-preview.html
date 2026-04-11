@@ -48,6 +48,20 @@
       .subtitle { font-size: 22px; color: var(--muted); margin-bottom: 14px; }
       .desc { font-size: 17px; line-height: 1.7; color: var(--subtle); max-width: 680px; }
       .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+      .quick-downloads { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+      .quick-download {
+        display: grid;
+        gap: 2px;
+        min-width: 140px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+        text-decoration: none;
+      }
+      .quick-download strong { font-size: 13px; color: var(--text); }
+      .quick-download span { font-size: 12px; color: var(--subtle); }
       .btn {
         display: inline-flex; align-items: center; justify-content: center;
         height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--border);
@@ -164,7 +178,25 @@
           <div class="cta-row">
             <a class="btn primary" href="https://github.com/chenpu17/memoforge/releases/tag/v0.1.0">Download v0.1.0</a>
             <a class="btn secondary" href="https://github.com/chenpu17/memoforge/blob/main/RELEASE_NOTES.md">Read Release Notes</a>
-            <a class="btn secondary" href="https://github.com/chenpu17/memoforge#readme">Setup Guide</a>
+            <a class="btn secondary" href="https://github.com/chenpu17/memoforge#readme">Connect via MCP</a>
+          </div>
+          <div class="quick-downloads">
+            <a class="quick-download" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe">
+              <strong>Windows</strong>
+              <span>Setup .exe</span>
+            </a>
+            <a class="quick-download" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg">
+              <strong>macOS</strong>
+              <span>Apple Silicon DMG</span>
+            </a>
+            <a class="quick-download" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage">
+              <strong>Linux</strong>
+              <span>AppImage</span>
+            </a>
+            <a class="quick-download" href="https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-windows-x64.exe">
+              <strong>MCP CLI</strong>
+              <span>memoforge-windows-x64.exe</span>
+            </a>
           </div>
           <div class="chips">
             <span class="chip">Local-first</span>
