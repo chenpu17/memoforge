@@ -3,10 +3,12 @@ import { ChevronRight, FolderOpen, CornerUpLeft } from 'lucide-react'
 import type { Knowledge } from '../types'
 import type { KnowledgeTreeNode, TreeBreadcrumbItem } from '../lib/knowledgeTree'
 import { KnowledgeListItem } from './KnowledgeListItem'
+import { GettingStartedCard } from './GettingStartedCard'
 
 interface DirectoryCreateAction {
   disabled?: boolean
   hint?: string
+  onCreate?: () => void
 }
 
 interface DirectoryKnowledgeBrowserProps {
@@ -174,8 +176,16 @@ export const DirectoryKnowledgeBrowser: React.FC<DirectoryKnowledgeBrowserProps>
                 当前目录暂无直接文档，可以继续进入上面的子目录浏览。
               </div>
             ) : (
-              <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed bg-[#FAFAFA] px-6 text-center text-sm text-neutral-400">
-                当前目录下暂无文档。你可以从左侧树继续进入子目录，或从这里开始创建第一篇文档。
+              <div className="rounded-2xl border border-dashed bg-[#FAFAFA] px-4 py-5">
+                <GettingStartedCard
+                  compact
+                  title="当前目录还是空的"
+                  description="你可以在这个目录下创建第一篇文档，或者先通过 MCP 接入 Agent，让它基于 Draft 流帮你整理知识。"
+                  primaryAction={createAction?.onCreate && !createAction.disabled ? {
+                    label: '在当前目录新建',
+                    onClick: createAction.onCreate,
+                  } : undefined}
+                />
               </div>
             )}
           </div>

@@ -5,6 +5,7 @@ import { tauriService } from '../services/tauri'
 import { Search, X, FileText, CornerDownLeft, ArrowUpDown } from 'lucide-react'
 import type { Category, GrepMatch } from '../types'
 import { useKnowledgeNavigation } from '../hooks/useKnowledgeNavigation'
+import { GettingStartedCard } from './GettingStartedCard'
 
 interface SearchHistoryItem {
   query: string
@@ -384,8 +385,12 @@ export const SearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         {/* Left - Search Results - 680px */}
         <div className="w-[680px] overflow-y-auto border-r" style={{ borderColor: '#E5E5E5' }}>
           {grepResults.length === 0 ? (
-            <div className="flex items-center justify-center h-full" style={{ color: '#A3A3A3' }}>
-              {emptyStateText}
+            <div className="flex h-full items-center justify-center p-6">
+              <GettingStartedCard
+                compact
+                title={query.trim() ? '没有找到匹配结果' : '开始搜索知识库'}
+                description={emptyStateText}
+              />
             </div>
           ) : (
             Object.values(groupedResults).map((group) => (

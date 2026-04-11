@@ -1317,6 +1317,7 @@ function App() {
                       createAction={!readonly ? {
                         disabled: !canCreateInSelectedFolder,
                         hint: selectedFolderCreateHint,
+                        onCreate: canCreateInSelectedFolder ? handleCreateKnowledgeInSelectedFolder : undefined,
                       } : undefined}
                       onSelectFolder={handleSelectTreeFolder}
                       onSelectKnowledge={(knowledgeId) => {
@@ -1331,6 +1332,8 @@ function App() {
                     <CurrentKnowledgeEditorPane
                       readonly={readonly}
                       editorMode={editorMode}
+                      onCreateKnowledge={!readonly ? openNewKnowledgeModal : undefined}
+                      onOpenSettings={() => setShowSettings(true)}
                     />
                   </div>
                 )}

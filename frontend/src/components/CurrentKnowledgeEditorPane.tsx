@@ -1,17 +1,22 @@
 import React, { startTransition, useCallback, useEffect, useRef } from 'react'
 import { shallow } from 'zustand/shallow'
 import { Editor } from './Editor'
+import { GettingStartedCard } from './GettingStartedCard'
 import { useAppStore, type EditorMode } from '../stores/appStore'
 import { clearKnowledgeDraft, loadKnowledgeDraft, saveKnowledgeDraft } from '../lib/knowledgeDrafts'
 
 interface CurrentKnowledgeEditorPaneProps {
   readonly: boolean
   editorMode: EditorMode
+  onCreateKnowledge?: () => void
+  onOpenSettings?: () => void
 }
 
 export const CurrentKnowledgeEditorPane: React.FC<CurrentKnowledgeEditorPaneProps> = React.memo(({
   readonly,
   editorMode,
+  onCreateKnowledge,
+  onOpenSettings,
 }) => {
   const {
     currentKnowledgeId,
@@ -80,8 +85,19 @@ export const CurrentKnowledgeEditorPane: React.FC<CurrentKnowledgeEditorPaneProp
 
   if (!currentKnowledgeId) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-400">
-        选择或创建知识开始编辑
+      <div className="flex h-full items-center justify-center px-6 py-10">
+        <GettingStartedCard
+          title="选择一篇知识，或从这里开始创建"
+          description="当前还没有打开文档。建议先创建第一篇知识，或打开设置复制 MCP 配置，让 Claude Code / OpenCode 通过 Draft 流安全写入。"
+          primaryAction={readonly || !onCreateKnowledge ? undefined : {
+            label: '新建第一篇知识',
+            onClick: onCreateKnowledge,
+          }}
+          secondaryAction={onOpenSettings ? {
+            label: '打开设置',
+            onClick: onOpenSettings,
+          } : undefined}
+        />
       </div>
     )
   }
