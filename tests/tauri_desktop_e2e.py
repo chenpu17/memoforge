@@ -64,6 +64,15 @@ def find_free_port() -> int:
         return sock.getsockname()[1]
 
 
+def wait_for_path(path: Path, *, timeout: float = 20.0, expect_dir: bool = False) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if path.exists() and (not expect_dir or path.is_dir()):
+            return
+        time.sleep(0.2)
+    raise AssertionError(f"Timed out waiting for path: {path}")
+
+
 def wait_for_http(url: str, timeout: float = 30.0) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -672,13 +681,12 @@ def run_welcome_create_flow(driver: webdriver.Remote, target_path: Path, mcp_por
 
     wait_for_button(driver, "项目复盘").click()
     wait_for_button(driver, "使用此模板").click()
-    wait_for_body_text(driver, "复盘", timeout=40.0)
-
-    assert (target_path / ".memoforge" / "config.yaml").exists()
-    assert (target_path / "复盘").is_dir()
-    assert (target_path / "问题").is_dir()
-    assert (target_path / "决策").is_dir()
-    assert_editor_state(mcp_port, expected_kb_path=target_path)
+    wait_for_body_text(driver, "全部文档", timeout=40.0)
+    assert_editor_state(mcp_port, expected_kb_path=target_path, timeout=40.0)
+    wait_for_path(target_path / ".memoforge" / "config.yaml", timeout=10.0)
+    wait_for_path(target_path / "复盘", timeout=10.0, expect_dir=True)
+    wait_for_path(target_path / "问题", timeout=10.0, expect_dir=True)
+    wait_for_path(target_path / "决策", timeout=10.0, expect_dir=True)
     mark("welcome-create-template")
 
 
