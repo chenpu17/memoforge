@@ -1,11 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ForgeNerveLogo } from './components/ForgeNerveLogo'
+import {
+  HERO_QUICK_DOWNLOADS,
+  README_URL,
+  RELEASE_NOTES_URL,
+  RELEASE_URL,
+} from './lib/releaseLinks'
 import './landing.css'
-
-const releaseUrl = 'https://github.com/chenpu17/memoforge/releases/tag/v0.1.0'
-const releaseNotesUrl = 'https://github.com/chenpu17/memoforge/blob/main/RELEASE_NOTES.md'
-const readmeUrl = 'https://github.com/chenpu17/memoforge#readme'
 
 type DownloadCard = {
   title: string
@@ -17,12 +19,6 @@ type McpConfigCard = {
   title: string
   targetFile: string
   snippet: string
-}
-
-type QuickDownloadLink = {
-  label: string
-  hint: string
-  url: string
 }
 
 const proofItems = [
@@ -108,29 +104,6 @@ const mcpConfigCards: McpConfigCard[] = [
   },
 ]
 
-const heroQuickDownloads: QuickDownloadLink[] = [
-  {
-    label: 'Windows',
-    hint: 'Setup .exe',
-    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe',
-  },
-  {
-    label: 'macOS',
-    hint: 'Apple Silicon DMG',
-    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg',
-  },
-  {
-    label: 'Linux',
-    hint: 'AppImage',
-    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage',
-  },
-  {
-    label: 'MCP CLI',
-    hint: 'memoforge-windows-x64.exe',
-    url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-windows-x64.exe',
-  },
-]
-
 const LandingPage = () => (
   <main className="landing-page">
     <div className="landing-shell">
@@ -160,12 +133,12 @@ const LandingPage = () => (
             with MCP access, draft-based writing, desktop review, and local-first control.
           </p>
           <div className="landing-cta-row">
-            <a className="landing-button primary" href={releaseUrl} target="_blank" rel="noreferrer">Download v0.1.0</a>
-            <a className="landing-button secondary" href={releaseNotesUrl} target="_blank" rel="noreferrer">Read Release Notes</a>
+            <a className="landing-button primary" href={RELEASE_URL} target="_blank" rel="noreferrer">Download v0.1.0</a>
+            <a className="landing-button secondary" href={RELEASE_NOTES_URL} target="_blank" rel="noreferrer">Read Release Notes</a>
             <a className="landing-button secondary" href="#mcp">Connect via MCP</a>
           </div>
           <div className="landing-quick-downloads" aria-label="Quick platform downloads">
-            {heroQuickDownloads.map((item) => (
+            {HERO_QUICK_DOWNLOADS.map((item) => (
               <a
                 key={item.label}
                 className="landing-quick-download"
@@ -249,7 +222,7 @@ const LandingPage = () => (
                 ))}
               </div>
               <div className="landing-card-actions">
-                <a className="landing-button secondary" href={releaseUrl} target="_blank" rel="noreferrer">Open Release Assets</a>
+                <a className="landing-button secondary" href={RELEASE_URL} target="_blank" rel="noreferrer">Open Release Assets</a>
               </div>
             </article>
           ))}
@@ -317,9 +290,9 @@ const LandingPage = () => (
         <div>ForgeNerve — The Agent Knowledge OS for Developers</div>
         <div>
           Download the current release from{' '}
-          <a href={releaseUrl} target="_blank" rel="noreferrer">GitHub Releases</a>
+          <a href={RELEASE_URL} target="_blank" rel="noreferrer">GitHub Releases</a>
           {' '}or read the setup guide in the{' '}
-          <a href={readmeUrl} target="_blank" rel="noreferrer">README</a>.
+          <a href={README_URL} target="_blank" rel="noreferrer">README</a>.
         </div>
       </footer>
     </div>

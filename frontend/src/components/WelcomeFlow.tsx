@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { tauriService, getErrorMessage } from '../services/tauri'
 import { TemplatePicker } from './TemplatePicker'
-import { FolderOpen, GitBranchPlus, Plus, ArrowLeft } from 'lucide-react'
+import { FolderOpen, GitBranchPlus, Plus, ArrowLeft, Download, ExternalLink } from 'lucide-react'
 import { ForgeNerveLogo } from './ForgeNerveLogo'
+import { openExternalLink } from '../lib/externalLinks'
+import { HERO_QUICK_DOWNLOADS, README_URL, RELEASE_NOTES_URL, RELEASE_URL } from '../lib/releaseLinks'
 
 type Step = 'main' | 'create' | 'import' | 'clone'
 
@@ -229,6 +231,54 @@ export const WelcomeFlow: React.FC<WelcomeFlowProps> = ({ onKbReady, readonly = 
           </div>
           <div className="mt-5 text-center text-xs" style={{ color: '#737373' }}>
             完成启动后，可在设置页一键复制 MCP 配置，连接 Claude Code 或 OpenCode。
+          </div>
+          <div className="mt-5 rounded-xl border p-4" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
+            <div className="text-sm font-medium" style={{ color: '#0A0A0A' }}>下载与发布入口</div>
+            <div className="mt-1 text-xs" style={{ color: '#737373' }}>
+              首次启动前后，你都可以直接查看正式版资产、Release Notes 和 MCP 配置说明。
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void openExternalLink(RELEASE_URL)}
+                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs"
+                style={{ backgroundColor: 'var(--brand-primary)', color: '#FFFFFF' }}
+              >
+                <Download className="h-3.5 w-3.5" />
+                下载 v0.1.0
+              </button>
+              <button
+                type="button"
+                onClick={() => void openExternalLink(RELEASE_NOTES_URL)}
+                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs"
+                style={{ backgroundColor: '#F5F5F5', color: '#0A0A0A' }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Release Notes
+              </button>
+              <button
+                type="button"
+                onClick={() => void openExternalLink(README_URL)}
+                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs"
+                style={{ backgroundColor: '#F5F5F5', color: '#0A0A0A' }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                安装与配置说明
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {HERO_QUICK_DOWNLOADS.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => void openExternalLink(item.url)}
+                  className="rounded-full border px-2.5 py-1 text-[11px]"
+                  style={{ borderColor: '#E5E7EB', color: '#525252', backgroundColor: '#FAFAFA' }}
+                >
+                  {item.label} · {item.hint}
+                </button>
+              ))}
+            </div>
           </div>
           {renderReadonlyHint()}
         </div>
