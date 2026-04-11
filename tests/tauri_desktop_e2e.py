@@ -227,8 +227,23 @@ def assert_body_contains_all(driver: webdriver.Remote, texts: list[str], timeout
     WebDriverWait(driver, timeout).until(has_all)
 
 
+def xpath_literal(text: str) -> str:
+    if "'" not in text:
+        return f"'{text}'"
+    if '"' not in text:
+        return f'"{text}"'
+    parts = text.split("'")
+    concat_parts: list[str] = []
+    for index, part in enumerate(parts):
+        if part:
+            concat_parts.append(f"'{part}'")
+        if index != len(parts) - 1:
+            concat_parts.append('"\'"')
+    return f"concat({', '.join(concat_parts)})"
+
+
 def wait_for_button(driver: webdriver.Remote, text: str, timeout: float = 20.0):
-    xpath = f"//button[contains(normalize-space(.), {json.dumps(text)})]"
+    xpath = f"//button[contains(normalize-space(.), {xpath_literal(text)})]"
     return WebDriverWait(driver, timeout).until(
         EC.element_to_be_clickable((By.XPATH, xpath))
     )
@@ -260,7 +275,7 @@ def accept_dialog(driver: webdriver.Remote, timeout: float = 10.0) -> None:
 def click_tree_button(driver: webdriver.Remote, label: str) -> None:
     xpath = (
         "//div[contains(@class,'knowledge-tree-shell')]"
-        f"//button[contains(normalize-space(.), {json.dumps(label)})]"
+        f"//button[contains(normalize-space(.), {xpath_literal(label)})]"
     )
     element = WebDriverWait(driver, 20.0).until(
         EC.element_to_be_clickable((By.XPATH, xpath))
@@ -271,7 +286,7 @@ def click_tree_button(driver: webdriver.Remote, label: str) -> None:
 def click_browser_card(driver: webdriver.Remote, label: str) -> None:
     xpath = (
         "//div[contains(@class,'directory-browser-shell')]"
-        f"//button[contains(normalize-space(.), {json.dumps(label)})]"
+        f"//button[contains(normalize-space(.), {xpath_literal(label)})]"
     )
     element = WebDriverWait(driver, 20.0).until(
         EC.element_to_be_clickable((By.XPATH, xpath))
@@ -708,7 +723,7 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     assert graph_node is not None
     beta_node = wait_clickable_xpath(
         driver,
-        f"//div[contains(@class,'react-flow__node')][contains(., {json.dumps('Beta Async Notes')})]",
+        f"//div[contains(@class,'react-flow__node')][contains(., {xpath_literal('Beta Async Notes')})]",
         timeout=25.0,
     )
     beta_node.click()
@@ -759,7 +774,7 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     wait_for_css(driver, 'button[aria-label="AI 草稿"]').click()
     wait_for_body_text(driver, draft_id)
     wait_for_body_text(driver, "programming/alpha.md")
-    wait_for_xpath(driver, f"//button[contains(., {json.dumps(draft_id)})]").click()
+    wait_for_xpath(driver, f"//button[contains(., {xpath_literal(draft_id)})]").click()
     wait_for_body_text(driver, "草稿预览")
     wait_for_body_text(driver, "Agent Draft Section")
     wait_for_button(driver, "确认提交").click()
@@ -783,7 +798,7 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     wait_for_css(driver, 'button[aria-label="元数据"]').click()
     wait_for_css(driver, 'button[aria-label="AI 草稿"]').click()
     wait_for_body_text(driver, discard_draft_id)
-    wait_for_xpath(driver, f"//button[contains(., {json.dumps(discard_draft_id)})]").click()
+    wait_for_xpath(driver, f"//button[contains(., {xpath_literal(discard_draft_id)})]").click()
     wait_for_body_text(driver, "Discarded Draft Section")
     wait_for_button(driver, "丢弃").click()
     accept_dialog(driver)
