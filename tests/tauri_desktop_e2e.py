@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -100,6 +101,11 @@ def scenario_artifact_dir(name: str) -> Path:
     return path
 
 
+def normalize_scenario_name(name: str) -> str:
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "-", name).strip("-._")
+    return sanitized or "scenario"
+
+
 def build_desktop_binary(env: dict[str, str]) -> Path:
     binary_override = os.environ.get("MEMOFORGE_TAURI_BIN")
     if binary_override:
@@ -177,11 +183,16 @@ def start_webdriver(application: Path) -> webdriver.Remote:
     )
 
 
-def run_app_session(application: Path, env: dict[str, str], scenario) -> None:
+def run_app_session(
+    application: Path,
+    env: dict[str, str],
+    scenario,
+    scenario_name: str | None = None,
+) -> None:
     driver_process = None
     driver = None
-    scenario_name = getattr(scenario, "__name__", "scenario")
-    artifact_dir = scenario_artifact_dir(scenario_name)
+    resolved_scenario_name = scenario_name or getattr(scenario, "__name__", "scenario")
+    artifact_dir = scenario_artifact_dir(normalize_scenario_name(resolved_scenario_name))
     try:
         driver_process = start_tauri_driver(env)
         driver = start_webdriver(application)
@@ -889,6 +900,7 @@ def main() -> None:
             application,
             welcome_import_env,
             lambda driver: run_welcome_import_flow(driver, welcome_import_paths, int(welcome_import_env["MEMOFORGE_MCP_PORT"])),
+            scenario_name="welcome-import",
         )
 
         welcome_create_env = make_test_env(temp_dir / "env-welcome-create")
@@ -899,6 +911,7 @@ def main() -> None:
             application,
             welcome_create_env,
             lambda driver: run_welcome_create_flow(driver, welcome_create_target, int(welcome_create_env["MEMOFORGE_MCP_PORT"])),
+            scenario_name="welcome-create-template",
         )
 
         welcome_clone_root = temp_dir / "welcome-clone"
@@ -916,6 +929,7 @@ def main() -> None:
                 welcome_clone_target,
                 int(welcome_clone_env["MEMOFORGE_MCP_PORT"]),
             ),
+            scenario_name="welcome-clone",
         )
 
         workspace_root = temp_dir / "workspace-flow"
@@ -928,6 +942,7 @@ def main() -> None:
             application,
             workspace_env,
             lambda driver: run_workspace_flow(driver, workspace_paths, int(workspace_env["MEMOFORGE_MCP_PORT"])),
+            scenario_name="workspace-flow",
         )
 
         readonly_root = temp_dir / "readonly-workspace"
@@ -945,6 +960,7 @@ def main() -> None:
                 readonly_paths,
                 int(readonly_env["MEMOFORGE_MCP_PORT"]),
             ),
+            scenario_name="readonly-workspace-flow",
         )
 
         print(json.dumps({
