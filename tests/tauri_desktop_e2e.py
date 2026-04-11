@@ -50,6 +50,13 @@ def write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def normalize_path(value: str | Path) -> Path:
+    raw = str(value)
+    if raw.startswith("\\\\?\\"):
+        raw = raw[4:]
+    return Path(raw).resolve()
+
+
 def find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -530,7 +537,7 @@ def assert_editor_state(
 
         if expected_kb_path is not None:
             current_kb = state.get("current_kb")
-            kb_ok = current_kb is not None and Path(current_kb["path"]).resolve() == expected_kb_path.resolve()
+            kb_ok = current_kb is not None and normalize_path(current_kb["path"]) == normalize_path(expected_kb_path)
 
         if expected_knowledge_title is not None:
             current_knowledge = state.get("current_knowledge")
