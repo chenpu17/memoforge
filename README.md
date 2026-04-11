@@ -17,7 +17,7 @@ ForgeNerve 是一个面向开发者和 AI Agent 的知识操作系统：它把 `
 
 当前阶段：**vNext.1 开发完成** (2026-04-10)
 
-最新正式版：[`ForgeNerve v0.1.0`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.0)
+最新正式版：[`ForgeNerve v0.1.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2)
 
 - ✅ Core Engine (Rust)
 - ✅ MCP Server (SSE + stdio transport, 47+ 个工具)
@@ -57,21 +57,21 @@ vNext.1 引入以下核心概念：
 
 如果你是第一次接触 ForgeNerve，最直接的入口就是 GitHub Release：
 
-- 正式版下载页：[`ForgeNerve v0.1.0`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.0)
+- 正式版下载页：[`ForgeNerve v0.1.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2)
 - 发布说明：[`RELEASE_NOTES.md`](RELEASE_NOTES.md)
 
 常用下载入口：
 
 | 平台 / 用途 | 推荐产物 | 链接 |
 |------|------|------|
-| Windows 安装版 | `ForgeNerve_0.1.0_x64-setup.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe) |
-| Windows MSI | `ForgeNerve_0.1.0_x64_en-US.msi` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64_en-US.msi) |
-| Windows 便携版 | `ForgeNerve_x64_portable.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_x64_portable.exe) |
-| macOS Apple Silicon | `ForgeNerve_0.1.0_aarch64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg) |
-| macOS Intel | `ForgeNerve_0.1.0_x64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64.dmg) |
-| Linux x64 | `ForgeNerve_0.1.0_amd64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage) |
-| Linux arm64 | `ForgeNerve_0.1.0_aarch64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.AppImage) |
-| MCP / CLI 二进制 | `memoforge-*` 系列 | [查看全部 release 资产](https://github.com/chenpu17/memoforge/releases/tag/v0.1.0) |
+| Windows 安装版 | `ForgeNerve_0.1.2_x64-setup.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_x64-setup.exe) |
+| Windows MSI | `ForgeNerve_0.1.2_x64_en-US.msi` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_x64_en-US.msi) |
+| Windows 便携版 | `ForgeNerve_x64_portable.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_x64_portable.exe) |
+| macOS Apple Silicon | `ForgeNerve_0.1.2_aarch64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_aarch64.dmg) |
+| macOS Intel | `ForgeNerve_0.1.2_x64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_x64.dmg) |
+| Linux x64 | `ForgeNerve_0.1.2_amd64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_amd64.AppImage) |
+| Linux arm64 | `ForgeNerve_0.1.2_aarch64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_aarch64.AppImage) |
+| MCP / CLI 二进制 | `memoforge-*` 系列 | [查看全部 release 资产](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2) |
 
 如果你想在首页或 release 页面快速找到二进制，可以直接按下面口径理解：
 

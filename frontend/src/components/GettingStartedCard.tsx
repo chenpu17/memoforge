@@ -1,7 +1,7 @@
 import React from 'react'
 import { Download, ExternalLink, Settings2, Sparkles } from 'lucide-react'
 import { openExternalLink } from '../lib/externalLinks'
-import { HERO_QUICK_DOWNLOADS, README_URL, RELEASE_NOTES_URL, RELEASE_URL } from '../lib/releaseLinks'
+import { HERO_QUICK_DOWNLOADS, README_URL, RELEASE_NOTES_URL, RELEASE_URL, RELEASE_VERSION } from '../lib/releaseLinks'
 
 interface ActionSpec {
   label: string
@@ -79,7 +79,7 @@ export const GettingStartedCard: React.FC<GettingStartedCardProps> = ({
             style={{ backgroundColor: 'var(--brand-primary)', color: '#FFFFFF' }}
           >
             <Download className="h-3.5 w-3.5" />
-            下载 v0.1.0
+            {`下载 v${RELEASE_VERSION}`}
           </button>
           <button
             type="button"

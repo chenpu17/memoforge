@@ -6,6 +6,8 @@ import {
   README_URL,
   RELEASE_NOTES_URL,
   RELEASE_URL,
+  RELEASE_TAG,
+  RELEASE_VERSION,
 } from './lib/releaseLinks'
 import './landing.css'
 
@@ -48,29 +50,29 @@ const problemCards = [
 const downloadCards: DownloadCard[] = [
   {
     title: 'Windows',
-    description: 'Recommended for most users. Choose the installer, MSI, or portable build directly from the official v0.1.0 release.',
+    description: `Recommended for most users. Choose the installer, MSI, or portable build directly from the official ${RELEASE_TAG} release.`,
     assets: [
-      { name: 'ForgeNerve_0.1.0_x64-setup.exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64-setup.exe' },
-      { name: 'ForgeNerve_0.1.0_x64_en-US.msi', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64_en-US.msi' },
-      { name: 'ForgeNerve_x64_portable.exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_x64_portable.exe' },
+      { name: `ForgeNerve_${RELEASE_VERSION}_x64-setup.exe`, url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_${RELEASE_VERSION}_x64-setup.exe` },
+      { name: `ForgeNerve_${RELEASE_VERSION}_x64_en-US.msi`, url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_${RELEASE_VERSION}_x64_en-US.msi` },
+      { name: 'ForgeNerve_x64_portable.exe', url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_x64_portable.exe` },
     ],
   },
   {
     title: 'macOS',
     description: 'Use the matching DMG for Apple Silicon or Intel. App tarballs are also published for advanced packaging workflows.',
     assets: [
-      { name: 'ForgeNerve_0.1.0_aarch64.dmg', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_aarch64.dmg' },
-      { name: 'ForgeNerve_0.1.0_x64.dmg', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_x64.dmg' },
+      { name: `ForgeNerve_${RELEASE_VERSION}_aarch64.dmg`, url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_${RELEASE_VERSION}_aarch64.dmg` },
+      { name: `ForgeNerve_${RELEASE_VERSION}_x64.dmg`, url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_${RELEASE_VERSION}_x64.dmg` },
     ],
   },
   {
     title: 'Linux + MCP CLI',
     description: 'Desktop bundles ship as AppImage / deb / rpm. MCP users can download the standalone memoforge binaries for all major targets.',
     assets: [
-      { name: 'ForgeNerve_0.1.0_amd64.AppImage', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/ForgeNerve_0.1.0_amd64.AppImage' },
-      { name: 'memoforge-linux-x64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-linux-x64' },
-      { name: 'memoforge-darwin-arm64', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-darwin-arm64' },
-      { name: 'memoforge-windows-x64.exe', url: 'https://github.com/chenpu17/memoforge/releases/download/v0.1.0/memoforge-windows-x64.exe' },
+      { name: `ForgeNerve_${RELEASE_VERSION}_amd64.AppImage`, url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_${RELEASE_VERSION}_amd64.AppImage` },
+      { name: 'memoforge-linux-x64', url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/memoforge-linux-x64` },
+      { name: 'memoforge-darwin-arm64', url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/memoforge-darwin-arm64` },
+      { name: 'memoforge-windows-x64.exe', url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/memoforge-windows-x64.exe` },
     ],
   },
 ]
@@ -133,7 +135,7 @@ const LandingPage = () => (
             with MCP access, draft-based writing, desktop review, and local-first control.
           </p>
           <div className="landing-cta-row">
-            <a className="landing-button primary" href={RELEASE_URL} target="_blank" rel="noreferrer">Download v0.1.0</a>
+            <a className="landing-button primary" href={RELEASE_URL} target="_blank" rel="noreferrer">{`Download v${RELEASE_VERSION}`}</a>
             <a className="landing-button secondary" href={RELEASE_NOTES_URL} target="_blank" rel="noreferrer">Read Release Notes</a>
             <a className="landing-button secondary" href="#mcp">Connect via MCP</a>
           </div>
@@ -204,7 +206,7 @@ const LandingPage = () => (
       </section>
 
       <section className="landing-section" id="download">
-        <h2>Download ForgeNerve v0.1.0</h2>
+        <h2>{`Download ForgeNerve v${RELEASE_VERSION}`}</h2>
         <p className="landing-section-lead">
           The first public ForgeNerve release is live. Use the official GitHub release page for the latest desktop bundles,
           portable executables, and standalone MCP binaries.

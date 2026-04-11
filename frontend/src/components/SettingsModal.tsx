@@ -9,6 +9,7 @@ import {
   RELEASE_NOTES_URL,
   README_URL,
   DOWNLOAD_GROUPS,
+  RELEASE_VERSION,
 } from '../lib/releaseLinks'
 import {
   getAutoSaveInterval,
@@ -419,7 +420,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   style={{ backgroundColor: 'var(--brand-primary)', color: '#FFFFFF' }}
                 >
                   <Download className="h-4 w-4" />
-                  下载 v0.1.0
+                  {`下载 v${RELEASE_VERSION}`}
                 </button>
                 <button
                   type="button"
@@ -581,7 +582,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span style={{ color: '#737373' }}>版本</span>
-                <span style={{ color: '#0A0A0A' }}>0.1.0</span>
+                <span style={{ color: '#0A0A0A' }}>{RELEASE_VERSION}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span style={{ color: '#737373' }}>构建</span>

@@ -562,7 +562,7 @@ This note arrived through browser git pull.
   mark('ui-git-pull')
 
   await treeNav.locator('button').filter({ has: page.locator('svg.lucide-settings') }).first().click()
-  await expect(page.getByText('0.1.0')).toBeVisible()
+  await expect(page.getByText('0.1.2')).toBeVisible()
   await currentModal().locator('button').last().click()
   mark('ui-settings')
 

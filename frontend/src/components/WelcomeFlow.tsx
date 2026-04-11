@@ -4,7 +4,7 @@ import { TemplatePicker } from './TemplatePicker'
 import { FolderOpen, GitBranchPlus, Plus, ArrowLeft, Download, ExternalLink } from 'lucide-react'
 import { ForgeNerveLogo } from './ForgeNerveLogo'
 import { openExternalLink } from '../lib/externalLinks'
-import { HERO_QUICK_DOWNLOADS, README_URL, RELEASE_NOTES_URL, RELEASE_URL } from '../lib/releaseLinks'
+import { HERO_QUICK_DOWNLOADS, README_URL, RELEASE_NOTES_URL, RELEASE_URL, RELEASE_VERSION } from '../lib/releaseLinks'
 
 type Step = 'main' | 'create' | 'import' | 'clone'
 
@@ -245,7 +245,7 @@ export const WelcomeFlow: React.FC<WelcomeFlowProps> = ({ onKbReady, readonly = 
                 style={{ backgroundColor: 'var(--brand-primary)', color: '#FFFFFF' }}
               >
                 <Download className="h-3.5 w-3.5" />
-                下载 v0.1.0
+                {`下载 v${RELEASE_VERSION}`}
               </button>
               <button
                 type="button"

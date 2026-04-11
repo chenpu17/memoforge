@@ -1,8 +1,8 @@
-# ForgeNerve v0.1.0 Release Notes
+# ForgeNerve v0.1.2 Release Notes
 
-Release Date: 2026-04-10
+Release Date: 2026-04-12
 
-ForgeNerve v0.1.0 is the first public release under the ForgeNerve brand.
+ForgeNerve v0.1.2 is the current stable release line under the ForgeNerve brand.
 
 This release turns the project from a Markdown + Git knowledge tool into a more complete Agent Knowledge OS for developers:
 
@@ -13,7 +13,13 @@ This release turns the project from a Markdown + Git knowledge tool into a more 
 
 GitHub Release:
 
-- https://github.com/chenpu17/memoforge/releases/tag/v0.1.0
+- https://github.com/chenpu17/memoforge/releases/tag/v0.1.2
+
+## Patch highlights
+
+- aligned Tauri bundle version metadata with the Git tag based release line
+- corrected desktop asset filenames so installers and DMG / AppImage packages match the published release version
+- updated in-app release entrypoints, landing page download links, and MCP binary links to the latest stable release
 
 ## Highlights
 
@@ -105,13 +111,13 @@ New runtime directories may appear automatically on first use:
 
 Desktop users:
 
-- Windows installer: `ForgeNerve_0.1.0_x64-setup.exe`
-- Windows MSI: `ForgeNerve_0.1.0_x64_en-US.msi`
+- Windows installer: `ForgeNerve_0.1.2_x64-setup.exe`
+- Windows MSI: `ForgeNerve_0.1.2_x64_en-US.msi`
 - Windows portable: `ForgeNerve_x64_portable.exe`
-- macOS Apple Silicon: `ForgeNerve_0.1.0_aarch64.dmg`
-- macOS Intel: `ForgeNerve_0.1.0_x64.dmg`
-- Linux x64: `ForgeNerve_0.1.0_amd64.AppImage`
-- Linux arm64: `ForgeNerve_0.1.0_aarch64.AppImage`
+- macOS Apple Silicon: `ForgeNerve_0.1.2_aarch64.dmg`
+- macOS Intel: `ForgeNerve_0.1.2_x64.dmg`
+- Linux x64: `ForgeNerve_0.1.2_amd64.AppImage`
+- Linux arm64: `ForgeNerve_0.1.2_aarch64.AppImage`
 
 CLI / MCP users:
 
@@ -123,7 +129,7 @@ CLI / MCP users:
 
 All official assets are published on the same release page:
 
-- https://github.com/chenpu17/memoforge/releases/tag/v0.1.0
+- https://github.com/chenpu17/memoforge/releases/tag/v0.1.2
 
 ## Validation status
 
