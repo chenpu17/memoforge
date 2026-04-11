@@ -219,6 +219,21 @@ def wait_for_body_text(driver: webdriver.Remote, text: str, timeout: float = 30.
     )
 
 
+def wait_for_any_body_text(
+    driver: webdriver.Remote,
+    texts: list[str],
+    timeout: float = 30.0,
+) -> str:
+    def has_any(current: webdriver.Remote) -> str | bool:
+        body_text = current.find_element(By.TAG_NAME, "body").text
+        for text in texts:
+            if text in body_text:
+                return text
+        return False
+
+    return WebDriverWait(driver, timeout).until(has_any)
+
+
 def assert_body_contains_all(driver: webdriver.Remote, texts: list[str], timeout: float = 20.0) -> None:
     def has_all(current: webdriver.Remote) -> bool:
         body_text = current.find_element(By.TAG_NAME, "body").text
@@ -616,7 +631,11 @@ def run_welcome_import_flow(driver: webdriver.Remote, paths: dict[str, str], mcp
     import_path.clear()
     import_path.send_keys(str(Path(paths["kb1"]).resolve()))
     wait_for_button(driver, "导入").click()
-    wait_for_body_text(driver, "Alpha Rust Patterns", timeout=40.0)
+    landing_text = wait_for_any_body_text(driver, ["Alpha Rust Patterns", "全部文档"], timeout=40.0)
+    if landing_text != "Alpha Rust Patterns":
+        click_tree_button(driver, "programming")
+        click_browser_card(driver, "Alpha Rust Patterns")
+        wait_for_body_text(driver, "Alpha Rust Patterns", timeout=40.0)
     assert_editor_state(mcp_port, expected_kb_path=Path(paths["kb1"]))
     mark("welcome-import")
 
