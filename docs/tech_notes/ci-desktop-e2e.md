@@ -81,3 +81,25 @@ GitHub Actions 手动运行 `CI` workflow 时支持 `ci_scope`：
 - 桌面态 E2E 只验证 Tauri command 分支与内嵌 MCP / SSE
 - 不要把桌面特有断言重新塞回浏览器 E2E
 - 新增桌面功能时，优先补 `tests/tauri_desktop_e2e.py`，其次再决定是否补浏览器态覆盖
+
+## 当前已覆盖的关键入口
+
+当前 `tests/tauri_desktop_e2e.py` 已覆盖以下桌面入口：
+
+- Welcome Flow
+  - 导入已有目录
+  - 新建知识库模板
+  - Clone Git 仓库
+  - 下载与发布入口可见性
+- Workspace 主链路
+  - 知识树 / 目录浏览 / 文档打开
+  - 编辑器选区同步
+  - 知识图谱选择
+  - 新建、保存、导入、Git 提交推送
+  - Agent Draft 提交与丢弃
+- 应用内辅助入口
+  - 设置页中的 MCP 快速配置
+  - 设置页中的下载与发布区
+  - 搜索空结果时的接入引导卡
+
+如果后续再新增欢迎页、空状态页、发布入口或 MCP 引导文案，默认应先更新这份桌面 E2E。

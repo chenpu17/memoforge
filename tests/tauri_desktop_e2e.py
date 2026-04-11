@@ -204,6 +204,14 @@ def wait_for_body_text(driver: webdriver.Remote, text: str, timeout: float = 30.
     )
 
 
+def assert_body_contains_all(driver: webdriver.Remote, texts: list[str], timeout: float = 20.0) -> None:
+    def has_all(current: webdriver.Remote) -> bool:
+        body_text = current.find_element(By.TAG_NAME, "body").text
+        return all(text in body_text for text in texts)
+
+    WebDriverWait(driver, timeout).until(has_all)
+
+
 def wait_for_button(driver: webdriver.Remote, text: str, timeout: float = 20.0):
     xpath = f"//button[contains(normalize-space(.), {json.dumps(text)})]"
     return WebDriverWait(driver, timeout).until(
@@ -254,6 +262,50 @@ def click_browser_card(driver: webdriver.Remote, label: str) -> None:
         EC.element_to_be_clickable((By.XPATH, xpath))
     )
     element.click()
+
+
+def assert_release_entrypoints_visible(driver: webdriver.Remote) -> None:
+    assert_body_contains_all(
+        driver,
+        [
+            "下载与发布入口",
+            "下载 v0.1.0",
+            "Release Notes",
+            "安装与配置说明",
+            "Windows",
+            "MCP CLI",
+        ],
+        timeout=20.0,
+    )
+
+
+def assert_settings_release_section(driver: webdriver.Remote) -> None:
+    assert_body_contains_all(
+        driver,
+        [
+            "MCP 快速配置",
+            "下载与发布",
+            "下载 v0.1.0",
+            "Release Notes",
+            "安装与配置说明",
+            "Standalone MCP",
+            "memoforge-*",
+        ],
+        timeout=20.0,
+    )
+
+
+def assert_search_empty_guidance(driver: webdriver.Remote) -> None:
+    assert_body_contains_all(
+        driver,
+        [
+            "没有找到匹配结果",
+            "下载 v0.1.0",
+            "Release Notes",
+            "MCP 配置说明",
+        ],
+        timeout=20.0,
+    )
 
 
 def poll_note_file(root: str, note_title: str, expected_snippet: str, timeout: float = 12.0) -> Path:
@@ -523,9 +575,11 @@ def create_agent_draft_for_existing_note(
 
 
 def run_welcome_import_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port: int) -> None:
-    wait_for_body_text(driver, "欢迎使用 MemoForge", timeout=40.0)
+    wait_for_body_text(driver, "欢迎使用", timeout=40.0)
     assert_tauri_runtime(driver)
     wait_for_http(f"http://127.0.0.1:{mcp_port}/health", timeout=20.0)
+    assert_release_entrypoints_visible(driver)
+    mark("welcome-release-entrypoints")
 
     wait_for_button(driver, "导入已有目录").click()
     import_path = wait_for_css(driver, 'input[placeholder="输入或选择已有目录路径"]')
@@ -538,9 +592,11 @@ def run_welcome_import_flow(driver: webdriver.Remote, paths: dict[str, str], mcp
 
 
 def run_welcome_create_flow(driver: webdriver.Remote, target_path: Path, mcp_port: int) -> None:
-    wait_for_body_text(driver, "欢迎使用 MemoForge", timeout=40.0)
+    wait_for_body_text(driver, "欢迎使用", timeout=40.0)
     assert_tauri_runtime(driver)
     wait_for_http(f"http://127.0.0.1:{mcp_port}/health", timeout=20.0)
+    assert_release_entrypoints_visible(driver)
+    mark("welcome-release-entrypoints")
 
     wait_for_button(driver, "新建知识库").click()
     name_input = wait_for_css(driver, 'input[placeholder="可选，用于显示知识库名称"]')
@@ -561,9 +617,11 @@ def run_welcome_create_flow(driver: webdriver.Remote, target_path: Path, mcp_por
 
 
 def run_welcome_clone_flow(driver: webdriver.Remote, repo_url: str, clone_target: Path, mcp_port: int) -> None:
-    wait_for_body_text(driver, "欢迎使用 MemoForge", timeout=40.0)
+    wait_for_body_text(driver, "欢迎使用", timeout=40.0)
     assert_tauri_runtime(driver)
     wait_for_http(f"http://127.0.0.1:{mcp_port}/health", timeout=20.0)
+    assert_release_entrypoints_visible(driver)
+    mark("welcome-release-entrypoints")
 
     wait_for_button(driver, "Clone Git 仓库").click()
     repo_input = wait_for_css(driver, 'input[placeholder="https://github.com/user/repo.git"]')
@@ -667,10 +725,20 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     mark("save-note")
 
     wait_for_css(driver, 'button[title="设置"]').click()
-    wait_for_body_text(driver, "MCP 快速配置")
+    assert_settings_release_section(driver)
     wait_for_body_text(driver, f"http://127.0.0.1:{mcp_port}/mcp")
     wait_for_xpath(driver, "//h2[normalize-space(.)='设置']/following::button[1]").click()
     mark("settings-modal")
+
+    wait_for_css(driver, 'button[title="搜索"]').click()
+    search_input = wait_for_css(driver, "div.fixed.inset-0.z-50 input")
+    search_input.send_keys("zzzz-no-match-release-e2e")
+    assert_search_empty_guidance(driver)
+    search_input.send_keys(Keys.ESCAPE)
+    WebDriverWait(driver, 10.0).until_not(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "div.fixed.inset-0.z-50"))
+    )
+    mark("search-empty-guidance")
 
     draft_id = create_agent_draft_for_existing_note(mcp_port, "programming/alpha.md")
     wait_for_css(driver, 'button[aria-label="AI 草稿"]').click()
