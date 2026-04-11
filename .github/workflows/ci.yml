@@ -184,7 +184,7 @@ jobs:
         run: npm run build
 
       - name: Prebuild Tauri desktop binary
-        run: cargo build -p memoforge-tauri
+        run: cargo build -p memoforge-tauri --features custom-protocol
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
@@ -241,7 +241,7 @@ jobs:
         run: npm run build
 
       - name: Prebuild Tauri desktop binary
-        run: cargo build -p memoforge-tauri
+        run: cargo build -p memoforge-tauri --features custom-protocol
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked

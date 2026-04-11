@@ -117,7 +117,11 @@ def build_desktop_binary(env: dict[str, str]) -> Path:
     if not frontend_dist.exists():
         run_command(["npm", "run", "build"], cwd=REPO_ROOT / "frontend", env=env)
 
-    run_command(["cargo", "build", "-p", "memoforge-tauri"], cwd=REPO_ROOT, env=env)
+    run_command(
+        ["cargo", "build", "-p", "memoforge-tauri", "--features", "custom-protocol"],
+        cwd=REPO_ROOT,
+        env=env,
+    )
     binary_name = "memoforge-tauri.exe" if os.name == "nt" else "memoforge-tauri"
     return REPO_ROOT / "target" / "debug" / binary_name
 

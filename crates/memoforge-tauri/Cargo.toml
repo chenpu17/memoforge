@@ -5,6 +5,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = []
+custom-protocol = ["tauri/custom-protocol"]
+
 [dependencies]
 memoforge-core = { path = "../memoforge-core" }
 memoforge-mcp = { path = "../memoforge-mcp" }
