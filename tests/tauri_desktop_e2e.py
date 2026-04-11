@@ -177,14 +177,24 @@ def start_tauri_driver(env: dict[str, str]) -> subprocess.Popen[str]:
     return process
 
 
-def start_webdriver(application: Path) -> webdriver.Remote:
+def start_webdriver(application: Path, timeout: float = 20.0) -> webdriver.Remote:
     options = ArgOptions()
     options.set_capability("browserName", "wry")
     options.set_capability("tauri:options", {"application": str(application)})
-    return webdriver.Remote(
-        command_executor=f"http://127.0.0.1:{TAURI_DRIVER_PORT}",
-        options=options,
-    )
+    deadline = time.time() + timeout
+    last_error: Exception | None = None
+    while time.time() < deadline:
+        try:
+            return webdriver.Remote(
+                command_executor=f"http://127.0.0.1:{TAURI_DRIVER_PORT}",
+                options=options,
+            )
+        except Exception as error:
+            last_error = error
+            time.sleep(1.0)
+    raise RuntimeError(
+        f"Timed out establishing Tauri WebDriver session for {application}"
+    ) from last_error
 
 
 def run_app_session(
