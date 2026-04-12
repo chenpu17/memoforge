@@ -1,12 +1,13 @@
-# ForgeNerve vNext Sprint 1 验收矩阵
+# ForgeNerve v0.3.0 Sprint 1 验收矩阵
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: Sprint 级验收草案
+> 文档类型: Sprint 验收矩阵
+> 状态: 待确认
 > 关联文档:
-> - [ForgeNerve-vNext Sprint1任务拆解](./ForgeNerve-vNext%20Sprint1任务拆解.md)
-> - [ForgeNerve-vNext测试与验收计划](./ForgeNerve-vNext测试与验收计划.md)
-> - [ForgeNerve-vNext MCP契约矩阵](./ForgeNerve-vNext%20MCP%E5%A5%91%E7%BA%A6%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0 Sprint1任务拆解](./ForgeNerve-v0.3.0-Sprint1任务拆解.md)
+> - [ForgeNerve-v0.3.0测试与验收计划](./ForgeNerve-v0.3.0-测试与验收计划.md)
+> - [ForgeNerve-v0.3.0 MCP契约矩阵](./ForgeNerve-v0.3.0-MCP%E5%A5%91%E7%BA%A6%E7%9F%A9%E9%98%B5.md)
 
 ---
 

@@ -1,12 +1,13 @@
-# ForgeNerve vNext 桌面接口冻结表
+# ForgeNerve v0.3.0 桌面接口冻结表
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-10
-> 状态: 开工前冻结草案
+> 文档类型: 桌面接口冻结表
+> 状态: 待冻结
 > 关联文档:
-> - [ForgeNerve-vNext技术方案](./ForgeNerve-vNext技术方案.md)
-> - [ForgeNerve-vNext依赖矩阵](./ForgeNerve-vNext%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md)
-> - [ForgeNerve-vNext Sprint1任务拆解](./ForgeNerve-vNext%20Sprint1任务拆解.md)
+> - [ForgeNerve-v0.3.0技术方案](./ForgeNerve-v0.3.0-技术方案.md)
+> - [ForgeNerve-v0.3.0依赖矩阵](./ForgeNerve-v0.3.0-%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0 Sprint1任务拆解](./ForgeNerve-v0.3.0-Sprint1任务拆解.md)
 
 ---
 
@@ -76,6 +77,6 @@
 
 以下条件满足后，Desktop / Frontend Worker 才可正式开写：
 
-1. `ForgeNerve-vNext数据模型与状态机.md` 已冻结
-2. `ForgeNerve-vNext MCP契约矩阵.md` 已冻结
+1. `ForgeNerve-v0.3.0-数据模型与状态机.md` 已冻结
+2. `ForgeNerve-v0.3.0-MCP契约矩阵.md` 已冻结
 3. 本文件评审通过

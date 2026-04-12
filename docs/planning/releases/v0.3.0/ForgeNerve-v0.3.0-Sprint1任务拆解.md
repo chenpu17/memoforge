@@ -1,11 +1,12 @@
-# ForgeNerve vNext Sprint 1 任务拆解
+# ForgeNerve v0.3.0 Sprint 1 任务拆解
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: Issue 级拆解草案
+> 文档类型: Sprint 任务拆解
+> 状态: 待派工
 > 关联文档:
-> - [ForgeNerve-vNext开发计划](./ForgeNerve-vNext开发计划.md)
-> - [ForgeNerve-vNext决策冻结清单](./ForgeNerve-vNext决策冻结清单.md)
+> - [ForgeNerve-v0.3.0开发计划](./ForgeNerve-v0.3.0-开发计划.md)
+> - [ForgeNerve-v0.3.0决策冻结清单](./ForgeNerve-v0.3.0-决策冻结清单.md)
 
 ---
 

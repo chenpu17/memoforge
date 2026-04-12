@@ -1,18 +1,19 @@
-# ForgeNerve vNext MCP 契约矩阵
+# ForgeNerve v0.3.0 MCP 契约矩阵
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: 开工前冻结草案
+> 文档类型: MCP 契约矩阵
+> 状态: 待冻结
 > 关联文档:
-> - [ForgeNerve-vNext技术方案](./ForgeNerve-vNext技术方案.md)
-> - [ForgeNerve-vNext决策冻结清单](./ForgeNerve-vNext决策冻结清单.md)
-> - [ForgeNerve-vNext Sprint1任务拆解](./ForgeNerve-vNext%20Sprint1任务拆解.md)
+> - [ForgeNerve-v0.3.0技术方案](./ForgeNerve-v0.3.0-技术方案.md)
+> - [ForgeNerve-v0.3.0决策冻结清单](./ForgeNerve-v0.3.0-决策冻结清单.md)
+> - [ForgeNerve-v0.3.0 Sprint1任务拆解](./ForgeNerve-v0.3.0-Sprint1任务拆解.md)
 
 ---
 
 ## 1. 文档目标
 
-本文件用于给 vNext 新增 MCP tools 提供单一事实源。
+本文件用于给 v0.3.0 新增 MCP tools 提供单一事实源。
 
 冻结内容：
 
@@ -142,5 +143,5 @@ Sprint 1 继续复用现有 Draft 工具，不新增别名：
 以下条件满足后，MCP Worker 才可正式开写：
 
 - 本文件完成评审
-- `ForgeNerve-vNext数据模型与状态机.md` 已冻结
+- `ForgeNerve-v0.3.0-数据模型与状态机.md` 已冻结
 - Sprint 1 任务拆解已绑定本文件

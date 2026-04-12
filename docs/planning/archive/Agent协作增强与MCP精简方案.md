@@ -4,7 +4,7 @@
 > 日期: 2026-04-08
 > 状态: 方案评审稿
 > 关联文档:
-> - [PRD](../design/PRD.md)
+> - [PRD](../../design/PRD.md)
 > - [README](../../README.md)
 > - [MCP Server README](../../crates/memoforge-mcp/README.md)
 

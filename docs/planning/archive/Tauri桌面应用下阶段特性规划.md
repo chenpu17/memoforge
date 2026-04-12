@@ -4,7 +4,7 @@
 > 日期: 2026-04-08
 > 状态: 方案评审稿
 > 关联文档:
-> - [PRD](../design/PRD.md)
+> - [PRD](../../design/PRD.md)
 > - [README](../../README.md)
 > - [Agent协作增强与MCP精简方案](./Agent协作增强与MCP精简方案.md)
 

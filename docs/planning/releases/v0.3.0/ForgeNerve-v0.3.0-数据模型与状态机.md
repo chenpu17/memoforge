@@ -1,12 +1,13 @@
-# ForgeNerve vNext 数据模型与状态机
+# ForgeNerve v0.3.0 数据模型与状态机
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: 开工前冻结草案
+> 文档类型: 数据模型与状态机
+> 状态: 待冻结
 > 关联文档:
-> - [ForgeNerve-vNext产品需求文档](./ForgeNerve-vNext产品需求文档.md)
-> - [ForgeNerve-vNext技术方案](./ForgeNerve-vNext技术方案.md)
-> - [ForgeNerve-vNext决策冻结清单](./ForgeNerve-vNext决策冻结清单.md)
+> - [ForgeNerve-v0.3.0产品需求文档](./ForgeNerve-v0.3.0-产品需求文档.md)
+> - [ForgeNerve-v0.3.0技术方案](./ForgeNerve-v0.3.0-技术方案.md)
+> - [ForgeNerve-v0.3.0决策冻结清单](./ForgeNerve-v0.3.0-决策冻结清单.md)
 
 ---
 
@@ -26,7 +27,7 @@
 
 1. Sprint 1 只冻结 `InboxItem`、`AgentSession`、`DraftLink`
 2. `ReliabilityIssue` 与 `ContextPack` 先冻结最小骨架
-3. `Review` 在 vNext.1 中不是独立存储实体，而是对 Draft 的待确认投影视图
+3. `Review` 在 v0.3.0 中不是独立存储实体，而是对 Draft 的待确认投影视图
 4. 所有主实体 ID 均使用字符串型 `ulid`
 
 ---
@@ -143,7 +144,7 @@ Sprint 1 冻结为：
 
 ### 6.1 DraftLink 冻结
 
-为避免在 vNext.1 引入额外持久化对象，冻结一层轻量关联定义：
+为避免在 v0.3.0 引入额外持久化对象，冻结一层轻量关联定义：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -155,7 +156,7 @@ Sprint 1 冻结为：
 
 ### 6.2 Review 边界冻结
 
-vNext.1 的 `Review` 定义为：
+v0.3.0 的 `Review` 定义为：
 
 - 桌面端对待确认 Draft 的聚合视图
 - 底层对象仍是现有 Draft
@@ -168,7 +169,7 @@ vNext.1 的 `Review` 定义为：
 - `DraftLink.source_inbox_item_id`
 - `DraftLink.source_session_id`
 
-在 `vNext.1` 中统一作为 Draft 文件顶层扩展对象持久化，冻结 key path 为：
+在 `v0.3.0` 中统一作为 Draft 文件顶层扩展对象持久化，冻结 key path 为：
 
 `draft_context.review`
 
@@ -240,7 +241,7 @@ vNext.1 的 `Review` 定义为：
 
 ### 8.2 说明
 
-- vNext.1 只交付 `Context Pack Foundation`
+- v0.3.0 只交付 `Context Pack Foundation`
 - 先支持创建、查看、被 Session 引用
 - `分享 / 发布 / 订阅` 留到后续阶段
 

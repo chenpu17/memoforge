@@ -1,13 +1,14 @@
-# ForgeNerve vNext 决策冻结清单
+# ForgeNerve v0.3.0 决策冻结清单
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: 待评审冻结
+> 文档类型: 决策冻结清单
+> 状态: 待评审
 > 关联文档:
-> - [ForgeNerve-vNext产品需求文档](./ForgeNerve-vNext产品需求文档.md)
-> - [ForgeNerve-vNext技术方案](./ForgeNerve-vNext技术方案.md)
-> - [ForgeNerve-vNext数据模型与状态机](./ForgeNerve-vNext%E6%95%B0%E6%8D%AE%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%8A%B6%E6%80%81%E6%9C%BA.md)
-> - [ForgeNerve-vNext MCP契约矩阵](./ForgeNerve-vNext%20MCP%E5%A5%91%E7%BA%A6%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0产品需求文档](./ForgeNerve-v0.3.0-产品需求文档.md)
+> - [ForgeNerve-v0.3.0技术方案](./ForgeNerve-v0.3.0-技术方案.md)
+> - [ForgeNerve-v0.3.0数据模型与状态机](./ForgeNerve-v0.3.0-%E6%95%B0%E6%8D%AE%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%8A%B6%E6%80%81%E6%9C%BA.md)
+> - [ForgeNerve-v0.3.0 MCP契约矩阵](./ForgeNerve-v0.3.0-MCP%E5%A5%91%E7%BA%A6%E7%9F%A9%E9%98%B5.md)
 
 ---
 
@@ -94,7 +95,7 @@
 
 ## 5. MCP 契约冻结
 
-建议冻结以下最小工具集，详细 request / response 以 `ForgeNerve-vNext MCP契约矩阵.md` 为准：
+建议冻结以下最小工具集，详细 request / response 以 `ForgeNerve-v0.3.0-MCP契约矩阵.md` 为准：
 
 ### 5.1 Inbox
 

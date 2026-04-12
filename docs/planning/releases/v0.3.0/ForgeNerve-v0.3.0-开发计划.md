@@ -1,22 +1,23 @@
-# ForgeNerve vNext 开发计划
+# ForgeNerve v0.3.0 开发计划
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: 执行计划草案
+> 文档类型: 开发计划
+> 状态: 草案
 > 关联文档:
-> - [ForgeNerve-vNext差异化战略](./ForgeNerve-vNext差异化战略.md)
-> - [ForgeNerve-vNext产品需求文档](./ForgeNerve-vNext产品需求文档.md)
-> - [ForgeNerve-vNext技术方案](./ForgeNerve-vNext技术方案.md)
-> - [ForgeNerve-vNext依赖矩阵](./ForgeNerve-vNext%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md)
-> - [ForgeNerve-vNext Sprint1验收矩阵](./ForgeNerve-vNext%20Sprint1%E9%AA%8C%E6%94%B6%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0差异化战略](./ForgeNerve-v0.3.0-差异化战略.md)
+> - [ForgeNerve-v0.3.0产品需求文档](./ForgeNerve-v0.3.0-产品需求文档.md)
+> - [ForgeNerve-v0.3.0技术方案](./ForgeNerve-v0.3.0-技术方案.md)
+> - [ForgeNerve-v0.3.0依赖矩阵](./ForgeNerve-v0.3.0-%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0 Sprint1验收矩阵](./ForgeNerve-v0.3.0-Sprint1%E9%AA%8C%E6%94%B6%E7%9F%A9%E9%98%B5.md)
 
 ---
 
 ## 1. 计划摘要
 
-vNext 建议拆为 5 个 Sprint，以“先建立壁垒，再扩展团队能力”为顺序推进。
+v0.3.0 建议拆为 5 个 Sprint，以“先建立壁垒，再扩展团队能力”为顺序推进。
 
-vNext.1 核心交付：
+v0.3.0 核心交付：
 
 1. Inbox
 2. Agent Session
@@ -44,7 +45,7 @@ vNext.1 核心交付：
 
 目标：
 
-- 建立 vNext 的核心数据层
+- 建立 v0.3.0 的核心数据层
 
 任务：
 
@@ -96,14 +97,14 @@ vNext.1 核心交付：
 
 说明：
 
-- `Context Pack Foundation` 属于 `vNext.1 P0`
+- `Context Pack Foundation` 属于 `v0.3.0 P0`
 - `Team Publish` 属于后续增强，可在 Sprint 4 内并行评审，但不应阻塞 `Context Pack Foundation` 验收
 
 ### Sprint 5：发布收口
 
 目标：
 
-- 让 vNext 成为可对外叙事的版本
+- 让 v0.3.0 成为可对外叙事的版本
 
 任务：
 
@@ -172,7 +173,7 @@ vNext.1 核心交付：
 2. Worker 2 根据模型冻结 MCP 契约
 3. Worker 3 在契约冻结后并行做界面
 4. Worker 4 从 Sprint 1 开始同步补测试与文档
-5. 以 `ForgeNerve-vNext依赖矩阵.md` 为并行依据
+5. 以 `ForgeNerve-v0.3.0-依赖矩阵.md` 为并行依据
 
 ---
 
@@ -192,7 +193,7 @@ vNext.1 核心交付：
 - MCP E2E 覆盖新增工具
 - Tauri E2E 覆盖主流程
 - 前端测试覆盖关键交互
-- Sprint 1 细则以 `ForgeNerve-vNext Sprint1验收矩阵.md` 为准
+- Sprint 1 细则以 `ForgeNerve-v0.3.0-Sprint1验收矩阵.md` 为准
 
 ### 6.3 产品验收
 

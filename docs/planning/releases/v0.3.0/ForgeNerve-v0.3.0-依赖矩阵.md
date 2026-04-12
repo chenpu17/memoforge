@@ -1,12 +1,13 @@
-# ForgeNerve vNext 依赖矩阵
+# ForgeNerve v0.3.0 依赖矩阵
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: 开工前依赖表
+> 文档类型: 依赖矩阵
+> 状态: 待确认
 > 关联文档:
-> - [ForgeNerve-vNext开发计划](./ForgeNerve-vNext开发计划.md)
-> - [ForgeNerve-vNext Sprint1任务拆解](./ForgeNerve-vNext%20Sprint1任务拆解.md)
-> - [ForgeNerve-vNext测试与验收计划](./ForgeNerve-vNext测试与验收计划.md)
+> - [ForgeNerve-v0.3.0开发计划](./ForgeNerve-v0.3.0-开发计划.md)
+> - [ForgeNerve-v0.3.0 Sprint1任务拆解](./ForgeNerve-v0.3.0-Sprint1任务拆解.md)
+> - [ForgeNerve-v0.3.0测试与验收计划](./ForgeNerve-v0.3.0-测试与验收计划.md)
 
 ---
 

@@ -1,11 +1,12 @@
-# ForgeNerve vNext 任务清单
+# ForgeNerve v0.3.0 任务清单
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
+> 文档类型: 任务清单
 > 状态: 待排期
 > 关联文档:
-> - [ForgeNerve-vNext开发计划](./ForgeNerve-vNext开发计划.md)
-> - [ForgeNerve-vNext依赖矩阵](./ForgeNerve-vNext%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0开发计划](./ForgeNerve-v0.3.0-开发计划.md)
+> - [ForgeNerve-v0.3.0依赖矩阵](./ForgeNerve-v0.3.0-%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md)
 
 ---
 
@@ -39,7 +40,7 @@
 
 ## 3. 建议优先级
 
-### vNext.1 P0
+### v0.3.0 P0
 
 - Inbox
 - Session

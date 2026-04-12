@@ -15,7 +15,7 @@ ForgeNerve 是一个面向开发者和 AI Agent 的知识操作系统：它把 `
 
 ## 项目状态
 
-当前阶段：**vNext.1 开发完成** (2026-04-10)
+当前规划主线：**v0.3.0** (2026-04-12，处于设计整理与评审冻结阶段)
 
 最新正式版：[`ForgeNerve v0.1.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2)
 
@@ -29,14 +29,10 @@ ForgeNerve 是一个面向开发者和 AI Agent 的知识操作系统：它把 `
 - ✅ 实时刷新 (MCP 创建自动同步到 GUI)
 - ✅ 前端单元测试 + E2E 测试
 - ✅ Tauri 桌面端到端测试（CI 覆盖）
-- ✅ Sprint 1: Inbox + Session + Draft 最小闭环
-- ✅ Sprint 2: Review 审阅面板 + Session 详情面板
-- ✅ Sprint 3: Reliability Dashboard — 知识质量规则扫描与修复
-- ✅ Sprint 4: Context Pack — 知识切片打包与 Agent 会话复用
 
-### vNext.1 新增能力
+### v0.3.0 规划范围
 
-vNext.1 引入以下核心概念：
+`v0.3.0` 当前仍处于设计与冻结阶段，规划聚焦以下核心概念：
 
 - **Inbox** — 待审阅的知识候选池，支持状态流转（new → triaged → drafted → promoted）
 - **Session** — Agent 工作会话追踪，记录上下文、草稿和生成的 Inbox items
@@ -190,11 +186,11 @@ curl -X POST http://127.0.0.1:31415/mcp \
 
 应用内也可以直接点击 `设置`，在 `MCP 快速配置` 区块里复制现成配置。
 
-品牌迁移说明见 `docs/planning/ForgeNerve品牌迁移方案.md`。
-官网首页文案见 `docs/planning/ForgeNerve官网首页文案.md`。
-官网完整结构稿见 `docs/planning/ForgeNerve官网完整落地结构稿.md`。
-发布公告草案见 `docs/planning/ForgeNerve品牌升级公告.md`。
-应用启动页文案层级见 `docs/planning/ForgeNerve应用启动页文案层级.md`。
+品牌迁移说明见 `docs/planning/brand/ForgeNerve品牌迁移方案.md`。
+官网首页文案见 `docs/planning/brand/ForgeNerve官网首页文案.md`。
+官网完整结构稿见 `docs/planning/brand/ForgeNerve官网完整落地结构稿.md`。
+发布公告草案见 `docs/planning/brand/ForgeNerve品牌升级公告.md`。
+应用启动页文案层级见 `docs/planning/brand/ForgeNerve应用启动页文案层级.md`。
 发布准备清单见 `docs/tech_notes/release-checklist.md`。
 CI 触发策略见 `docs/tech_notes/release-ci-strategy.md`。
 发布文案包见 `docs/tech_notes/release-launch-pack.md`。
@@ -388,29 +384,44 @@ frontend/src/
 - [PRD.md](docs/design/PRD.md) - 产品需求文档
 - [技术实现文档.md](docs/design/技术实现文档.md) - 技术实现方案
 - [MCP Server README](crates/memoforge-mcp/README.md) - MCP 详细文档
-- [Agent协作增强与MCP精简方案](docs/planning/Agent协作增强与MCP精简方案.md) - Agent 友好写入与 MCP 重构方案
-- [Agent协作增强开发计划](docs/planning/Agent协作增强开发计划.md) - 测试、开发排期与团队分工
-- [Agent协作增强Sprint1任务拆解](docs/planning/Agent协作增强Sprint1任务拆解.md) - Agent Draft 流第一阶段的 issue 级拆解
-- [Tauri桌面应用下阶段特性规划](docs/planning/Tauri桌面应用下阶段特性规划.md) - 桌面端产品与特性增强规划
-- [Tauri桌面应用增强开发计划](docs/planning/Tauri桌面应用增强开发计划.md) - 桌面端 Sprint、测试矩阵与团队分工
-- [Tauri桌面应用Epic与任务拆解](docs/planning/Tauri桌面应用Epic与任务拆解.md) - 桌面端 Epic、子任务与开工顺序
-- [ForgeNerve-vNext差异化战略](docs/planning/ForgeNerve-vNext差异化战略.md) - 新版本竞争力与品类战略
-- [ForgeNerve-vNext产品需求文档](docs/planning/ForgeNerve-vNext产品需求文档.md) - 新版本核心功能范围与验收目标
-- [ForgeNerve-vNext技术方案](docs/planning/ForgeNerve-vNext技术方案.md) - Inbox / Session / Reliability / Context Pack 技术落地
-- [ForgeNerve-vNext开发计划](docs/planning/ForgeNerve-vNext开发计划.md) - Sprint 规划与 Claude Code Agent Teams 分工
-- [ForgeNerve-vNext任务清单](docs/planning/ForgeNerve-vNext任务清单.md) - 可直接进入 issue / 任务系统的待办清单
-- [ForgeNerve-vNext文档索引](docs/planning/ForgeNerve-vNext文档索引.md) - 开发前文档总导航与开工顺序
-- [ForgeNerve-vNext开发前准备清单](docs/planning/ForgeNerve-vNext开发前准备清单.md) - 开工前总入口与 TODO List
-- [ForgeNerve-vNext决策冻结清单](docs/planning/ForgeNerve-vNext决策冻结清单.md) - 范围、模型边界、MCP 契约冻结项
-- [ForgeNerve-vNext数据模型与状态机](docs/planning/ForgeNerve-vNext%E6%95%B0%E6%8D%AE%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%8A%B6%E6%80%81%E6%9C%BA.md) - Core / MCP / Desktop 共用的数据模型与状态机事实源
-- [ForgeNerve-vNext MCP契约矩阵](docs/planning/ForgeNerve-vNext%20MCP%E5%A5%91%E7%BA%A6%E7%9F%A9%E9%98%B5.md) - MCP 工具、profile 与 request/response 冻结表
-- [ForgeNerve-vNext依赖矩阵](docs/planning/ForgeNerve-vNext%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md) - Sprint 1 并行依赖、阻塞关系与合并门槛
-- [ForgeNerve-vNext桌面接口冻结表](docs/planning/ForgeNerve-vNext%E6%A1%8C%E9%9D%A2%E6%8E%A5%E5%8F%A3%E5%86%BB%E7%BB%93%E8%A1%A8.md) - Tauri command 与前端 service 的冻结接口表
-- [ForgeNerve-vNext Sprint1任务拆解](docs/planning/ForgeNerve-vNext%20Sprint1任务拆解.md) - 第一阶段 issue 级任务拆解
-- [ForgeNerve-vNext Sprint1验收矩阵](docs/planning/ForgeNerve-vNext%20Sprint1%E9%AA%8C%E6%94%B6%E7%9F%A9%E9%98%B5.md) - Sprint 1 最小闭环的完成定义
-- [ForgeNerve-vNext测试与验收计划](docs/planning/ForgeNerve-vNext测试与验收计划.md) - 测试矩阵与发布前验收标准
-- [ForgeNerve-vNext Agent Teams提示词](docs/planning/ForgeNerve-vNext%20Agent%20Teams提示词.md) - Claude Code 多 Agent 执行提示词
-- [规划与现状对齐说明](docs/planning/规划与现状对齐说明.md) - 规划目标与当前代码真实状态的差异说明
+- [规划文档目录](docs/planning/README.md) - 当前版本、历史归档、品牌文案的总导航
+
+### 当前权威版本：v0.3.0
+
+- [ForgeNerve v0.3.0 文档索引](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-文档索引.md) - 当前版本开发前文档总导航
+- [ForgeNerve v0.3.0 差异化战略](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-差异化战略.md) - 新版本竞争力与品类战略
+- [ForgeNerve v0.3.0 产品需求文档](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-产品需求文档.md) - 新版本核心功能范围与验收目标
+- [ForgeNerve v0.3.0 技术方案](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-技术方案.md) - Inbox / Session / Reliability / Context Pack 技术落地
+- [ForgeNerve v0.3.0 开发计划](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-开发计划.md) - Sprint 规划与 Claude Code Agent Teams 分工
+- [ForgeNerve v0.3.0 任务清单](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-任务清单.md) - 可直接进入 issue / 任务系统的待办清单
+- [ForgeNerve v0.3.0 开发前准备清单](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-开发前准备清单.md) - 开工前总入口与 TODO List
+- [ForgeNerve v0.3.0 决策冻结清单](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-决策冻结清单.md) - 范围、模型边界、MCP 契约冻结项
+- [ForgeNerve v0.3.0 数据模型与状态机](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-数据模型与状态机.md) - Core / MCP / Desktop 共用的数据模型与状态机事实源
+- [ForgeNerve v0.3.0 MCP 契约矩阵](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-MCP契约矩阵.md) - MCP 工具、profile 与 request/response 冻结表
+- [ForgeNerve v0.3.0 依赖矩阵](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-依赖矩阵.md) - Sprint 1 并行依赖、阻塞关系与合并门槛
+- [ForgeNerve v0.3.0 桌面接口冻结表](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-桌面接口冻结表.md) - Tauri command 与前端 service 的冻结接口表
+- [ForgeNerve v0.3.0 Sprint 1 任务拆解](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-Sprint1任务拆解.md) - 第一阶段 issue 级任务拆解
+- [ForgeNerve v0.3.0 Sprint 1 验收矩阵](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-Sprint1验收矩阵.md) - Sprint 1 最小闭环的完成定义
+- [ForgeNerve v0.3.0 测试与验收计划](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-测试与验收计划.md) - 测试矩阵与发布前验收标准
+- [ForgeNerve v0.3.0 Agent Teams 提示词](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-Agent%20Teams提示词.md) - Claude Code 多 Agent 执行提示词
+
+### 历史归档
+
+- [Agent协作增强与MCP精简方案](docs/planning/archive/Agent协作增强与MCP精简方案.md) - 早期 Agent 交互增强方案
+- [Agent协作增强开发计划](docs/planning/archive/Agent协作增强开发计划.md) - 早期 Agent Sprint 规划
+- [Agent协作增强 Sprint1 任务拆解](docs/planning/archive/Agent协作增强Sprint1任务拆解.md) - 早期 Agent issue 级拆解
+- [Tauri 桌面应用下阶段特性规划](docs/planning/archive/Tauri桌面应用下阶段特性规划.md) - 早期桌面端增强规划
+- [Tauri 桌面应用增强开发计划](docs/planning/archive/Tauri桌面应用增强开发计划.md) - 早期桌面端开发计划
+- [Tauri 桌面应用 Epic 与任务拆解](docs/planning/archive/Tauri桌面应用Epic与任务拆解.md) - 早期桌面端任务拆解
+- [规划与现状对齐说明](docs/planning/archive/规划与现状对齐说明.md) - 规划目标与代码现状差异说明
+
+### 品牌与对外文案
+
+- [ForgeNerve 品牌迁移方案](docs/planning/brand/ForgeNerve品牌迁移方案.md) - 品牌升级原则与迁移策略
+- [ForgeNerve 品牌升级公告](docs/planning/brand/ForgeNerve品牌升级公告.md) - 对外公告草稿
+- [ForgeNerve 官网首页文案](docs/planning/brand/ForgeNerve官网首页文案.md) - 官网 Hero 与主体文案
+- [ForgeNerve 官网完整落地结构稿](docs/planning/brand/ForgeNerve官网完整落地结构稿.md) - 官网结构与内容编排
+- [ForgeNerve 应用启动页文案层级](docs/planning/brand/ForgeNerve应用启动页文案层级.md) - 应用启动页层级与文案
 
 ## License
 

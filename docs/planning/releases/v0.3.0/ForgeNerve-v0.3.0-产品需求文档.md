@@ -1,24 +1,25 @@
-# ForgeNerve vNext 产品需求文档
+# ForgeNerve v0.3.0 产品需求文档
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: PRD 草案
+> 文档类型: PRD
+> 状态: 草案
 > 关联文档:
-> - [ForgeNerve-vNext差异化战略](./ForgeNerve-vNext差异化战略.md)
-> - [ForgeNerve-vNext技术方案](./ForgeNerve-vNext技术方案.md)
-> - [ForgeNerve-vNext开发计划](./ForgeNerve-vNext开发计划.md)
+> - [ForgeNerve-v0.3.0差异化战略](./ForgeNerve-v0.3.0-差异化战略.md)
+> - [ForgeNerve-v0.3.0技术方案](./ForgeNerve-v0.3.0-技术方案.md)
+> - [ForgeNerve-v0.3.0开发计划](./ForgeNerve-v0.3.0-开发计划.md)
 
 ---
 
 ## 1. 版本目标
 
-ForgeNerve vNext 的目标不是增加零散功能，而是让产品从“可用的 Agent 知识工作台”进入“具备行业差异化的知识运行系统”阶段。
+ForgeNerve v0.3.0 的目标不是增加零散功能，而是让产品从“可用的 Agent 知识工作台”进入“具备行业差异化的知识运行系统”阶段。
 
 本轮开发前冻结口径：
 
-- `vNext.1 = 当前准备开工的版本`
-- `vNext.1 P0 = Inbox + Session + Verified Draft + Reliability Dashboard + Context Pack Foundation`
-- `vNext.2 = Team Publish / Session Templates / 更完整 Review Queue`
+- `v0.3.0 = 当前准备开工的版本`
+- `v0.3.0 P0 = Inbox + Session + Verified Draft + Reliability Dashboard + Context Pack Foundation`
+- `v0.4.0 = Team Publish / Session Templates / 更完整 Review Queue`
 
 本版本聚焦四个结果：
 
@@ -100,7 +101,7 @@ ForgeNerve vNext 的目标不是增加零散功能，而是让产品从“可用
 
 交付说明：
 
-- `vNext.1` 优先保证“候选项 -> Draft”闭环
+- `v0.3.0` 优先保证“候选项 -> Draft”闭环
 - 候选项直接进入正式知识在产品范围内保留，但对应 MCP tool `promote_inbox_item_to_knowledge` 计划在 `S2+` 补齐
 - 桌面端可先通过 Review / Draft 工作流承接直接落知识的用户需求
 
@@ -153,7 +154,7 @@ ForgeNerve vNext 的目标不是增加零散功能，而是让产品从“可用
 
 说明：
 
-- vNext.1 只交付 Foundation 能力
+- v0.3.0 只交付 Foundation 能力
 - 不包含 Team Publish、分享、订阅与托管分发
 
 ---
@@ -172,7 +173,7 @@ ForgeNerve vNext 的目标不是增加零散功能，而是让产品从“可用
 
 说明：
 
-- vNext.1 中已有最小 `Review` 一级入口，用于承接 Draft 审阅
+- v0.3.0 中已有最小 `Review` 一级入口，用于承接 Draft 审阅
 - 此处 `Unified Knowledge Review Queue` 指更完整的统一变更队列，属于后续增强
 
 ### P1.3 Session Templates
@@ -273,9 +274,9 @@ ForgeNerve vNext 的目标不是增加零散功能，而是让产品从“可用
 
 ## 7.4 Review 边界冻结
 
-- `Review` 是 vNext.1 的一级导航名称
+- `Review` 是 v0.3.0 的一级导航名称
 - `Review Queue` 是对该导航的功能描述
-- vNext.1 的 `Review` 仅承接 Draft 待确认变更
+- v0.3.0 的 `Review` 仅承接 Draft 待确认变更
 - 更完整的统一变更队列留在 `P1.2`
 
 ---
@@ -290,7 +291,7 @@ ForgeNerve vNext 的目标不是增加零散功能，而是让产品从“可用
 - Reliability 问题修复率
 - Agent Session 完成率
 
-vNext.1 内部验收基线建议：
+v0.3.0 内部验收基线建议：
 
 - 最小 Agent 写入闭环 E2E 成功率 `>= 90%`
 - Draft 提交成功率 `>= 90%`（基于验收脚本集）
@@ -302,7 +303,7 @@ vNext.1 内部验收基线建议：
 - 批量处理知识问题的平均时长
 - 用户在桌面端完成确认的比例
 
-vNext.1 内部体验基线建议：
+v0.3.0 内部体验基线建议：
 
 - 首次 Agent 写入确认时间 `<= 3 分钟`
 - 桌面端从 Session / Inbox 进入 Review 预览不超过 `3` 次点击
@@ -314,7 +315,7 @@ vNext.1 内部体验基线建议：
 - 无摘要知识占比
 - 过期知识占比
 
-vNext.1 内部质量基线建议：
+v0.3.0 内部质量基线建议：
 
 - 冲突提交率在验收脚本集中 `<= 10%`
 - 不允许出现 Draft / Inbox / Session 关联错绑
@@ -327,11 +328,11 @@ vNext.1 内部质量基线建议：
 
 - 继续沿用 `.memoforge/`
 - 继续兼容现有 `drafts/`、`config.yaml`、知识内容目录
-- 不在 `vNext.1` 重命名 crate、目录或底层数据根
+- 不在 `v0.3.0` 重命名 crate、目录或底层数据根
 
 ### 9.2 新增目录
 
-`vNext.1` 新增：
+`v0.3.0` 新增：
 
 - `.memoforge/inbox/`
 - `.memoforge/sessions/`
@@ -358,7 +359,7 @@ vNext.1 内部质量基线建议：
 
 ## 10. 版本验收标准
 
-满足以下条件可认为 vNext 达标：
+满足以下条件可认为 v0.3.0 达标：
 
 1. Agent 可以围绕 session + draft + inbox 稳定工作
 2. 用户可在桌面端完成完整的审阅与确认闭环

@@ -1,18 +1,19 @@
-# ForgeNerve vNext 测试与验收计划
+# ForgeNerve v0.3.0 测试与验收计划
 
-> 版本: v0.1
+> 目标版本: v0.3.0
 > 日期: 2026-04-09
-> 状态: 测试计划草案
+> 文档类型: 测试与验收计划
+> 状态: 草案
 > 关联文档:
-> - [ForgeNerve-vNext产品需求文档](./ForgeNerve-vNext产品需求文档.md)
-> - [ForgeNerve-vNext开发计划](./ForgeNerve-vNext开发计划.md)
-> - [ForgeNerve-vNext Sprint1验收矩阵](./ForgeNerve-vNext%20Sprint1%E9%AA%8C%E6%94%B6%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0产品需求文档](./ForgeNerve-v0.3.0-产品需求文档.md)
+> - [ForgeNerve-v0.3.0开发计划](./ForgeNerve-v0.3.0-开发计划.md)
+> - [ForgeNerve-v0.3.0 Sprint1验收矩阵](./ForgeNerve-v0.3.0-Sprint1%E9%AA%8C%E6%94%B6%E7%9F%A9%E9%98%B5.md)
 
 ---
 
 ## 1. 测试目标
 
-vNext 的测试重点不是“页面有没有渲染”，而是：
+v0.3.0 的测试重点不是“页面有没有渲染”，而是：
 
 1. Agent 协作链路是否稳定
 2. 变更是否可审、可回退、可确认

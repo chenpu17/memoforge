@@ -22,13 +22,13 @@
 创建一个 agent team 来实现 MemoForge 下版本全部特性增强，包括 Agent Draft 流和 Tauri 桌面端增强。
 
 先阅读以下文档理解完整方案（你自己先读，不要让 teammate 读）：
-1. docs/planning/规划与现状对齐说明.md — 理解现状与差距
-2. docs/planning/Agent协作增强与MCP精简方案.md — 理解 Draft 流和 MCP 设计
-3. docs/planning/Agent协作增强开发计划.md — 理解 Agent 线 Sprint 规划和跨线依赖
-4. docs/planning/Agent协作增强Sprint1任务拆解.md — 理解 Sprint 1 具体任务
-5. docs/planning/Tauri桌面应用下阶段特性规划.md — 理解桌面端特性方向
-6. docs/planning/Tauri桌面应用增强开发计划.md — 理解桌面端 Sprint 规划
-7. docs/planning/Tauri桌面应用Epic与任务拆解.md — 理解桌面端具体任务
+1. docs/planning/archive/规划与现状对齐说明.md — 理解现状与差距
+2. docs/planning/archive/Agent协作增强与MCP精简方案.md — 理解 Draft 流和 MCP 设计
+3. docs/planning/archive/Agent协作增强开发计划.md — 理解 Agent 线 Sprint 规划和跨线依赖
+4. docs/planning/archive/Agent协作增强Sprint1任务拆解.md — 理解 Sprint 1 具体任务
+5. docs/planning/archive/Tauri桌面应用下阶段特性规划.md — 理解桌面端特性方向
+6. docs/planning/archive/Tauri桌面应用增强开发计划.md — 理解桌面端 Sprint 规划
+7. docs/planning/archive/Tauri桌面应用Epic与任务拆解.md — 理解桌面端具体任务
 8. crates/memoforge-core/src/api.rs — 理解现有 API 风格
 9. crates/memoforge-core/src/knowledge.rs — 理解 split_sections
 10. crates/memoforge-core/src/models.rs — 理解数据模型
