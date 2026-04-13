@@ -278,6 +278,8 @@ def read_markdown_editor_text(driver: webdriver.Remote) -> str:
     try:
         text = driver.execute_script(
             """
+            const hooked = window.__MEMOFORGE_EDITOR_TEST_HOOKS__?.getMarkdownDocument?.();
+            if (typeof hooked === 'string') return hooked;
             const node = document.querySelector('.cm-content');
             if (!node) return '';
             return node.innerText || node.textContent || '';
