@@ -64,9 +64,22 @@ def init_git_repo(kb_path: Path, remote_path: Optional[Path] = None) -> None:
         stdout=subprocess.DEVNULL,
     )
     if remote_path:
+        subprocess.run(["git", "init", "--bare", str(remote_path)], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=kb_path, check=True, stdout=subprocess.DEVNULL)
         subprocess.run(
             ["git", "remote", "add", "origin", str(remote_path)],
             cwd=kb_path,
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            ["git", "push", "-u", "origin", "main"],
+            cwd=kb_path,
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            ["git", "-C", str(remote_path), "symbolic-ref", "HEAD", "refs/heads/main"],
             check=True,
             stdout=subprocess.DEVNULL,
         )

@@ -33,6 +33,13 @@ def init_git_repo(kb_path: Path, remote_path: Path) -> None:
     subprocess.run(["git", "-C", str(kb_path), "branch", "-M", "main"], check=True, stdout=subprocess.DEVNULL)
     subprocess.run(["git", "-C", str(kb_path), "remote", "add", "origin", str(remote_path)], check=True)
     subprocess.run(["git", "-C", str(kb_path), "push", "-u", "origin", "main"], check=True, stdout=subprocess.DEVNULL)
+    # Keep the bare remote HEAD aligned with the pushed default branch so clone
+    # produces a checked-out working tree on every platform.
+    subprocess.run(
+        ["git", "-C", str(remote_path), "symbolic-ref", "HEAD", "refs/heads/main"],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
 
 
 def seed_knowledge_base(base_dir: Path) -> dict[str, str]:
