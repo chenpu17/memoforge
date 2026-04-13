@@ -399,9 +399,13 @@ def wait_for_draft_card(driver: webdriver.Remote, knowledge_path: str, timeout: 
     return wait_clickable_xpath(driver, xpath, timeout=timeout)
 
 
-def accept_dialog(driver: webdriver.Remote, timeout: float = 10.0) -> None:
-    alert = WebDriverWait(driver, timeout).until(EC.alert_is_present())
+def accept_dialog(driver: webdriver.Remote, timeout: float = 2.0) -> bool:
+    try:
+        alert = WebDriverWait(driver, timeout).until(EC.alert_is_present())
+    except TimeoutException:
+        return False
     alert.accept()
+    return True
 
 
 def click_tree_button(driver: webdriver.Remote, label: str) -> None:
