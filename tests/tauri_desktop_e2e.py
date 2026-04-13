@@ -29,7 +29,7 @@ from frontend_e2e import REPO_ROOT, make_test_env, seed_knowledge_base, terminat
 
 try:
     from selenium import webdriver
-    from selenium.common.exceptions import TimeoutException
+    from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.common.options import ArgOptions
@@ -240,9 +240,13 @@ def run_app_session(
 
 
 def wait_for_body_text(driver: webdriver.Remote, text: str, timeout: float = 30.0) -> None:
-    WebDriverWait(driver, timeout).until(
-        lambda current: text in current.find_element(By.TAG_NAME, "body").text
-    )
+    def has_text(current: webdriver.Remote) -> bool:
+        try:
+            return text in current.find_element(By.TAG_NAME, "body").text
+        except StaleElementReferenceException:
+            return False
+
+    WebDriverWait(driver, timeout).until(has_text)
 
 
 def wait_for_any_body_text(
@@ -251,7 +255,10 @@ def wait_for_any_body_text(
     timeout: float = 30.0,
 ) -> str:
     def has_any(current: webdriver.Remote) -> str | bool:
-        body_text = current.find_element(By.TAG_NAME, "body").text
+        try:
+            body_text = current.find_element(By.TAG_NAME, "body").text
+        except StaleElementReferenceException:
+            return False
         for text in texts:
             if text in body_text:
                 return text
@@ -262,7 +269,10 @@ def wait_for_any_body_text(
 
 def assert_body_contains_all(driver: webdriver.Remote, texts: list[str], timeout: float = 20.0) -> None:
     def has_all(current: webdriver.Remote) -> bool:
-        body_text = current.find_element(By.TAG_NAME, "body").text
+        try:
+            body_text = current.find_element(By.TAG_NAME, "body").text
+        except StaleElementReferenceException:
+            return False
         return all(text in body_text for text in texts)
 
     WebDriverWait(driver, timeout).until(has_all)
