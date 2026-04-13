@@ -703,7 +703,11 @@ def run_welcome_clone_flow(driver: webdriver.Remote, repo_url: str, clone_target
     repo_input.send_keys(repo_url)
     path_input.send_keys(str(clone_target))
     wait_for_button(driver, "开始克隆").click()
-    wait_for_body_text(driver, "Alpha Rust Patterns", timeout=90.0)
+    landing_text = wait_for_any_body_text(driver, ["Alpha Rust Patterns", "全部文档"], timeout=90.0)
+    if landing_text != "Alpha Rust Patterns":
+        click_tree_button(driver, "programming")
+        click_browser_card(driver, "Alpha Rust Patterns")
+        wait_for_body_text(driver, "Alpha Rust Patterns", timeout=40.0)
 
     assert (clone_target / ".git").exists()
     assert (clone_target / "programming" / "alpha.md").exists()
