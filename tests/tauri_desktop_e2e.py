@@ -356,6 +356,55 @@ def activate_element(driver: webdriver.Remote, element) -> None:
     ActionChains(driver).move_to_element(element).click().perform()
 
 
+def activate_graph_node(
+    driver: webdriver.Remote,
+    *,
+    xpath: str,
+    mcp_port: int,
+    expected_kb_path: Path,
+    expected_knowledge_title: str,
+    timeout: float = 15.0,
+) -> None:
+    deadline = time.time() + timeout
+    last_error: Exception | None = None
+
+    while time.time() < deadline:
+        node = wait_clickable_xpath(driver, xpath, timeout=10.0)
+
+        try:
+            activate_element(driver, node)
+            assert_editor_state(
+                mcp_port,
+                expected_kb_path=expected_kb_path,
+                expected_knowledge_title=expected_knowledge_title,
+                timeout=1.5,
+            )
+            return
+        except Exception as error:
+            last_error = error
+
+        try:
+            driver.execute_script("arguments[0].focus();", node)
+            node.send_keys(Keys.ENTER)
+            assert_editor_state(
+                mcp_port,
+                expected_kb_path=expected_kb_path,
+                expected_knowledge_title=expected_knowledge_title,
+                timeout=1.5,
+            )
+            return
+        except Exception as error:
+            last_error = error
+
+        time.sleep(0.4)
+
+    if last_error is not None:
+        raise AssertionError(
+            f"Timed out activating graph node for {expected_knowledge_title}: {last_error}"
+        ) from last_error
+    raise AssertionError(f"Timed out activating graph node for {expected_knowledge_title}")
+
+
 def open_note_from_landing(
     driver: webdriver.Remote,
     *,
@@ -815,9 +864,11 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
         f"//div[contains(@class,'react-flow__node')][contains(., {xpath_literal('Beta Async Notes')})]",
         timeout=25.0,
     )
-    activate_element(driver, beta_node)
-    assert_editor_state(
-        mcp_port,
+    assert beta_node is not None
+    activate_graph_node(
+        driver,
+        xpath=f"//div[contains(@class,'react-flow__node')][contains(., {xpath_literal('Beta Async Notes')})]",
+        mcp_port=mcp_port,
         expected_kb_path=Path(paths["kb1"]),
         expected_knowledge_title="Beta Async Notes",
     )
