@@ -267,6 +267,95 @@ def wait_for_any_body_text(
     return WebDriverWait(driver, timeout).until(has_any)
 
 
+def normalize_editor_text(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.replace("\r\n", "\n").replace("\u00a0", " ").strip()
+
+
+def read_markdown_editor_text(driver: webdriver.Remote) -> str:
+    try:
+        text = driver.execute_script(
+            """
+            const node = document.querySelector('.cm-content');
+            if (!node) return '';
+            return node.innerText || node.textContent || '';
+            """
+        )
+    except Exception:
+        return ""
+    return normalize_editor_text(text)
+
+
+def wait_for_markdown_editor_text(
+    driver: webdriver.Remote,
+    expected_text: str,
+    timeout: float = 8.0,
+) -> None:
+    normalized_expected = normalize_editor_text(expected_text)
+    WebDriverWait(driver, timeout).until(
+        lambda current: read_markdown_editor_text(current) == normalized_expected
+    )
+
+
+def set_markdown_editor_text(driver: webdriver.Remote, text: str, attempts: int = 4) -> None:
+    normalized_expected = normalize_editor_text(text)
+    last_seen = ""
+
+    for _ in range(attempts):
+        editor = wait_for_css(driver, ".cm-content")
+        editor.click()
+
+        updated = driver.execute_script(
+            """
+            const expected = arguments[0];
+            const content = document.querySelector('.cm-content');
+            const editor = content?.closest('.cm-editor');
+            const candidates = [
+              content?.cmView?.rootView?.view,
+              content?.cmView?.view,
+              editor?.cmView?.rootView?.view,
+              editor?.cmView?.view,
+            ];
+            const view = candidates.find(
+              (candidate) => candidate && typeof candidate.dispatch === 'function' && candidate.state?.doc
+            );
+            if (!view) return null;
+            view.dispatch({
+              changes: { from: 0, to: view.state.doc.length, insert: expected },
+              selection: { anchor: expected.length, head: expected.length },
+              scrollIntoView: true,
+            });
+            view.focus();
+            return view.state.doc.toString();
+            """,
+            text,
+        )
+        if normalize_editor_text(updated) == normalized_expected:
+            wait_for_markdown_editor_text(driver, text, timeout=4.0)
+            return
+
+        editor = wait_for_css(driver, ".cm-content")
+        editor.click()
+        editor.send_keys(Keys.CONTROL, "a")
+        editor.send_keys(Keys.DELETE)
+        time.sleep(0.1)
+
+        for chunk_start in range(0, len(text), 8):
+            wait_for_css(driver, ".cm-content").send_keys(text[chunk_start:chunk_start + 8])
+            time.sleep(0.04)
+
+        last_seen = read_markdown_editor_text(driver)
+        if last_seen == normalized_expected:
+            return
+        time.sleep(0.2)
+
+    raise AssertionError(
+        "Failed to populate markdown editor text exactly. "
+        f"Expected={normalized_expected!r} actual={last_seen!r}"
+    )
+
+
 def assert_body_contains_all(driver: webdriver.Remote, texts: list[str], timeout: float = 20.0) -> None:
     def has_all(current: webdriver.Remote) -> bool:
         try:
@@ -837,10 +926,8 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     mark("create-note")
 
     wait_for_button(driver, "Markdown").click()
-    editor = wait_for_css(driver, ".cm-content")
-    editor.click()
-    editor.send_keys(Keys.CONTROL, "a")
-    editor.send_keys(note_body)
+    set_markdown_editor_text(driver, note_body)
+    wait_for_markdown_editor_text(driver, note_body, timeout=6.0)
     wait_for_button(driver, "保存").click()
     saved_path = poll_note_file(paths["kb1"], note_title, "saved through tauri desktop e2e")
     assert saved_path.exists(), "Saved note file should exist on disk"
