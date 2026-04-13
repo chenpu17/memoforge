@@ -64,6 +64,14 @@ pub enum RuleKey {
     StaleContent,
     BrokenLink,
     OrphanedKnowledge,
+    /// Knowledge entry lacks evidence metadata (no owner, no verified_at)
+    NoEvidence,
+    /// Knowledge entry lacks an owner in evidence metadata
+    NoOwner,
+    /// Knowledge entry has not been verified within the effective SLA period
+    StaleVerification,
+    /// Knowledge entry lacks a freshness policy
+    NoFreshness,
 }
 
 impl RuleKey {
@@ -75,6 +83,10 @@ impl RuleKey {
             RuleKey::StaleContent => "stale_content",
             RuleKey::BrokenLink => "broken_link",
             RuleKey::OrphanedKnowledge => "orphaned_knowledge",
+            RuleKey::NoEvidence => "no_evidence",
+            RuleKey::NoOwner => "no_owner",
+            RuleKey::StaleVerification => "stale_verification",
+            RuleKey::NoFreshness => "no_freshness",
         }
     }
 
@@ -86,6 +98,10 @@ impl RuleKey {
             RuleKey::StaleContent => IssueSeverity::Medium,
             RuleKey::BrokenLink => IssueSeverity::High,
             RuleKey::OrphanedKnowledge => IssueSeverity::Low,
+            RuleKey::NoEvidence => IssueSeverity::Medium,
+            RuleKey::NoOwner => IssueSeverity::Medium,
+            RuleKey::StaleVerification => IssueSeverity::High,
+            RuleKey::NoFreshness => IssueSeverity::Low,
         }
     }
 }
@@ -210,6 +226,10 @@ mod tests {
         assert_eq!(RuleKey::StaleContent.as_str(), "stale_content");
         assert_eq!(RuleKey::BrokenLink.as_str(), "broken_link");
         assert_eq!(RuleKey::OrphanedKnowledge.as_str(), "orphaned_knowledge");
+        assert_eq!(RuleKey::NoEvidence.as_str(), "no_evidence");
+        assert_eq!(RuleKey::NoOwner.as_str(), "no_owner");
+        assert_eq!(RuleKey::StaleVerification.as_str(), "stale_verification");
+        assert_eq!(RuleKey::NoFreshness.as_str(), "no_freshness");
     }
 
     #[test]
@@ -229,6 +249,13 @@ mod tests {
             RuleKey::OrphanedKnowledge.default_severity(),
             IssueSeverity::Low
         );
+        assert_eq!(RuleKey::NoEvidence.default_severity(), IssueSeverity::Medium);
+        assert_eq!(RuleKey::NoOwner.default_severity(), IssueSeverity::Medium);
+        assert_eq!(
+            RuleKey::StaleVerification.default_severity(),
+            IssueSeverity::High
+        );
+        assert_eq!(RuleKey::NoFreshness.default_severity(), IssueSeverity::Low);
     }
 
     #[test]

@@ -340,7 +340,7 @@ def assert_release_entrypoints_visible(driver: webdriver.Remote) -> None:
         driver,
         [
             "下载与发布入口",
-            "下载 v0.1.2",
+            "下载 v0.3.0-beta.1",
             "Release Notes",
             "安装与配置说明",
             "Windows",
@@ -356,7 +356,7 @@ def assert_settings_release_section(driver: webdriver.Remote) -> None:
         [
             "MCP 快速配置",
             "下载与发布",
-            "下载 v0.1.2",
+            "下载 v0.3.0-beta.1",
             "Release Notes",
             "安装与配置说明",
             "Standalone MCP",
@@ -371,7 +371,7 @@ def assert_search_empty_guidance(driver: webdriver.Remote) -> None:
         driver,
         [
             "没有找到匹配结果",
-            "下载 v0.1.2",
+            "下载 v0.3.0-beta.1",
             "Release Notes",
             "MCP 配置说明",
         ],

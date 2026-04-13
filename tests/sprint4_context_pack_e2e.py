@@ -18,7 +18,7 @@ from frontend_e2e import REPO_ROOT, make_test_env, seed_knowledge_base, write
 
 class McpClient:
     def __init__(self, binary: Path, kb_path: str, env: dict[str, str], readonly: bool) -> None:
-        cmd = [str(binary), "serve", "--knowledge-path", kb_path]
+        cmd = [str(binary), "serve", "--knowledge-path", kb_path, "--profile", "legacy-full"]
         if readonly:
             cmd.append("--readonly")
         self.process = subprocess.Popen(
@@ -327,18 +327,20 @@ def test_session_with_context_pack(client: McpClient, pack_id: str) -> None:
         },
     )
 
-    # start_agent_session returns the session object directly
-    assert "id" in session_result, f"Missing 'id' in session: {session_result}"
-    assert session_result["agent_name"] == "test-agent", f"Expected agent_name 'test-agent', got {session_result['agent_name']}"
-    assert session_result["goal"] == "Test context pack integration", f"Expected goal 'Test context pack integration', got {session_result['goal']}"
-    assert session_result["status"] == "running", f"Expected status 'running', got {session_result['status']}"
+    # start_agent_session returns the session wrapped in a "session" key
+    session = session_result.get("session", session_result)
+    assert "id" in session, f"Missing 'id' in session: {session_result}"
+    assert session["agent_name"] == "test-agent", f"Expected agent_name 'test-agent', got {session['agent_name']}"
+    assert session["goal"] == "Test context pack integration", f"Expected goal 'Test context pack integration', got {session['goal']}"
+    assert session["status"] == "running", f"Expected status 'running', got {session['status']}"
 
-    session_id = session_result["id"]
+    session_id = session["id"]
     print(f"  Started session: {session_id} with pack: {pack_id}")
 
     # Get session details
-    session_detail = client.call_tool("get_agent_session", {"session_id": session_id})
-    assert "id" in session_detail, f"Missing 'id' in session detail: {session_detail}"
+    session_detail_raw = client.call_tool("get_agent_session", {"session_id": session_id})
+    session_detail = session_detail_raw.get("session", session_detail_raw)
+    assert "id" in session_detail, f"Missing 'id' in session detail: {session_detail_raw}"
     assert session_detail["id"] == session_id, f"Session ID mismatch"
 
     print(f"  Retrieved session: {session_id}")

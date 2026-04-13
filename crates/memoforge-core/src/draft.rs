@@ -116,12 +116,13 @@ pub struct ReadKnowledgeResult {
 /// Default TTL for drafts in seconds (24 hours).
 const DRAFT_TTL_SECS: i64 = 24 * 60 * 60;
 
-fn drafts_dir(kb_path: &Path) -> std::path::PathBuf {
+pub(crate) fn drafts_dir(kb_path: &Path) -> std::path::PathBuf {
     kb_path.join(".memoforge/drafts")
 }
 
-fn draft_path(kb_path: &Path, draft_id: &str) -> std::path::PathBuf {
-    drafts_dir(kb_path).join(format!("{}.json", draft_id))
+pub(crate) fn draft_path(kb_path: &Path, draft_id: &str) -> Result<std::path::PathBuf, MemoError> {
+    crate::error::validate_storage_id(draft_id, "draft ID")?;
+    Ok(drafts_dir(kb_path).join(format!("{}.json", draft_id)))
 }
 
 fn normalize_target_path(path: &str) -> Result<String, MemoError> {
@@ -316,6 +317,8 @@ fn write_new_knowledge_at_target(
         summary_hash,
         created_at: now,
         updated_at: now,
+        evidence: None,
+        freshness: None,
     };
     let fm_yaml = serde_yaml::to_string(&frontmatter).map_err(|e| MemoError {
         code: ErrorCode::InvalidPath,
@@ -367,7 +370,7 @@ fn ensure_drafts_dir(kb_path: &Path) -> Result<(), MemoError> {
 }
 
 fn load_draft(kb_path: &Path, draft_id: &str) -> Result<DraftFile, MemoError> {
-    let path = draft_path(kb_path, draft_id);
+    let path = draft_path(kb_path, draft_id)?;
     if !path.exists() {
         return Err(MemoError {
             code: ErrorCode::NotFoundKnowledge,
@@ -392,7 +395,7 @@ fn load_draft(kb_path: &Path, draft_id: &str) -> Result<DraftFile, MemoError> {
 
 fn save_draft(kb_path: &Path, draft: &DraftFile) -> Result<(), MemoError> {
     ensure_drafts_dir(kb_path)?;
-    let path = draft_path(kb_path, &draft.draft_id);
+    let path = draft_path(kb_path, &draft.draft_id)?;
     let json = serde_json::to_string_pretty(draft).map_err(|e| MemoError {
         code: ErrorCode::InvalidData,
         message: format!("Failed to serialize draft: {}", e),
@@ -408,7 +411,7 @@ fn save_draft(kb_path: &Path, draft: &DraftFile) -> Result<(), MemoError> {
 }
 
 fn delete_draft_file(kb_path: &Path, draft_id: &str) -> Result<(), MemoError> {
-    let path = draft_path(kb_path, draft_id);
+    let path = draft_path(kb_path, draft_id)?;
     if path.exists() {
         fs::remove_file(&path).map_err(|e| MemoError {
             code: ErrorCode::InvalidPath,
@@ -480,6 +483,8 @@ pub fn read_knowledge_unified(
             summary_hash: None,
             created_at: resolved.created_at,
             updated_at: resolved.updated_at,
+            evidence: None,
+            freshness: None,
         }
     };
 
@@ -1005,8 +1010,10 @@ mod tests {
                     path: "notes".to_string(),
                     parent_id: None,
                     description: None,
+                    default_sla_days: None,
                 }],
                 metadata: None,
+                knowledge_policy: None,
             },
         )
         .unwrap();
@@ -1223,7 +1230,7 @@ mod tests {
         assert!(content.contains("New content"));
 
         // Verify draft was deleted after commit
-        assert!(!draft_path(&kb_path, &draft_id).exists());
+        assert!(!draft_path(&kb_path, &draft_id).unwrap().exists());
     }
 
     #[test]
@@ -1383,7 +1390,7 @@ mod tests {
         assert!(err.message.contains("Conflict"));
 
         // Draft should still exist
-        assert!(draft_path(&kb_path, &draft_id).exists());
+        assert!(draft_path(&kb_path, &draft_id).unwrap().exists());
     }
 
     #[test]
@@ -1393,7 +1400,7 @@ mod tests {
         let draft_id = start_draft(&kb_path, Some(&path), None, "test-agent").unwrap();
 
         discard_draft(&kb_path, &draft_id).unwrap();
-        assert!(!draft_path(&kb_path, &draft_id).exists());
+        assert!(!draft_path(&kb_path, &draft_id).unwrap().exists());
     }
 
     #[test]
@@ -1426,7 +1433,7 @@ mod tests {
         let draft_id = start_draft(&kb_path, Some(&path), None, "test-agent").unwrap();
         let mut draft = load_draft(&kb_path, &draft_id).unwrap();
         draft.updated_at = Utc::now() - chrono::Duration::hours(25);
-        let path_buf = draft_path(&kb_path, &draft_id);
+        let path_buf = draft_path(&kb_path, &draft_id).unwrap();
         let json = serde_json::to_string_pretty(&draft).unwrap();
         fs::write(&path_buf, json).unwrap();
 
@@ -1436,8 +1443,8 @@ mod tests {
         let expired = cleanup_expired_drafts(&kb_path, None).unwrap();
         assert_eq!(expired.len(), 1);
         assert_eq!(expired[0], draft_id);
-        assert!(!draft_path(&kb_path, &draft_id).exists());
-        assert!(draft_path(&kb_path, &recent_id).exists());
+        assert!(!draft_path(&kb_path, &draft_id).unwrap().exists());
+        assert!(draft_path(&kb_path, &recent_id).unwrap().exists());
     }
 
     #[test]
@@ -1563,7 +1570,7 @@ mod tests {
         let draft_id = start_draft(&kb_path, Some(&path), None, "test-agent").unwrap();
         let mut draft = load_draft(&kb_path, &draft_id).unwrap();
         draft.updated_at = Utc::now() - chrono::Duration::seconds(10);
-        let path_buf = draft_path(&kb_path, &draft_id);
+        let path_buf = draft_path(&kb_path, &draft_id).unwrap();
         let json = serde_json::to_string_pretty(&draft).unwrap();
         fs::write(&path_buf, json).unwrap();
 

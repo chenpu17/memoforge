@@ -6,6 +6,26 @@ MCP Server implementation for MemoForge knowledge management system.
 
 **SSE Mode** is the recommended way to use MemoForge with AI agents. It provides real-time state synchronization between the desktop application and connected AI clients.
 
+### Tool Exposure Strategy
+
+The MCP server uses profile-based tool exposure to match different agent scenarios. Each profile exposes a curated subset of tools optimized for its use case.
+
+**Profiles** (v0.3.0):
+
+| Profile | Use Case | Description |
+|---------|----------|-------------|
+| `generic-stdio` | CLI / headless agents | Core agent tools (12). Draft + Inbox + Session workflows. |
+| `desktop-assisted` | Desktop-collaborating agents | Adds editor state, session detail, draft listing, reliability, review queue, workflow, and governance tools (25 total). |
+| `legacy-full` | Debugging / backward compat | Full backward-compatible surface. Not recommended for new agents. |
+
+New agent integrations should **not** conceptually default to the full tool list.
+
+Status:
+
+- Profile gating is active as of `v0.3.0`
+- SSE connections default to `desktop-assisted`, stdio connections default to `generic-stdio`
+- Override via `MEMOFORGE_MCP_PROFILE` environment variable
+
 ### How It Works
 
 The SSE MCP Server is embedded in the Tauri desktop application and starts automatically when the app launches:
@@ -51,6 +71,8 @@ Add to `~/.claude/mcp.json`:
   }
 }
 ```
+
+Agents should prefer using the Draft + Inbox + Session + Review workflow rather than legacy direct-write tools.
 
 ### Testing
 
@@ -645,6 +667,289 @@ Context packs can be referenced when starting an agent session using the `contex
 ```
 
 The agent session will have access to all knowledge items included in the referenced context packs.
+
+### Workflow Template Workflow (Sprint 2)
+
+Sprint 2 introduces workflow templates for high-frequency knowledge creation tasks. Templates define goals, context sources, output targets, and review policies.
+
+**Typical Workflow**:
+
+```
+1. list_workflow_templates()                    — Browse available templates
+2. start_workflow_run(template_id, ...)         — Start a workflow from template
+3. [Agent works with session, drafts...]        — Execute the workflow
+4. complete_agent_session(session_id, ...)      — Mark session complete
+```
+
+#### Workflow Template Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_workflow_templates` | List available workflow templates |
+| `start_workflow_run` | Start a workflow run from a template |
+
+**`list_workflow_templates`**
+
+List all available workflow templates (built-in and custom).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| None | -- | -- | -- |
+
+Returns:
+```json
+{
+  "templates": [
+    {
+      "template_id": "meeting_notes",
+      "name": "会议纪要整理入库",
+      "goal": "将会议纪要整理为结构化知识并入库",
+      "default_context_refs": [],
+      "suggested_output_target": "会议",
+      "review_policy": "确保关键决策和 action item 被准确记录",
+      "success_criteria": ["..."],
+      "enabled": true
+    }
+  ]
+}
+```
+
+**`start_workflow_run`**
+
+Start a workflow run from a template. Creates an agent session and optionally a draft.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `template_id` | string | yes | Template ID to run |
+| `goal_override` | string | no | Override the template's default goal |
+| `context_refs` | array | no | Additional context references |
+| `suggested_output_target` | string | no | Override the template's output target |
+
+Returns:
+```json
+{
+  "run_id": "01H...",
+  "session_id": "01H...",
+  "draft_id": "draft-123",
+  "inbox_item_ids": [],
+  "context_items_with_snapshots": 2
+}
+```
+
+Side effects:
+- Creates an AgentSession with template context
+- Populates snapshot summaries for Knowledge-type context refs
+- Creates a Draft if the template specifies an output target
+
+#### Built-in Templates
+
+| Template ID | Name | Description |
+|-------------|------|-------------|
+| `pr_issue_knowledge` | PR/Issue 沉淀知识 | Extract knowledge from PRs and Issues |
+| `runbook_verify` | Runbook 校验与修复 | Verify and repair runbook documents |
+| `meeting_notes` | 会议纪要整理入库 | Organize meeting notes into knowledge |
+| `release_retrospective` | 版本发布复盘 | Post-release retrospective |
+
+### Review Workflow (Sprint 3)
+
+Sprint 3 introduces a unified review queue for managing drafts, inbox items, and knowledge quality through a consistent interface.
+
+**Typical Workflow**:
+
+```
+1. list_review_items(status="pending")          — List items awaiting review
+2. get_review_item(item_id)                     — View item details
+3. apply_review_decision(item_id, decision)     — Approve or return
+```
+
+#### Review Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_review_items` | List review items with optional filtering |
+| `get_review_item` | Get details of a specific review item |
+| `apply_review_decision` | Apply a review decision (approve/return) |
+
+**`list_review_items`**
+
+List review items with optional filtering. By default only returns active (non-terminal) items: pending, in_review, returned. Set `include_terminal=true` to also see approved/discarded items.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `status` | string | no | Filter by status: `pending`, `in_review`, `approved`, `returned`, `discarded`. Overrides the default non-terminal filter. |
+| `source_type` | string | no | Filter by source: `agent_draft`, `inbox_promotion`, `reliability_fix`, `import_cleanup` |
+| `include_terminal` | boolean | no | Include terminal states (approved, discarded). Default: false |
+| `limit` | integer | no | Maximum number of results |
+
+Returns:
+```json
+{
+  "items": [
+    {
+      "id": "01H...",
+      "source_type": "draft",
+      "source_id": "draft-123",
+      "status": "pending",
+      "title": "...",
+      "created_at": "2026-04-10T00:00:00Z"
+    }
+  ],
+  "total": 3
+}
+```
+
+**`get_review_item`**
+
+Get detailed information about a specific review item.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `item_id` | string | yes | Review item ID |
+
+Returns:
+```json
+{
+  "item": {
+    "id": "01H...",
+    "source_type": "draft",
+    "source_id": "draft-123",
+    "status": "pending",
+    "title": "...",
+    "content_preview": "...",
+    "created_at": "2026-04-10T00:00:00Z"
+  }
+}
+```
+
+**`apply_review_decision`**
+
+Apply a review decision to an item.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `item_id` | string | yes | Review item ID |
+| `decision` | string | yes | `approved` or `returned` |
+| `comment` | string | no | Optional review comment |
+
+Returns:
+```json
+{
+  "item": {
+    "id": "01H...",
+    "status": "approved",
+    ...
+  }
+}
+```
+
+### Knowledge Governance Workflow (Sprint 4)
+
+Sprint 4 introduces knowledge governance tools for managing freshness policies, SLA tracking, and evidence-based verification.
+
+**Typical Workflow**:
+
+```
+1. get_knowledge_governance(path)              — View governance state
+2. update_knowledge_governance(path, ...)      — Set freshness policy
+3. verify_knowledge(path, ...)                 — Record verification evidence
+```
+
+#### Governance Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_knowledge_governance` | Get governance state for a knowledge item |
+| `update_knowledge_governance` | Update governance settings for a knowledge item |
+
+**`get_knowledge_governance`**
+
+Get the current governance state for a knowledge item, including freshness status and review history.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | string | yes | Knowledge file path |
+
+Returns:
+```json
+{
+  "path": "dev/rust-guide.md",
+  "freshness": {
+    "status": "fresh",
+    "sla_days": 90,
+    "last_verified_at": "2026-04-01T00:00:00Z",
+    "due_for_review_at": "2026-07-01T00:00:00Z"
+  },
+  "evidence": []
+}
+```
+
+**`update_knowledge_governance`**
+
+Update governance settings for a knowledge item.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | string | yes | Knowledge file path |
+| `sla_days` | integer | no | SLA in days for freshness review |
+| `verified` | boolean | no | Mark as verified with current timestamp |
+
+Returns:
+```json
+{
+  "path": "dev/rust-guide.md",
+  "freshness": {
+    "status": "fresh",
+    "sla_days": 30,
+    "last_verified_at": "2026-04-12T00:00:00Z",
+    "due_for_review_at": "2026-05-12T00:00:00Z"
+  }
+}
+```
+
+---
+
+## Profile Gate (v0.3.0)
+
+The MCP server uses profile-based tool exposure to match different agent scenarios. Each profile exposes a curated subset of tools optimized for its use case.
+
+### Profiles
+
+| Profile | Use Case | Tool Count | Description |
+|---------|----------|------------|-------------|
+| `generic-stdio` | CLI / headless agents | 12 | Core agent tools: Draft workflow, Session tracking, Inbox flow. |
+| `desktop-assisted` | Desktop-collaborating agents | 25 | Adds session detail, reliability, review queue, draft listing, workflow, governance, and editor state tools. |
+| `legacy-full` | Debugging / backward compat | All | Full tool surface including legacy read/write, git, context packs, categories. Not recommended for new agents. |
+
+### Profile Assignment
+
+The profile is determined at connection time. SSE connections default to `desktop-assisted`. Stdio connections default to `generic-stdio`. Override via `MEMOFORGE_MCP_PROFILE` environment variable:
+
+```bash
+export MEMOFORGE_MCP_PROFILE=generic-stdio
+```
+
+### Tool Surface by Profile
+
+**`generic-stdio`** (12 tools -- core agent workflow):
+- Read & Draft flow (6): `read_knowledge`, `start_draft`, `update_draft`, `preview_draft`, `commit_draft`, `discard_draft`
+- Session tracking (3): `start_agent_session`, `append_agent_session_context`, `complete_agent_session`
+- Inbox flow (3): `create_inbox_item`, `promote_inbox_item_to_draft`, `list_inbox_items`
+
+**`desktop-assisted`** (generic-stdio + 13 additional tools):
+- Editor state (1): `get_editor_state`
+- Session detail (2): `get_agent_session`, `list_agent_sessions`
+- Draft management (1): `list_drafts`
+- Reliability (2): `list_reliability_issues`, `get_reliability_issue_detail`
+- Workflow templates (2): `list_workflow_templates`, `start_workflow_run`
+- Review queue (3): `list_review_items`, `get_review_item`, `apply_review_decision`
+- Governance (2): `get_knowledge_governance`, `update_knowledge_governance`
+
+**`legacy-full`** (all tools, includes):
+- Legacy read tools: `list_knowledge`, `get_summary`, `get_content`, `get_knowledge_with_stale`, `grep`, `get_tags`, `get_backlinks`, `get_related`, `get_knowledge_graph`
+- Legacy write tools: `create_knowledge`, `update_knowledge`, `update_metadata`, `delete_knowledge`, `move_knowledge`
+- Git tools: `git_status`, `git_commit`, `git_pull`, `git_push`, `git_log`
+- Reliability fix: `create_fix_draft_from_issue`
+- Context packs: `create_context_pack`, `get_context_pack`, `export_context_pack`, `list_context_packs`
 
 ---
 

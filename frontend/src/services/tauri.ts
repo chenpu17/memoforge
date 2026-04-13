@@ -1,7 +1,7 @@
-import type { Category, Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, GrepMatch, PaginatedKnowledge, DraftSummary, DraftPreviewResponse, CommitDraftResponse, DiscardDraftResponse, UpdateDraftReviewStateResponse, ReliabilityIssue, ReliabilityStats, CreateFixDraftResult, ContextPack } from '../types'
+import type { Category, Knowledge, KnowledgeLinkCompletion, KnowledgeWithStale, GrepMatch, PaginatedKnowledge, DraftSummary, DraftPreviewResponse, CommitDraftResponse, DiscardDraftResponse, UpdateDraftReviewStateResponse, ReliabilityIssue, ReliabilityStats, CreateFixDraftResult, ContextPack, WorkflowTemplate, WorkflowRun, ReviewItem, KnowledgeGovernance } from '../types'
 
 // Re-export types for component usage
-export type { InboxItem, PromoteInboxItemResult, ContextItem, AgentSession, CompleteSessionOptions, CreateInboxItemOptions, StartSessionOptions, DraftSummary, DraftPreviewResponse, CommitDraftResponse, DiscardDraftResponse, UpdateDraftReviewStateResponse, ReliabilityIssue, ReliabilityStats, CreateFixDraftResult, ContextPack }
+export type { InboxItem, PromoteInboxItemResult, ContextItem, AgentSession, CompleteSessionOptions, CreateInboxItemOptions, StartSessionOptions, DraftSummary, DraftPreviewResponse, CommitDraftResponse, DiscardDraftResponse, UpdateDraftReviewStateResponse, ReliabilityIssue, ReliabilityStats, CreateFixDraftResult, ContextPack, WorkflowTemplate, WorkflowRun, ReviewItem, KnowledgeGovernance }
 import type {
   InboxItem,
   PromoteInboxItemResult,
@@ -799,6 +799,148 @@ export const tauriService = {
       return invoke('export_context_pack_cmd', { packId, format })
     }
     throw new Error('HTTP mode not supported for context pack export')
+  },
+
+  // ==================== Workflow Template Functions ====================
+
+  async listWorkflowTemplates(enabledOnly?: boolean): Promise<WorkflowTemplate[]> {
+    if (isTauriEnv()) {
+      return invoke('list_workflow_templates_cmd', { enabledOnly: enabledOnly ?? false })
+    }
+    // HTTP fallback: return hardcoded built-in templates (IDs must match backend)
+    return [
+      {
+        template_id: 'pr_issue_knowledge',
+        name: 'PR/Issue 沉淀知识',
+        goal: '从 PR 或 Issue 中提取关键知识并沉淀到知识库',
+        default_context_refs: [],
+        suggested_output_target: '开发',
+        review_policy: 'human-approve',
+        success_criteria: [
+          '每个 PR/Issue 至少生成一条结构化知识',
+          '知识条目包含问题背景、决策理由和影响范围',
+          '标签和分类准确反映内容主题',
+        ],
+        enabled: true,
+      },
+      {
+        template_id: 'runbook_verify',
+        name: 'Runbook 校验与修复',
+        goal: '检查 Runbook 文档的准确性和时效性，修复过期内容',
+        default_context_refs: [],
+        suggested_output_target: '运维',
+        review_policy: 'human-approve',
+        success_criteria: [
+          '每个步骤可执行且结果符合预期',
+          '标注的过时内容有明确替代方案',
+          '校验报告包含改进优先级排序',
+        ],
+        enabled: true,
+      },
+      {
+        template_id: 'meeting_notes',
+        name: '会议纪要整理入库',
+        goal: '将会议纪要整理为结构化知识并入库',
+        default_context_refs: [],
+        suggested_output_target: '会议',
+        review_policy: 'human-approve',
+        success_criteria: [
+          '决策事项有明确的结论和理由',
+          '行动项有负责人和截止时间',
+          '会议纪要按照统一模板格式输出',
+        ],
+        enabled: true,
+      },
+      {
+        template_id: 'release_retrospective',
+        name: '版本发布复盘',
+        goal: '对版本发布过程进行复盘，沉淀经验教训',
+        default_context_refs: [],
+        suggested_output_target: '复盘',
+        review_policy: 'human-approve',
+        success_criteria: [
+          '复盘包含目标回顾、实际结果和差异分析',
+          '经验教训有具体的改进措施',
+          '改进方向有优先级和负责人',
+        ],
+        enabled: true,
+      },
+    ]
+  },
+
+  async startWorkflowRun(params: {
+    template_id: string
+    goal_override?: string
+    context_refs?: Array<{
+      ref_type: 'knowledge' | 'pack' | 'url' | 'file'
+      ref_id: string
+      required: boolean
+      reason?: string
+    }>
+    suggested_output_target?: string
+  }): Promise<WorkflowRun> {
+    if (isTauriEnv()) {
+      return invoke('start_workflow_run_cmd', {
+        template_id: params.template_id,
+        goal_override: params.goal_override ?? null,
+        context_refs: params.context_refs ?? [],
+        suggested_output_target: params.suggested_output_target ?? null,
+      })
+    }
+    throw new Error('HTTP mode not supported for workflow runs')
+  },
+
+  // ==================== Unified Review Queue Functions ====================
+
+  async listReviewItems(params?: { status?: string; source_type?: string; limit?: number }): Promise<ReviewItem[]> {
+    if (isTauriEnv()) {
+      return invoke('list_review_items_cmd', {
+        status: params?.status ?? null,
+        source_type: params?.source_type ?? null,
+        limit: params?.limit ?? 100,
+      })
+    }
+    // HTTP mode not supported for review queue yet
+    return []
+  },
+
+  async getReviewItem(params: { review_item_id: string }): Promise<ReviewItem> {
+    if (isTauriEnv()) {
+      return invoke('get_review_item_cmd', { review_item_id: params.review_item_id })
+    }
+    throw new Error('HTTP mode not supported for review items')
+  },
+
+  async applyReviewDecision(params: { review_item_id: string; decision: string; notes?: string }): Promise<ReviewItem> {
+    if (isTauriEnv()) {
+      return invoke('apply_review_decision_cmd', {
+        review_item_id: params.review_item_id,
+        decision: params.decision,
+        notes: params.notes ?? null,
+      })
+    }
+    throw new Error('HTTP mode not supported for review decisions')
+  },
+
+  // ==================== Governance Functions ====================
+
+  async getKnowledgeGovernance(params: { path: string }): Promise<KnowledgeGovernance> {
+    if (isTauriEnv()) {
+      return invoke('get_knowledge_governance_cmd', { path: params.path })
+    }
+    // HTTP mode not supported for governance yet
+    return { evidence: null, freshness: null, effective_sla_days: 0 }
+  },
+
+  async updateKnowledgeGovernance(params: { path: string; evidence?: Record<string, unknown>; freshness?: Record<string, unknown> }): Promise<KnowledgeGovernance> {
+    if (isTauriEnv()) {
+      return invoke('update_knowledge_governance_cmd', {
+        path: params.path,
+        evidence: params.evidence ?? null,
+        freshness: params.freshness ?? null,
+      })
+    }
+    throw new Error('HTTP mode not supported for governance updates')
   },
 }
 

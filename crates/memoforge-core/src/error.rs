@@ -38,6 +38,30 @@ pub enum ErrorCode {
     GitDirtyState,
     // 权限
     PermissionReadonly,
+    PermissionProfileDenied,
     // 限制
     LimitResultTooLarge,
+}
+
+/// Validate a storage ID to prevent path traversal attacks.
+///
+/// Rejects empty strings, overly long strings (>128 chars), and any ID
+/// containing `/`, `\`, `.`, or `\0` characters.
+pub fn validate_storage_id(id: &str, label: &str) -> Result<(), MemoError> {
+    if id.is_empty()
+        || id.len() > 128
+        || id.contains('/')
+        || id.contains('\\')
+        || id.contains('.')
+        || id.contains('\0')
+    {
+        Err(MemoError {
+            code: ErrorCode::InvalidPath,
+            message: format!("Invalid {}: '{}'", label, id),
+            retry_after_ms: None,
+            context: None,
+        })
+    } else {
+        Ok(())
+    }
 }

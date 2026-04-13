@@ -1,14 +1,14 @@
 # ForgeNerve v0.3.0 决策冻结清单
 
 > 目标版本: v0.3.0
-> 日期: 2026-04-09
+> 日期: 2026-04-12
 > 文档类型: 决策冻结清单
 > 状态: 待评审
 > 关联文档:
 > - [ForgeNerve-v0.3.0产品需求文档](./ForgeNerve-v0.3.0-产品需求文档.md)
 > - [ForgeNerve-v0.3.0技术方案](./ForgeNerve-v0.3.0-技术方案.md)
-> - [ForgeNerve-v0.3.0数据模型与状态机](./ForgeNerve-v0.3.0-%E6%95%B0%E6%8D%AE%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%8A%B6%E6%80%81%E6%9C%BA.md)
-> - [ForgeNerve-v0.3.0 MCP契约矩阵](./ForgeNerve-v0.3.0-MCP%E5%A5%91%E7%BA%A6%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0数据模型与状态机](./ForgeNerve-v0.3.0-数据模型与状态机.md)
+> - [ForgeNerve-v0.3.0 MCP契约矩阵](./ForgeNerve-v0.3.0-MCP契约矩阵.md)
 
 ---
 
@@ -24,59 +24,68 @@
 
 本版本 P0 范围冻结为：
 
-1. `Knowledge Inbox`
-2. `Agent Session`
-3. `Verified Draft Flow`
-4. `Reliability Dashboard`
-5. `Context Pack Foundation`
+1. `Workflow Templates / Playbooks`
+2. `Unified Review Queue`
+3. `Evidence-backed Knowledge`
+4. `Reliability & Freshness Operations`
+5. `Agent Context Reuse Polish`
 
-### 2.2 本版本明确不做
+### 2.2 现状校准冻结
+
+以下结论在本轮评审中同步冻结：
+
+- 当前代码基线已存在 `Inbox / Session / Review / Reliability / Context Pack` 入口与基础能力
+- `v0.3.0` 成功与否，不再以“这些模块是否存在”作为判定
+- `Inbox / Session / Context Pack` 在 `v0.3.0` 中是支撑层，不是版本 headline
+
+### 2.3 本版本明确不做
 
 - 复杂权限系统
 - 完整云端协作
 - crate / 目录 / `.memoforge` 全量重命名
 - 通用页面数据库路线
 - 通用聊天产品路线
+- 为了模板而引入重型编排引擎
 
 ---
 
 ## 3. 模型边界冻结
 
-### 3.1 Inbox
+### 3.1 Workflow Template
 
 定义：
 
-- 候选知识项
-- 尚未进入正式知识库主内容层
-- 可来源于 Agent、导入、外部粘贴、人工采集
+- 高频知识工作流的可执行模板
+- 负责携带目标、默认上下文、建议输出位置、审阅标准
 
-### 3.2 Draft
-
-定义：
-
-- 针对正式知识或拟落地知识的受控变更缓冲层
-- Draft 是“要提交的改动”，不是“候选素材池”
-
-### 3.3 Session
+### 3.2 Review Item
 
 定义：
 
-- 一次 Agent 协作过程记录
-- Session 负责串联上下文、目标、Inbox、Draft、结果
+- 面向用户的统一审阅投影
+- 负责承接来自 Draft / Inbox / Reliability / 导入整理的待确认项
 
-### 3.4 Reliability Issue
-
-定义：
-
-- 对现有知识质量问题的规则化发现
-- 问题本身不修改内容，但可生成修复 Draft
-
-### 3.5 Context Pack
+### 3.3 Evidence Meta
 
 定义：
 
-- 面向 Agent / 项目复用的知识切片包
-- 可被 Session 引用
+- 知识可信度的最小证据层
+- 负责记录来源、owner、验证者、验证时间、适用版本等信息
+
+### 3.4 Freshness Policy
+
+定义：
+
+- 知识复查与治理规则
+- 负责 SLA、owner、复查状态和提醒入口
+
+### 3.5 支撑对象
+
+`Inbox / Session / Context Pack` 的冻结角色为：
+
+- Workflow Template 的上下文与产出承载层
+- Review Queue 的来源对象层
+- 后续复用推荐能力的基础层
 
 ---
 
@@ -89,64 +98,52 @@
 - `.memoforge/drafts/`
 - `.memoforge/packs/`
 
+同时允许在知识 frontmatter 或关联元数据中扩展：
+
+- `owner`
+- `verified_at`
+- `verified_by`
+- `valid_for_version`
+- 关联 URL / issue / PR / commit 的证据字段
+
 不在本版本内进行底层目录迁移。
 
 ---
 
-## 5. MCP 契约冻结
+## 5. 契约冻结
 
-建议冻结以下最小工具集，详细 request / response 以 `ForgeNerve-v0.3.0-MCP契约矩阵.md` 为准：
+### 5.1 当前基线契约
 
-### 5.1 Inbox
+现有 Inbox / Session / Draft / Reliability / Context Pack 相关 tool 与桌面接口保持兼容，不做破坏性更名。
 
-- `list_inbox_items`
-- `create_inbox_item`
-- `promote_inbox_item_to_draft`
-- `dismiss_inbox_item`
+### 5.2 v0.3.0 新增契约方向
 
-### 5.2 Session
+在正式实现前，需要冻结以下新增契约方向：
 
-- `start_agent_session`
-- `append_agent_session_context`
-- `list_agent_sessions`
-- `get_agent_session`
-- `complete_agent_session`
+1. 模板启动与模板配置
+2. 统一 Review Item 读取与决策
+3. Evidence Meta 的读写边界
+4. Freshness / SLA 的最小输入输出
 
-### 5.3 Draft
-
-- `start_draft`
-- `update_draft`
-- `preview_draft`
-- `commit_draft`
-- `discard_draft`
-
-### 5.4 Reliability
-
-- `list_reliability_issues`
-- `create_fix_draft_from_issue`
-
-### 5.5 Context Pack
-
-- `list_context_packs`
-- `create_context_pack`
-- `get_context_pack`
+详细命名与 request / response 以 `ForgeNerve-v0.3.0-MCP契约矩阵.md` 和 `ForgeNerve-v0.3.0-桌面接口冻结表.md` 后续冻结结果为准。
 
 ---
 
 ## 6. 桌面端入口冻结
 
-建议在桌面端增加四个稳定入口：
+当前桌面端的稳定入口基线为：
 
 1. `Inbox`
 2. `Sessions`
 3. `Review`
 4. `Reliability`
+5. `Packs`
 
 其中：
 
-- `Review` 是待确认变更中心
-- `Draft` 是 Review 的底层对象，不一定单独做一级导航
-- `Review Queue` 仅作为功能描述别名，不作为单独一级导航命名
+- `Review` 是统一变更中心的承载入口
+- `Draft` 是 Review 的底层对象，不单独作为版本叙事核心
+- `v0.3.0` 的桌面端重点是升级现有入口，而不是重新发明一级导航
 
 ---
 
@@ -154,17 +151,18 @@
 
 Sprint 1 只做以下内容：
 
-1. Inbox 核心模型与存储
-2. Session 核心模型与存储
-3. Draft / Inbox / Session 的最小 MCP 契约
-4. 最小桌面端可见入口占位
-5. 测试基线
+1. 盘点当前基线与文档口径差异
+2. 冻结 `WorkflowTemplate / ReviewItem / EvidenceMeta / FreshnessPolicy` 最小模型
+3. 冻结新增 MCP / Tauri / frontend 契约方向
+4. 建立回归测试基线
+5. 文档口径同步
 
 Sprint 1 不做：
 
-- Reliability 全规则
+- 从零新建新的 Inbox / Session / Review 面板
+- 完整 Workflow 引擎
+- 完整 Pack Recommendation
 - Team Publish
-- 批量复杂流程
 - 大规模导航重构
 
 ---
@@ -173,20 +171,21 @@ Sprint 1 不做：
 
 如果出现以下任一情况，视为偏离冻结范围：
 
-- 把 Inbox 做成正式知识列表的替代品
+- 继续把对象模型清单当成版本卖点
 - 把 Session 做成聊天产品
-- 把 Draft 做成通用编辑器缓存
-- MCP 新工具数量失控且无 profile 策略
-- 桌面端入口一轮新增过多并破坏现有主流程
+- 把 Review 做成只承接单一 Draft 的旧视角
+- 没有证据层却宣称“知识可信”
+- 没有治理闭环却宣称“知识可持续运营”
 
 ---
 
 ## 9. 评审后必须确认的事项
 
 - [ ] P0 范围是否认可
-- [ ] 五层模型边界是否认可
+- [ ] “现有基线已存在”这一校准结论是否认可
+- [ ] Workflow / Review / Evidence / Freshness 四层边界是否认可
 - [ ] `.memoforge` 兼容策略是否认可
-- [ ] MCP 最小契约是否认可
+- [ ] 新增契约方向是否认可
 - [ ] Sprint 1 范围是否认可
 - [ ] 数据模型与状态机是否认可
 - [ ] 依赖矩阵是否认可

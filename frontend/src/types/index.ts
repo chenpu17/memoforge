@@ -191,3 +191,15 @@ export interface ContextPack {
   created_at: string
   updated_at: string
 }
+
+// ==================== Workflow Template Types ====================
+
+export { type ContextRef, type WorkflowTemplate, type WorkflowRun } from './workflow'
+
+// ==================== Governance Types ====================
+
+export { type EvidenceMeta, type FreshnessPolicy, type KnowledgeGovernance } from './governance'
+
+// ==================== Unified Review Queue Types ====================
+
+export { type ReviewSourceType, type ReviewStatus, type ReviewDecision, type ReviewItem } from './review'

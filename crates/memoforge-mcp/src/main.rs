@@ -35,6 +35,10 @@ enum Cli {
         /// Agent 名称
         #[arg(long, default_value = "unknown")]
         agent_name: String,
+
+        /// 工具暴露 profile：generic-stdio（默认）, desktop-assisted, legacy-full
+        #[arg(long, value_parser = ["generic-stdio", "desktop-assisted", "legacy-full"], default_value = "generic-stdio")]
+        profile: String,
     },
 }
 
@@ -80,7 +84,11 @@ fn main() {
             allow_stale_kb,
             readonly,
             agent_name,
+            profile,
         } => {
+            // Set profile before any tool calls
+            tools::set_profile(tools::Profile::from_str(&profile));
+
             let effective_mode = mode.unwrap_or_else(|| {
                 if knowledge_path.is_some() {
                     "bound".to_string()

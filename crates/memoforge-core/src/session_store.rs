@@ -78,8 +78,9 @@ impl SessionStore {
         self.kb_path.join(".memoforge/sessions")
     }
 
-    fn session_path(&self, id: &str) -> std::path::PathBuf {
-        self.sessions_dir().join(format!("{}.json", id))
+    fn session_path(&self, id: &str) -> Result<std::path::PathBuf, MemoError> {
+        crate::error::validate_storage_id(id, "session ID")?;
+        Ok(self.sessions_dir().join(format!("{}.json", id)))
     }
 
     fn index_path(&self) -> std::path::PathBuf {
@@ -168,7 +169,7 @@ impl SessionStore {
     pub fn create_session(&self, session: AgentSession) -> Result<AgentSession, MemoError> {
         self.ensure_dir()?;
 
-        let session_path = self.session_path(&session.id);
+        let session_path = self.session_path(&session.id)?;
         if session_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::InvalidData,
@@ -203,7 +204,7 @@ impl SessionStore {
 
     /// Get a session by ID.
     pub fn get_session(&self, id: &str) -> Result<AgentSession, MemoError> {
-        let session_path = self.session_path(id);
+        let session_path = self.session_path(id)?;
         if !session_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -412,7 +413,7 @@ impl SessionStore {
     pub fn update_session(&self, session: AgentSession) -> Result<AgentSession, MemoError> {
         self.ensure_dir()?;
 
-        let session_path = self.session_path(&session.id);
+        let session_path = self.session_path(&session.id)?;
         if !session_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -428,7 +429,7 @@ impl SessionStore {
 
     /// Save a session to disk and update index.
     fn save_session(&self, session: &AgentSession) -> Result<(), MemoError> {
-        let session_path = self.session_path(&session.id);
+        let session_path = self.session_path(&session.id)?;
 
         let json = serde_json::to_string_pretty(session).map_err(|e| MemoError {
             code: ErrorCode::InvalidData,
@@ -454,7 +455,7 @@ impl SessionStore {
 
     /// Delete a session.
     pub fn delete_session(&self, id: &str) -> Result<(), MemoError> {
-        let session_path = self.session_path(id);
+        let session_path = self.session_path(id)?;
         if !session_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -509,7 +510,7 @@ mod tests {
         assert_eq!(created.status, SessionStatus::Running);
 
         // Verify file exists
-        assert!(store.session_path(&session.id).exists());
+        assert!(store.session_path(&session.id).unwrap().exists());
 
         // Verify index exists
         assert!(store.index_path().exists());
@@ -756,10 +757,10 @@ mod tests {
         let session = AgentSession::new("claude-code".to_string(), "Delete test".to_string());
         let created = store.create_session(session).unwrap();
 
-        assert!(store.session_path(&created.id).exists());
+        assert!(store.session_path(&created.id).unwrap().exists());
 
         store.delete_session(&created.id).unwrap();
-        assert!(!store.session_path(&created.id).exists());
+        assert!(!store.session_path(&created.id).unwrap().exists());
 
         // Should also be removed from index
         let sessions = store.list_sessions(None, None).unwrap();

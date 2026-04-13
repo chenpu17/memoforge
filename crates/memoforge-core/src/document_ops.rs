@@ -259,6 +259,8 @@ pub fn remove_section(content: &str, heading: &str) -> Result<String, MemoError>
 /// - `title`: string replacement
 /// - `tags`: array of strings (replaced, not merged)
 /// - `summary`: string or null
+/// - `evidence`: object or null (v0.3.0 governance)
+/// - `freshness`: object or null (v0.3.0 governance)
 ///
 /// The patch is applied in-place.
 pub fn apply_metadata_patch(frontmatter: &mut Frontmatter, patch: &serde_json::Value) {
@@ -282,6 +284,36 @@ pub fn apply_metadata_patch(frontmatter: &mut Frontmatter, patch: &serde_json::V
             }
             serde_json::Value::String(s) => {
                 frontmatter.summary = Some(s.clone());
+            }
+            _ => {}
+        }
+    }
+
+    // Evidence metadata (v0.3.0 governance)
+    if let Some(evidence_val) = patch.get("evidence") {
+        match evidence_val {
+            serde_json::Value::Null => {
+                frontmatter.evidence = None;
+            }
+            serde_json::Value::Object(_) => {
+                if let Ok(evidence) = serde_json::from_value::<crate::governance::EvidenceMeta>(evidence_val.clone()) {
+                    frontmatter.evidence = Some(evidence);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Freshness policy (v0.3.0 governance)
+    if let Some(freshness_val) = patch.get("freshness") {
+        match freshness_val {
+            serde_json::Value::Null => {
+                frontmatter.freshness = None;
+            }
+            serde_json::Value::Object(_) => {
+                if let Ok(freshness) = serde_json::from_value::<crate::governance::FreshnessPolicy>(freshness_val.clone()) {
+                    frontmatter.freshness = Some(freshness);
+                }
             }
             _ => {}
         }
@@ -471,6 +503,8 @@ mod tests {
             summary_hash: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
         };
 
         let patch = serde_json::json!({"title": "Updated"});
@@ -492,6 +526,8 @@ mod tests {
             summary_hash: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
         };
 
         let patch = serde_json::json!({"tags": ["rust", "async"]});
@@ -512,6 +548,8 @@ mod tests {
             summary_hash: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
         };
 
         // Set summary
@@ -585,6 +623,8 @@ mod tests {
             summary_hash: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
         };
 
         // Patch only title, tags and summary should stay unchanged
@@ -608,6 +648,8 @@ mod tests {
             summary_hash: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
         };
 
         let patch = serde_json::json!({});
@@ -615,6 +657,112 @@ mod tests {
         assert_eq!(fm.title, "Unchanged");
         assert_eq!(fm.tags, vec!["tag"]);
         assert_eq!(fm.summary, Some("summary".to_string()));
+    }
+
+    #[test]
+    fn test_apply_metadata_patch_evidence() {
+        use chrono::Utc;
+
+        let mut fm = Frontmatter {
+            id: "test".to_string(),
+            title: "Test".to_string(),
+            tags: vec![],
+            category: None,
+            summary: None,
+            summary_hash: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
+        };
+
+        // Set evidence
+        let patch = serde_json::json!({
+            "evidence": {
+                "owner": "alice",
+                "source_url": "https://example.com",
+                "linked_issue_ids": ["ISSUE-1"],
+            }
+        });
+        apply_metadata_patch(&mut fm, &patch);
+        let evidence = fm.evidence.take().unwrap();
+        assert_eq!(evidence.owner.unwrap(), "alice");
+        assert_eq!(evidence.source_url.unwrap(), "https://example.com");
+        assert_eq!(evidence.linked_issue_ids.len(), 1);
+
+        // Clear evidence
+        let clear_patch = serde_json::json!({"evidence": null});
+        apply_metadata_patch(&mut fm, &clear_patch);
+        assert!(fm.evidence.is_none());
+    }
+
+    #[test]
+    fn test_apply_metadata_patch_freshness() {
+        use chrono::Utc;
+
+        let mut fm = Frontmatter {
+            id: "test".to_string(),
+            title: "Test".to_string(),
+            tags: vec![],
+            category: None,
+            summary: None,
+            summary_hash: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
+        };
+
+        // Set freshness
+        let patch = serde_json::json!({
+            "freshness": {
+                "sla_days": 30,
+                "review_status": "ok",
+            }
+        });
+        apply_metadata_patch(&mut fm, &patch);
+        let freshness = fm.freshness.take().unwrap();
+        assert_eq!(freshness.sla_days, 30);
+        assert_eq!(freshness.review_status, crate::governance::FreshnessReviewStatus::Ok);
+
+        // Clear freshness
+        let clear_patch = serde_json::json!({"freshness": null});
+        apply_metadata_patch(&mut fm, &clear_patch);
+        assert!(fm.freshness.is_none());
+    }
+
+    #[test]
+    fn test_apply_metadata_patch_evidence_and_freshness_together() {
+        use chrono::Utc;
+
+        let mut fm = Frontmatter {
+            id: "test".to_string(),
+            title: "Test".to_string(),
+            tags: vec!["keep".to_string()],
+            category: None,
+            summary: Some("summary".to_string()),
+            summary_hash: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            evidence: None,
+            freshness: None,
+        };
+
+        let patch = serde_json::json!({
+            "title": "Updated",
+            "evidence": {
+                "owner": "bob",
+            },
+            "freshness": {
+                "sla_days": 60,
+            }
+        });
+        apply_metadata_patch(&mut fm, &patch);
+        assert_eq!(fm.title, "Updated");
+        assert_eq!(fm.tags, vec!["keep"]);
+        assert_eq!(fm.summary, Some("summary".to_string()));
+        assert_eq!(fm.evidence.unwrap().owner.unwrap(), "bob");
+        assert_eq!(fm.freshness.unwrap().sla_days, 60);
     }
 
     #[test]

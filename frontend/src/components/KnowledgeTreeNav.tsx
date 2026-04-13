@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search, Settings, FolderInput, Bot, MoreHorizontal, GitBranch, Inbox } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search, Settings, FolderInput, Bot, MoreHorizontal, GitBranch, Inbox, Zap } from 'lucide-react'
 import type { KnowledgeTreeNode, TreeSelection } from '../lib/knowledgeTree'
 import { filterKnowledgeTree, getAncestorFolderPaths } from '../lib/knowledgeTree'
 import { MinimalWorkspace } from './MinimalWorkspace'
@@ -597,6 +597,20 @@ export const KnowledgeTreeNav: React.FC<KnowledgeTreeNavProps> = React.memo(({
                   <GitBranch className="h-3.5 w-3.5" />
                   知识图谱
                 </button>
+                {onOpenAgentPanel && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenAgentPanel('templates')
+                      setShowToolsMenu(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium"
+                    style={{ color: '#404040' }}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    工作流模板
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {

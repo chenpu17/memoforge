@@ -1,8 +1,10 @@
-//! 核心数据结构
-//! Task 1.4: Knowledge, Category, Frontmatter 定义
+//! Core data structures
+//! Task 1.4: Knowledge, Category, Frontmatter definitions
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+use crate::governance::{EvidenceMeta, FreshnessPolicy};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Frontmatter {
@@ -22,6 +24,12 @@ pub struct Frontmatter {
     pub created_at: DateTime<Utc>,
     #[serde(alias = "updated")]
     pub updated_at: DateTime<Utc>,
+    /// Knowledge evidence metadata (v0.3.0)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<EvidenceMeta>,
+    /// Knowledge freshness policy (v0.3.0)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub freshness: Option<FreshnessPolicy>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -52,7 +52,7 @@ describe('SettingsModal import strategy options', () => {
     expect(screen.getByText('3. 用 Draft 写入')).toBeInTheDocument()
     expect(screen.getByText('推荐工作流：让 Agent 先读取上下文，再使用 Draft 流生成变更，最后回到桌面端审阅与确认。')).toBeInTheDocument()
     expect(screen.getByText('下载与发布')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /下载 v0.1.2/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /下载 v0.3.0-beta.1/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Release Notes/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /安装与配置说明/ })).toBeInTheDocument()
     expect(screen.getByText(/首页与 GitHub Release 页面都能找到桌面安装包/)).toBeInTheDocument()

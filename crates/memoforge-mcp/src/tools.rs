@@ -17,6 +17,149 @@ static MODE: Mutex<Option<String>> = Mutex::new(None);
 static ALLOW_STALE_KB: Mutex<bool> = Mutex::new(false);
 static AGENT_NAME: Mutex<Option<String>> = Mutex::new(None);
 static LAST_REGISTERED_KB: Mutex<Option<PathBuf>> = Mutex::new(None);
+static PROFILE: Mutex<Profile> = Mutex::new(Profile::GenericStdio);
+
+// ---------------------------------------------------------------------------
+// Profile Gate
+// ---------------------------------------------------------------------------
+
+/// MCP tool exposure profile.
+///
+/// Controls which tools are visible to clients based on the connection scenario.
+/// See `docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-MCP契约矩阵.md` for
+/// the frozen profile definitions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Profile {
+    /// Generic Agent, no desktop collaboration. Minimum tool surface (<= 12).
+    GenericStdio,
+    /// Agent collaborating with the desktop app. Extended read-only tools.
+    DesktopAssisted,
+    /// Full backward-compatible surface. For debugging / legacy only.
+    LegacyFull,
+}
+
+impl Profile {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "generic-stdio" => Profile::GenericStdio,
+            "desktop-assisted" => Profile::DesktopAssisted,
+            "legacy-full" => Profile::LegacyFull,
+            _ => Profile::GenericStdio, // default to safest
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Profile::GenericStdio => "generic-stdio",
+            Profile::DesktopAssisted => "desktop-assisted",
+            Profile::LegacyFull => "legacy-full",
+        }
+    }
+}
+
+/// Tools recommended for `generic-stdio` profile (<= 12 tools).
+/// Core agent tools: Draft workflow, Session tracking, Inbox flow.
+/// See `docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-MCP契约矩阵.md`.
+const GENERIC_STDIO_TOOLS: &[&str] = &[
+    // Draft workflow (6)
+    "read_knowledge",
+    "start_draft",
+    "update_draft",
+    "preview_draft",
+    "commit_draft",
+    "discard_draft",
+    // Session tracking (3)
+    "start_agent_session",
+    "append_agent_session_context",
+    "complete_agent_session",
+    // Inbox flow (3)
+    "create_inbox_item",
+    "promote_inbox_item_to_draft",
+    "list_inbox_items",
+];
+
+/// Additional tools exposed in `desktop-assisted` profile.
+/// Read-only information and review tools for desktop AI assistants.
+const DESKTOP_ONLY_TOOLS: &[&str] = &[
+    // Editor state (1)
+    "get_editor_state",
+    // Review queue (2)
+    "list_review_items",
+    "get_review_item",
+    // Workflow templates (1)
+    "list_workflow_templates",
+    // Governance (1)
+    "get_knowledge_governance",
+    // Reliability (1)
+    "list_reliability_issues",
+];
+
+/// Legacy-only tools. Only visible under the `legacy-full` profile.
+#[allow(dead_code)] // kept for documentation and future profile-gating extensions
+const LEGACY_ONLY_TOOLS: &[&str] = &[
+    "list_knowledge",
+    "get_summary",
+    "get_content",
+    "get_knowledge_with_stale",
+    "grep",
+    "get_tags",
+    "get_backlinks",
+    "get_related",
+    "get_knowledge_graph",
+    "create_knowledge",
+    "update_knowledge",
+    "update_metadata",
+    "delete_knowledge",
+    "move_knowledge",
+    "git_status",
+    "git_commit",
+    "git_pull",
+    "git_push",
+    "git_log",
+    "create_fix_draft_from_issue",
+    "create_context_pack",
+    "get_context_pack",
+    "export_context_pack",
+    "list_context_packs",
+    // Moved from DESKTOP_ONLY_TOOLS (desktop-assisted → legacy-only)
+    "get_agent_session",
+    "list_agent_sessions",
+    "list_drafts",
+    "get_reliability_issue_detail",
+    "start_workflow_run",
+    "apply_review_decision",
+    "start_review",
+    "update_knowledge_governance",
+];
+
+/// Check whether a tool is visible under the given profile.
+fn is_tool_visible(tool_name: &str, profile: &Profile) -> bool {
+    match profile {
+        Profile::LegacyFull => true,
+        Profile::GenericStdio => GENERIC_STDIO_TOOLS.contains(&tool_name),
+        Profile::DesktopAssisted => {
+            GENERIC_STDIO_TOOLS.contains(&tool_name)
+                || DESKTOP_ONLY_TOOLS.contains(&tool_name)
+        }
+    }
+}
+
+/// Public visibility check for cross-module use (e.g., SSE early-return paths).
+pub fn is_tool_visible_for_review(tool_name: &str, profile: &Profile) -> bool {
+    is_tool_visible(tool_name, profile)
+}
+
+pub fn set_profile(profile: Profile) {
+    let mut guard = PROFILE.lock().unwrap();
+    // Only update if actually changed to reduce mutex contention
+    if *guard != profile {
+        *guard = profile;
+    }
+}
+
+pub fn get_profile() -> Profile {
+    PROFILE.lock().unwrap().clone()
+}
 
 pub fn set_kb_path(path: PathBuf) {
     *KB_PATH.lock().unwrap() = Some(path);
@@ -129,7 +272,7 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 }
 
 pub fn list_tools() -> Vec<Value> {
-    vec![
+    let all_tools = vec![
         tool(
             "get_editor_state",
             "Get current MemoForge desktop editor state including: mode (follow/bound), desktop app status, current knowledge base path, current knowledge being edited, text selection info, and list of active AI agents. Call this to understand the user's current context.",
@@ -1126,7 +1269,226 @@ pub fn list_tools() -> Vec<Value> {
                 "description": "Returns exported pack data and format"
             }),
         ),
-    ]
+        // Sprint 2: Workflow template tools
+        tool(
+            "list_workflow_templates",
+            "List available workflow templates. Returns built-in templates and any custom templates. Use enabled_only=true to filter out disabled templates.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "enabled_only": {
+                        "type": "boolean",
+                        "description": "If true, only return enabled templates (default: false)"
+                    }
+                },
+                "description": "Returns list of workflow templates with template_id, name, goal, and enabled status"
+            }),
+        ),
+        tool(
+            "start_workflow_run",
+            "Start a workflow run from a template. Creates an agent session and optionally a draft based on the template configuration. Returns run_id and associated resource IDs.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "template_id": {
+                        "type": "string",
+                        "description": "ID of the workflow template to run"
+                    },
+                    "goal_override": {
+                        "type": "string",
+                        "description": "Optional: Override the template's default goal"
+                    },
+                    "context_refs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "ref_type": {
+                                    "type": "string",
+                                    "enum": ["knowledge", "pack", "url", "file"],
+                                    "description": "Context reference type"
+                                },
+                                "ref_id": {
+                                    "type": "string",
+                                    "description": "Path / pack_id / URL reference"
+                                },
+                                "required": {
+                                    "type": "boolean",
+                                    "description": "Whether this context is mandatory"
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "description": "Recommended reason"
+                                }
+                            },
+                            "required": ["ref_type", "ref_id", "required"]
+                        },
+                        "description": "Optional: Override default context references for this run"
+                    },
+                    "suggested_output_target": {
+                        "type": "string",
+                        "description": "Optional: Override the template's suggested output target (category path or file path)"
+                    }
+                },
+                "required": ["template_id"],
+                "description": "Returns run_id, session_id, draft_id (if created), and inbox_item_ids"
+            }),
+        ),
+        // Sprint 3: Unified Review Queue tools
+        tool(
+            "list_review_items",
+            "List items in the unified review queue. Review items are projected from drafts that have review context metadata. By default only returns active (non-terminal) items: pending, in_review, returned. Set include_terminal=true to also see approved/discarded items. Returns items sorted by creation time (newest first). Use this to see what content awaits human review.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "in_review", "approved", "returned", "discarded"],
+                        "description": "Filter by review status. Overrides the default non-terminal filter."
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["agent_draft", "inbox_promotion", "reliability_fix", "import_cleanup"],
+                        "description": "Filter by source type (optional)"
+                    },
+                    "include_terminal": {
+                        "type": "boolean",
+                        "description": "Include terminal states (approved, discarded). Default: false."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results to return (optional, default: all)"
+                    }
+                },
+                "description": "Returns filtered review items with review_item_id, draft_id, title, source_type, status, and risk_flags"
+            }),
+        ),
+        tool(
+            "get_review_item",
+            "Get full details of a single review item by ID. Returns source type, source reference, status, risk flags, and decision metadata if available.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "review_item_id": {
+                        "type": "string",
+                        "description": "Review item ID (format: ri_{draft_id})"
+                    }
+                },
+                "required": ["review_item_id"],
+                "description": "Returns complete review item details"
+            }),
+        ),
+        tool(
+            "apply_review_decision",
+            "Apply a review decision to an item in the review queue. 'approve' commits the underlying draft to the knowledge base. 'discard' removes the draft. 'return' sends the item back for revision. 'reopen' re-queues a returned item. State transitions follow the frozen state machine: pending/in_review -> approved/returned/discarded, returned -> pending.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "review_item_id": {
+                        "type": "string",
+                        "description": "Review item ID to decide on (format: ri_{draft_id})"
+                    },
+                    "decision": {
+                        "type": "string",
+                        "enum": ["approve", "return", "discard", "reopen"],
+                        "description": "Decision to apply: approve (commit draft), return (send back for revision), discard (remove draft), reopen (re-queue returned item)"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Optional notes explaining the decision (for audit trail)"
+                    }
+                },
+                "required": ["review_item_id", "decision"],
+                "description": "Returns updated review item with new status"
+            }),
+        ),
+        tool(
+            "start_review",
+            "Start a review on a pending review item, transitioning it from 'pending' to 'in_review'. Only items in 'pending' status can be started. Use this to signal that a reviewer is actively looking at the item.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "review_item_id": {
+                        "type": "string",
+                        "description": "Review item ID to start reviewing (format: ri_{draft_id})"
+                    },
+                    "reviewer": {
+                        "type": "string",
+                        "description": "Optional: Name or ID of the reviewer starting the review"
+                    }
+                },
+                "required": ["review_item_id"],
+                "description": "Returns updated review item with 'in_review' status"
+            }),
+        ),
+        // Sprint 4: Governance tools
+        tool(
+            "get_knowledge_governance",
+            "Get governance metadata (evidence and freshness) for a knowledge entry. Returns evidence metadata, freshness policy, and the effective SLA days computed from the inheritance chain: knowledge > category > global config > 90 days default.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Docs-style path to the knowledge entry, e.g., 'tech/rust-async.md'"
+                    }
+                },
+                "required": ["path"],
+                "description": "Returns evidence, freshness, and effective_sla_days"
+            }),
+        ),
+        tool(
+            "update_knowledge_governance",
+            "Update governance metadata (evidence and/or freshness) for a knowledge entry. Accepts partial updates — only provided fields will be overwritten. Use this to set ownership, link evidence, or configure review cycles.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Docs-style path to the knowledge entry, e.g., 'tech/rust-async.md'"
+                    },
+                    "evidence": {
+                        "type": "object",
+                        "description": "Evidence metadata to set. All fields are optional. Provided fields overwrite existing values.",
+                        "properties": {
+                            "owner": { "type": "string", "description": "Responsible person" },
+                            "source_url": { "type": "string", "description": "Source URL" },
+                            "linked_issue_ids": { "type": "array", "items": { "type": "string" }, "description": "Linked issue IDs" },
+                            "linked_pr_ids": { "type": "array", "items": { "type": "string" }, "description": "Linked PR IDs" },
+                            "linked_commit_shas": { "type": "array", "items": { "type": "string" }, "description": "Linked commit SHAs" },
+                            "command_output_refs": { "type": "array", "items": { "type": "string" }, "description": "Command output references" },
+                            "verified_at": { "type": "string", "description": "Last verification time (ISO 8601)" },
+                            "verified_by": { "type": "string", "description": "Verifier" },
+                            "valid_for_version": { "type": "string", "description": "Applicable version" }
+                        }
+                    },
+                    "freshness": {
+                        "type": "object",
+                        "description": "Freshness policy to set. All fields are optional. Provided fields overwrite existing values.",
+                        "properties": {
+                            "sla_days": { "type": "integer", "description": "Review cycle in days" },
+                            "last_verified_at": { "type": "string", "description": "Last verification time (ISO 8601)" },
+                            "next_review_at": { "type": "string", "description": "Next review time (ISO 8601)" },
+                            "review_owner": { "type": "string", "description": "Review responsible person" },
+                            "review_status": { "type": "string", "enum": ["ok", "due", "overdue", "unknown"], "description": "Current review status" }
+                        }
+                    }
+                },
+                "required": ["path"],
+                "description": "Returns updated evidence and freshness metadata"
+            }),
+        ),
+    ];
+
+    // Filter by current profile
+    let profile = PROFILE.lock().unwrap().clone();
+    all_tools
+        .into_iter()
+        .filter(|t| {
+            let name = t.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            is_tool_visible(name, &profile)
+        })
+        .collect()
 }
 
 pub fn call_tool(params: Option<Value>, readonly: bool) -> Result<String, MemoError> {
@@ -1143,6 +1505,23 @@ pub fn call_tool(params: Option<Value>, readonly: bool) -> Result<String, MemoEr
         retry_after_ms: None,
         context: None,
     })?;
+
+    // Profile gate: reject tools not visible under current profile
+    {
+        let profile = PROFILE.lock().unwrap().clone();
+        if !is_tool_visible(name, &profile) {
+            return Err(MemoError {
+                code: ErrorCode::PermissionProfileDenied,
+                message: format!(
+                    "Tool '{}' not found or not available in current profile ({})",
+                    name,
+                    profile.as_str()
+                ),
+                retry_after_ms: None,
+                context: None,
+            });
+        }
+    }
 
     let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
@@ -1208,6 +1587,25 @@ pub fn call_tool(params: Option<Value>, readonly: bool) -> Result<String, MemoEr
         "create_context_pack" => check_readonly(readonly, || handle_create_context_pack(arguments)),
         "get_context_pack" => handle_get_context_pack(arguments),
         "export_context_pack" => handle_export_context_pack(arguments),
+        // Sprint 2: Workflow template tools
+        "list_workflow_templates" => handle_list_workflow_templates(arguments),
+        "start_workflow_run" => {
+            check_readonly(readonly, || handle_start_workflow_run(arguments))
+        }
+        // Sprint 3: Unified Review Queue tools
+        "list_review_items" => handle_list_review_items(arguments),
+        "get_review_item" => handle_get_review_item(arguments),
+        "apply_review_decision" => {
+            check_readonly(readonly, || handle_apply_review_decision(arguments))
+        }
+        "start_review" => {
+            check_readonly(readonly, || handle_start_review(arguments))
+        }
+        // Sprint 4: Governance tools
+        "get_knowledge_governance" => handle_get_knowledge_governance(arguments),
+        "update_knowledge_governance" => {
+            check_readonly(readonly, || handle_update_knowledge_governance(arguments))
+        }
         _ => Err(MemoError {
             code: ErrorCode::InvalidPath,
             message: format!("Unknown tool: {}", name),
@@ -2414,6 +2812,12 @@ fn handle_complete_agent_session(args: Value) -> Result<String, MemoError> {
 fn handle_list_reliability_issues(args: Value) -> Result<String, MemoError> {
     let kb_path = get_kb_path()?;
 
+    // Auto-scan to detect issues before listing
+    if let Ok(issues) = memoforge_core::scan_kb(&kb_path) {
+        let store = memoforge_core::ReliabilityStore::new(kb_path.clone());
+        let _ = store.save_issues(issues);
+    }
+
     let severity = optional_str_arg(&args, &["severity"]).and_then(|s| match s {
         "high" => Some(memoforge_core::IssueSeverity::High),
         "medium" => Some(memoforge_core::IssueSeverity::Medium),
@@ -2496,6 +2900,16 @@ fn handle_create_fix_draft_from_issue(args: Value) -> Result<String, MemoError> 
         Some(draft_metadata),
         &agent_name,
     )?;
+
+    // Inject review metadata so the draft appears in the unified review queue
+    let _ = memoforge_core::update_draft_review_state(
+        &kb_path,
+        &draft_id,
+        "pending",
+        Some("reliability_fix".to_string()),
+        None,
+        None,
+    );
 
     // Link draft to issue
     let updated_issue = store.link_draft(issue_id, draft_id.clone())?;
@@ -2612,6 +3026,381 @@ fn handle_export_context_pack(args: Value) -> Result<String, MemoError> {
     .to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Sprint 2: Workflow template tools
+// ---------------------------------------------------------------------------
+
+fn handle_list_workflow_templates(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let enabled_only = args
+        .get("enabled_only")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    let store = memoforge_core::WorkflowTemplateStore::new(kb_path);
+    let mut templates = store.list_all_templates()?;
+
+    if enabled_only {
+        templates.retain(|t| t.enabled);
+    }
+
+    let summary: Vec<serde_json::Value> = templates
+        .into_iter()
+        .map(|t| {
+            json!({
+                "template_id": t.template_id,
+                "name": t.name,
+                "goal": t.goal,
+                "enabled": t.enabled,
+            })
+        })
+        .collect();
+
+    Ok(json!({ "templates": summary }).to_string())
+}
+
+fn handle_start_workflow_run(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let template_id = required_str_arg(&args, &["template_id"])?;
+    let goal_override = optional_str_arg(&args, &["goal_override"]).map(String::from);
+    let suggested_output_target =
+        optional_str_arg(&args, &["suggested_output_target"]).map(String::from);
+
+    // Parse context_refs if provided
+    let context_refs = args
+        .get("context_refs")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|item| {
+                    let ref_type_str = item.get("ref_type").and_then(Value::as_str)?;
+                    let ref_id = item.get("ref_id").and_then(Value::as_str)?;
+                    let required = item
+                        .get("required")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                    let reason = item
+                        .get("reason")
+                        .and_then(Value::as_str)
+                        .map(String::from);
+
+                    let ref_type = match ref_type_str {
+                        "knowledge" => memoforge_core::ContextRefType::Knowledge,
+                        "pack" => memoforge_core::ContextRefType::Pack,
+                        "url" => memoforge_core::ContextRefType::Url,
+                        "file" => memoforge_core::ContextRefType::File,
+                        _ => return None,
+                    };
+
+                    Some(memoforge_core::ContextRef {
+                        ref_type,
+                        ref_id: ref_id.to_string(),
+                        required,
+                        reason,
+                        snapshot_summary: None,
+                    })
+                })
+                .collect::<Vec<_>>()
+        });
+
+    let agent_name = get_agent_name();
+
+    let params = memoforge_core::StartWorkflowRunParams {
+        template_id,
+        goal_override: goal_override.as_deref(),
+        context_refs,
+        suggested_output_target: suggested_output_target.as_deref(),
+        agent_name: &agent_name,
+    };
+
+    let run = memoforge_core::start_workflow_run(&kb_path, params)?;
+
+    // Count context items with snapshots by loading the created session
+    let snapshot_count = run.session_id.as_ref().and_then(|sid| {
+        let session_store = memoforge_core::SessionStore::new(kb_path.clone());
+        session_store.get_session(sid).ok().map(|session| {
+            session
+                .context_items
+                .iter()
+                .filter(|item| item.summary.is_some())
+                .count()
+        })
+    });
+
+    Ok(json!({
+        "run_id": run.run_id,
+        "session_id": run.session_id,
+        "draft_id": run.draft_id,
+        "inbox_item_ids": run.inbox_item_ids,
+        "context_items_with_snapshots": snapshot_count,
+    })
+    .to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 3: Unified Review Queue tools
+// ---------------------------------------------------------------------------
+
+fn handle_list_review_items(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+
+    let status = optional_str_arg(&args, &["status"]).and_then(|s| match s {
+        "pending" => Some(memoforge_core::ReviewStatus::Pending),
+        "in_review" => Some(memoforge_core::ReviewStatus::InReview),
+        "approved" => Some(memoforge_core::ReviewStatus::Approved),
+        "returned" => Some(memoforge_core::ReviewStatus::Returned),
+        "discarded" => Some(memoforge_core::ReviewStatus::Discarded),
+        _ => None,
+    });
+    let source_type = optional_str_arg(&args, &["source_type"]).and_then(|s| match s {
+        "agent_draft" => Some(memoforge_core::ReviewSourceType::AgentDraft),
+        "inbox_promotion" => Some(memoforge_core::ReviewSourceType::InboxPromotion),
+        "reliability_fix" => Some(memoforge_core::ReviewSourceType::ReliabilityFix),
+        "import_cleanup" => Some(memoforge_core::ReviewSourceType::ImportCleanup),
+        _ => None,
+    });
+    let limit = optional_usize_arg(&args, &["limit"]);
+
+    let filter = memoforge_core::ReviewListFilter {
+        status,
+        source_type,
+        include_terminal: optional_bool_arg(&args, &["include_terminal"]).unwrap_or(false),
+        limit,
+    };
+
+    let items = memoforge_core::list_review_items(&kb_path, filter)?;
+
+    let items_json: Vec<serde_json::Value> = items
+        .into_iter()
+        .map(|item| {
+            json!({
+                "review_item_id": item.review_item_id,
+                "draft_id": item.draft_id,
+                "title": item.title,
+                "source_type": item.source_type,
+                "status": item.status,
+                "risk_flags": item.risk_flags,
+            })
+        })
+        .collect();
+
+    Ok(json!({ "items": items_json }).to_string())
+}
+
+fn handle_get_review_item(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let review_item_id = required_str_arg(&args, &["review_item_id"])?;
+
+    let item = memoforge_core::get_review_item(&kb_path, review_item_id)?;
+
+    Ok(json!({
+        "item": {
+            "review_item_id": item.review_item_id,
+            "draft_id": item.draft_id,
+            "source_type": item.source_type,
+            "source_ref_id": item.source_ref_id,
+            "status": item.status,
+            "risk_flags": item.risk_flags,
+            "decided_by": item.decided_by,
+            "decided_at": item.decided_at,
+        }
+    })
+    .to_string())
+}
+
+fn handle_apply_review_decision(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let review_item_id = required_str_arg(&args, &["review_item_id"])?;
+
+    let decision_str = required_str_arg(&args, &["decision"])?;
+    let decision = match decision_str {
+        "approve" => memoforge_core::ReviewDecision::Approve,
+        "return" => memoforge_core::ReviewDecision::Return,
+        "discard" => memoforge_core::ReviewDecision::Discard,
+        "reopen" => memoforge_core::ReviewDecision::Reopen,
+        _ => {
+            return Err(MemoError {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "Invalid decision '{}'. Must be one of: approve, return, discard, reopen",
+                    decision_str
+                ),
+                retry_after_ms: None,
+                context: None,
+            })
+        }
+    };
+
+    let notes = optional_str_arg(&args, &["notes"]).map(String::from);
+    let agent_name = get_agent_name();
+    let decided_by = Some(agent_name);
+
+    let item =
+        memoforge_core::apply_review_decision(&kb_path, review_item_id, decision, decided_by, notes)?;
+
+    Ok(json!({
+        "item": {
+            "review_item_id": item.review_item_id,
+            "status": item.status,
+            "decided_by": item.decided_by,
+            "decided_at": item.decided_at,
+        }
+    })
+    .to_string())
+}
+
+fn handle_start_review(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let review_item_id = required_str_arg(&args, &["review_item_id"])?;
+    let reviewer = optional_str_arg(&args, &["reviewer"]).map(String::from);
+
+    let item = memoforge_core::start_review(&kb_path, review_item_id, reviewer)?;
+
+    Ok(json!({
+        "item": {
+            "review_item_id": item.review_item_id,
+            "draft_id": item.draft_id,
+            "status": item.status,
+            "decided_by": item.decided_by,
+            "decided_at": item.decided_at,
+        }
+    })
+    .to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 4: Governance handlers
+// ---------------------------------------------------------------------------
+
+fn handle_get_knowledge_governance(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let path = required_str_arg(&args, &["path"])?;
+    let normalized = normalize_relative_path(path);
+
+    // Ensure .md extension
+    let knowledge_path = if normalized.ends_with(".md") {
+        normalized
+    } else {
+        format!("{}.md", normalized)
+    };
+
+    let evidence = memoforge_core::read_evidence(&kb_path, &knowledge_path)?;
+    let freshness = memoforge_core::effective_freshness(&kb_path, &knowledge_path)?;
+
+    Ok(json!({
+        "evidence": evidence,
+        "freshness": {
+            "sla_days": freshness.sla_days,
+            "last_verified_at": freshness.last_verified_at,
+            "next_review_at": freshness.next_review_at,
+            "review_owner": freshness.review_owner,
+            "review_status": freshness.review_status,
+        },
+        "effective_sla_days": freshness.sla_days,
+    })
+    .to_string())
+}
+
+fn handle_update_knowledge_governance(args: Value) -> Result<String, MemoError> {
+    let kb_path = get_kb_path()?;
+    let path = required_str_arg(&args, &["path"])?;
+    let normalized = normalize_relative_path(path);
+
+    // Ensure .md extension
+    let knowledge_path = if normalized.ends_with(".md") {
+        normalized
+    } else {
+        format!("{}.md", normalized)
+    };
+
+    // Update evidence if provided
+    if let Some(evidence_val) = args.get("evidence").filter(|v| v.is_object()) {
+        let mut current = memoforge_core::read_evidence(&kb_path, &knowledge_path)?
+            .unwrap_or_default();
+
+        if let Some(v) = evidence_val.get("owner").and_then(|v| v.as_str()) {
+            current.owner = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("source_url").and_then(|v| v.as_str()) {
+            current.source_url = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("linked_issue_ids").and_then(|v| v.as_array()) {
+            current.linked_issue_ids = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("linked_pr_ids").and_then(|v| v.as_array()) {
+            current.linked_pr_ids = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("linked_commit_shas").and_then(|v| v.as_array()) {
+            current.linked_commit_shas = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("command_output_refs").and_then(|v| v.as_array()) {
+            current.command_output_refs = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("verified_at").and_then(|v| v.as_str()) {
+            current.verified_at = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("verified_by").and_then(|v| v.as_str()) {
+            current.verified_by = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("valid_for_version").and_then(|v| v.as_str()) {
+            current.valid_for_version = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+
+        memoforge_core::write_evidence(&kb_path, &knowledge_path, &current)?;
+    }
+
+    // Update freshness if provided
+    if let Some(freshness_val) = args.get("freshness").filter(|v| v.is_object()) {
+        let mut current = memoforge_core::read_freshness(&kb_path, &knowledge_path)?
+            .unwrap_or_else(|| {
+                // Compute effective freshness as baseline
+                memoforge_core::effective_freshness(&kb_path, &knowledge_path).unwrap()
+            });
+
+        if let Some(v) = freshness_val.get("sla_days").and_then(|v| v.as_u64()) {
+            current.sla_days = v as u32;
+        }
+        if let Some(v) = freshness_val.get("last_verified_at").and_then(|v| v.as_str()) {
+            current.last_verified_at = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = freshness_val.get("next_review_at").and_then(|v| v.as_str()) {
+            current.next_review_at = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = freshness_val.get("review_owner").and_then(|v| v.as_str()) {
+            current.review_owner = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = freshness_val.get("review_status").and_then(|v| v.as_str()) {
+            current.review_status = match v {
+                "ok" => memoforge_core::FreshnessReviewStatus::Ok,
+                "due" => memoforge_core::FreshnessReviewStatus::Due,
+                "overdue" => memoforge_core::FreshnessReviewStatus::Overdue,
+                _ => memoforge_core::FreshnessReviewStatus::Unknown,
+            };
+        }
+
+        memoforge_core::write_freshness(&kb_path, &knowledge_path, &current)?;
+    }
+
+    // Return the updated governance state (same shape as get_knowledge_governance)
+    let evidence = memoforge_core::read_evidence(&kb_path, &knowledge_path)?;
+    let freshness = memoforge_core::effective_freshness(&kb_path, &knowledge_path)?;
+
+    Ok(json!({
+        "evidence": evidence,
+        "freshness": {
+            "sla_days": freshness.sla_days,
+            "last_verified_at": freshness.last_verified_at,
+            "next_review_at": freshness.next_review_at,
+            "review_owner": freshness.review_owner,
+            "review_status": freshness.review_status,
+        },
+        "effective_sla_days": freshness.sla_days,
+    })
+    .to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2630,6 +3419,8 @@ mod tests {
 
     #[test]
     fn create_knowledge_schema_requires_path_or_title() {
+        // This tool is only visible under LegacyFull profile
+        set_profile(Profile::LegacyFull);
         let tools = list_tools();
         let create_tool = tools
             .into_iter()

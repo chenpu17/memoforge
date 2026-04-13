@@ -130,6 +130,8 @@ fn import_file(
             summary_hash: None,
             created_at: mtime,
             updated_at: mtime,
+            evidence: None,
+            freshness: None,
         };
 
         let fm_yaml = serde_yaml::to_string(&frontmatter)
@@ -244,6 +246,7 @@ pub fn import_markdown_folder(
                     path: dir_name.clone(),
                     parent_id: None,
                     description: None,
+                    default_sla_days: None,
                 };
                 config.categories.push(category);
                 stats.categories_created += 1;

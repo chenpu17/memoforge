@@ -48,6 +48,10 @@ use memoforge_core::{
     GrepMatch, InboxItem, InboxSourceType, InboxStatus, InboxStore, Knowledge,
     KnowledgeLinkCompletion, KnowledgeWithStale, LoadLevel, MemoError, MovePreview,
     ReliabilityStore, SessionStatus, SessionStore,
+    WorkflowTemplateStore, StartWorkflowRunParams, start_workflow_run,
+    ReviewListFilter, ReviewDecision, ReviewStatus, ReviewSourceType,
+    list_review_items, get_review_item, apply_review_decision,
+    read_evidence, read_freshness, write_evidence, write_freshness, effective_freshness,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -2478,6 +2482,285 @@ fn dismiss_inbox_item_cmd(
     Ok(serde_json::to_value(dismissed).unwrap())
 }
 
+// ==================== v0.3.0 Sprint 2/3/4: Workflow / Review / Governance Commands ====
+
+#[tauri::command]
+fn list_workflow_templates_cmd(enabled_only: Option<bool>) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let store = WorkflowTemplateStore::new(kb_path);
+    let mut templates = store.list_all_templates().map_err(to_tauri_error)?;
+
+    if enabled_only.unwrap_or(false) {
+        templates.retain(|t| t.enabled);
+    }
+
+    Ok(serde_json::to_value(templates).unwrap_or(serde_json::json!([])))
+}
+
+#[derive(Debug, Deserialize)]
+struct StartWorkflowRunArgs {
+    template_id: String,
+    goal_override: Option<String>,
+    context_refs: Option<Vec<serde_json::Value>>,
+    suggested_output_target: Option<String>,
+}
+
+#[tauri::command]
+fn start_workflow_run_cmd(args: StartWorkflowRunArgs) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+
+    let context_refs = args.context_refs.map(|arr| {
+        arr.into_iter()
+            .filter_map(|item| {
+                let ref_type_str = item.get("ref_type").and_then(|v| v.as_str())?;
+                let ref_id = item.get("ref_id").and_then(|v| v.as_str())?;
+                let required = item.get("required").and_then(|v| v.as_bool()).unwrap_or(false);
+                let reason = item.get("reason").and_then(|v| v.as_str()).map(String::from);
+
+                let ref_type = match ref_type_str {
+                    "knowledge" => memoforge_core::ContextRefType::Knowledge,
+                    "pack" => memoforge_core::ContextRefType::Pack,
+                    "url" => memoforge_core::ContextRefType::Url,
+                    "file" => memoforge_core::ContextRefType::File,
+                    _ => return None,
+                };
+
+                Some(memoforge_core::ContextRef {
+                    ref_type,
+                    ref_id: ref_id.to_string(),
+                    required,
+                    reason,
+                    snapshot_summary: None,
+                })
+            })
+            .collect::<Vec<_>>()
+    });
+
+    let params = StartWorkflowRunParams {
+        template_id: &args.template_id,
+        goal_override: args.goal_override.as_deref(),
+        context_refs,
+        suggested_output_target: args.suggested_output_target.as_deref(),
+        agent_name: "desktop-user",
+    };
+
+    let run = start_workflow_run(&kb_path, params).map_err(to_tauri_error)?;
+
+    Ok(serde_json::json!({
+        "run_id": run.run_id,
+        "session_id": run.session_id,
+        "draft_id": run.draft_id,
+        "inbox_item_ids": run.inbox_item_ids,
+        "started_at": run.started_at,
+    }))
+}
+
+#[tauri::command]
+fn list_review_items_cmd(
+    status: Option<String>,
+    source_type: Option<String>,
+    include_terminal: Option<bool>,
+    limit: Option<usize>,
+) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+
+    let status_filter = status.and_then(|s| match s.to_lowercase().as_str() {
+        "pending" => Some(ReviewStatus::Pending),
+        "in_review" => Some(ReviewStatus::InReview),
+        "approved" => Some(ReviewStatus::Approved),
+        "returned" => Some(ReviewStatus::Returned),
+        "discarded" => Some(ReviewStatus::Discarded),
+        _ => None,
+    });
+    let source_type_filter = source_type.and_then(|s| match s.to_lowercase().as_str() {
+        "agent_draft" => Some(ReviewSourceType::AgentDraft),
+        "inbox_promotion" => Some(ReviewSourceType::InboxPromotion),
+        "reliability_fix" => Some(ReviewSourceType::ReliabilityFix),
+        "import_cleanup" => Some(ReviewSourceType::ImportCleanup),
+        _ => None,
+    });
+
+    let filter = ReviewListFilter {
+        status: status_filter,
+        source_type: source_type_filter,
+        include_terminal: include_terminal.unwrap_or(false),
+        limit,
+    };
+
+    let items = list_review_items(&kb_path, filter).map_err(to_tauri_error)?;
+    Ok(serde_json::to_value(items).unwrap_or(serde_json::json!([])))
+}
+
+#[tauri::command]
+fn get_review_item_cmd(review_item_id: String) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let item = get_review_item(&kb_path, &review_item_id).map_err(to_tauri_error)?;
+    Ok(serde_json::to_value(item).unwrap())
+}
+
+#[derive(Debug, Deserialize)]
+struct ApplyReviewDecisionArgs {
+    review_item_id: String,
+    decision: String,
+    notes: Option<String>,
+}
+
+#[tauri::command]
+fn apply_review_decision_cmd(args: ApplyReviewDecisionArgs) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+
+    let decision = match args.decision.to_lowercase().as_str() {
+        "approve" => ReviewDecision::Approve,
+        "return" => ReviewDecision::Return,
+        "discard" => ReviewDecision::Discard,
+        "reopen" => ReviewDecision::Reopen,
+        _ => return Err(format!("Invalid decision: {}", args.decision)),
+    };
+
+    let item = apply_review_decision(
+        &kb_path,
+        &args.review_item_id,
+        decision,
+        Some("desktop-user".to_string()),
+        args.notes,
+    )
+    .map_err(to_tauri_error)?;
+
+    Ok(serde_json::to_value(item).unwrap())
+}
+
+#[tauri::command]
+fn get_knowledge_governance_cmd(path: String) -> Result<serde_json::Value, String> {
+    let kb_path = get_kb_path()?;
+    let normalized = path.trim().trim_matches('/').replace('\\', "/");
+    let knowledge_path = if normalized.ends_with(".md") {
+        normalized
+    } else {
+        format!("{}.md", normalized)
+    };
+
+    let evidence = read_evidence(&kb_path, &knowledge_path).map_err(to_tauri_error)?;
+    let freshness = effective_freshness(&kb_path, &knowledge_path).map_err(to_tauri_error)?;
+
+    Ok(serde_json::json!({
+        "evidence": evidence,
+        "freshness": {
+            "sla_days": freshness.sla_days,
+            "last_verified_at": freshness.last_verified_at,
+            "next_review_at": freshness.next_review_at,
+            "review_owner": freshness.review_owner,
+            "review_status": freshness.review_status,
+        },
+        "effective_sla_days": freshness.sla_days,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateKnowledgeGovernanceArgs {
+    path: String,
+    evidence: Option<serde_json::Value>,
+    freshness: Option<serde_json::Value>,
+}
+
+#[tauri::command]
+fn update_knowledge_governance_cmd(args: UpdateKnowledgeGovernanceArgs) -> Result<serde_json::Value, String> {
+    ensure_writable()?;
+    let kb_path = get_kb_path()?;
+    let normalized = args.path.trim().trim_matches('/').replace('\\', "/");
+    let knowledge_path = if normalized.ends_with(".md") {
+        normalized
+    } else {
+        format!("{}.md", normalized)
+    };
+
+    // Update evidence if provided
+    if let Some(evidence_val) = args.evidence.as_ref().filter(|v| v.is_object()) {
+        let mut current = read_evidence(&kb_path, &knowledge_path)
+            .map_err(to_tauri_error)?
+            .unwrap_or_default();
+
+        if let Some(v) = evidence_val.get("owner").and_then(|v| v.as_str()) {
+            current.owner = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("source_url").and_then(|v| v.as_str()) {
+            current.source_url = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("linked_issue_ids").and_then(|v| v.as_array()) {
+            current.linked_issue_ids = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("linked_pr_ids").and_then(|v| v.as_array()) {
+            current.linked_pr_ids = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("linked_commit_shas").and_then(|v| v.as_array()) {
+            current.linked_commit_shas = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("command_output_refs").and_then(|v| v.as_array()) {
+            current.command_output_refs = v.iter().filter_map(|i| i.as_str().map(String::from)).collect();
+        }
+        if let Some(v) = evidence_val.get("verified_at").and_then(|v| v.as_str()) {
+            current.verified_at = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("verified_by").and_then(|v| v.as_str()) {
+            current.verified_by = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = evidence_val.get("valid_for_version").and_then(|v| v.as_str()) {
+            current.valid_for_version = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+
+        write_evidence(&kb_path, &knowledge_path, &current).map_err(to_tauri_error)?;
+    }
+
+    // Update freshness if provided
+    if let Some(freshness_val) = args.freshness.as_ref().filter(|v| v.is_object()) {
+        let mut current = read_freshness(&kb_path, &knowledge_path)
+            .map_err(to_tauri_error)?
+            .unwrap_or_else(|| {
+                effective_freshness(&kb_path, &knowledge_path).unwrap()
+            });
+
+        if let Some(v) = freshness_val.get("sla_days").and_then(|v| v.as_u64()) {
+            current.sla_days = v as u32;
+        }
+        if let Some(v) = freshness_val.get("last_verified_at").and_then(|v| v.as_str()) {
+            current.last_verified_at = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = freshness_val.get("next_review_at").and_then(|v| v.as_str()) {
+            current.next_review_at = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = freshness_val.get("review_owner").and_then(|v| v.as_str()) {
+            current.review_owner = if v.is_empty() { None } else { Some(v.to_string()) };
+        }
+        if let Some(v) = freshness_val.get("review_status").and_then(|v| v.as_str()) {
+            current.review_status = match v {
+                "ok" => memoforge_core::FreshnessReviewStatus::Ok,
+                "due" => memoforge_core::FreshnessReviewStatus::Due,
+                "overdue" => memoforge_core::FreshnessReviewStatus::Overdue,
+                _ => memoforge_core::FreshnessReviewStatus::Unknown,
+            };
+        }
+
+        write_freshness(&kb_path, &knowledge_path, &current).map_err(to_tauri_error)?;
+    }
+
+    // Return updated state (same shape as get_knowledge_governance_cmd)
+    let evidence = read_evidence(&kb_path, &knowledge_path).map_err(to_tauri_error)?;
+    let freshness = effective_freshness(&kb_path, &knowledge_path).map_err(to_tauri_error)?;
+
+    Ok(serde_json::json!({
+        "evidence": evidence,
+        "freshness": {
+            "sla_days": freshness.sla_days,
+            "last_verified_at": freshness.last_verified_at,
+            "next_review_at": freshness.next_review_at,
+            "review_owner": freshness.review_owner,
+            "review_status": freshness.review_status,
+        },
+        "effective_sla_days": freshness.sla_days,
+    }))
+}
+
 // ==================== Epic G: Reliability Commands ==================================
 
 #[derive(Debug, Serialize)]
@@ -2581,6 +2864,12 @@ fn create_fix_draft_from_issue_cmd(
     // Create a draft for the knowledge file
     let draft_id = draft::start_draft(&kb_path, Some(&issue.knowledge_path), None, "reliability")
         .map_err(|e: MemoError| e.to_string())?;
+
+    // Inject review metadata so the draft appears in the unified review queue
+    let _ = draft::update_draft_review_state(
+        &kb_path, &draft_id, "pending",
+        Some("reliability_fix".to_string()), None, None,
+    );
 
     // Link the draft to the issue
     let _updated_issue = store
@@ -2895,8 +3184,11 @@ fn main() {
 
     let initial_snapshot = memory_state.to_sse_snapshot();
     let (sse_tx, sse_rx) = tokio::sync::watch::channel(initial_snapshot.clone());
+    let mut sse_config = memoforge_mcp::sse::McpServerConfig::default();
+    // Tauri-embedded SSE defaults to desktop-assisted profile
+    sse_config.default_profile = "desktop-assisted".to_string();
     let server_state = Arc::new(memoforge_mcp::sse::McpServerState::new(
-        memoforge_mcp::sse::McpServerConfig::default(),
+        sse_config,
         sse_tx,
         sse_rx,
     ));
@@ -3080,6 +3372,14 @@ fn main() {
             create_context_pack_cmd,
             get_context_pack_cmd,
             export_context_pack_cmd,
+            // v0.3.0 Sprint 2/3/4: Workflow / Review / Governance Commands
+            list_workflow_templates_cmd,
+            start_workflow_run_cmd,
+            list_review_items_cmd,
+            get_review_item_cmd,
+            apply_review_decision_cmd,
+            get_knowledge_governance_cmd,
+            update_knowledge_governance_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -3167,4 +3467,3 @@ mod tests {
         assert_eq!(found.as_deref(), Some(existing.as_path()));
     }
 }
-

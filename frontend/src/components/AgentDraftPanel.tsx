@@ -3,7 +3,7 @@ import { tauriService, DraftSummary, getErrorMessage } from '../services/tauri'
 import { FileEdit, Clock, Bot, ChevronRight } from 'lucide-react'
 
 interface AgentDraftPanelProps {
-  onSelectDraft: (draftId: string) => void
+  onSelectDraft: (draftId: string, draftSummary?: DraftSummary) => void
   onCountChange?: (count: number) => void
   refreshToken?: number
 }
@@ -55,7 +55,7 @@ export const AgentDraftPanel: React.FC<AgentDraftPanelProps> = ({
       {drafts.map((draft) => (
         <button
           key={draft.draft_id}
-          onClick={() => onSelectDraft(draft.draft_id)}
+          onClick={() => onSelectDraft(draft.draft_id, draft)}
           className="flex items-center gap-2.5 w-full rounded-lg border px-3 py-2.5 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50/30"
           style={{ borderColor: '#E5E5E5' }}
         >

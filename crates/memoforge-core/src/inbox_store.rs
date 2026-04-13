@@ -81,8 +81,9 @@ impl InboxStore {
         self.inbox_dir().join("index.json")
     }
 
-    fn item_path(&self, id: &str) -> std::path::PathBuf {
-        self.inbox_dir().join(format!("{}.json", id))
+    fn item_path(&self, id: &str) -> Result<std::path::PathBuf, MemoError> {
+        crate::error::validate_storage_id(id, "inbox item ID")?;
+        Ok(self.inbox_dir().join(format!("{}.json", id)))
     }
 
     /// Ensure the inbox directory exists.
@@ -167,7 +168,7 @@ impl InboxStore {
     pub fn create_inbox_item(&self, item: InboxItem) -> Result<InboxItem, MemoError> {
         self.ensure_dir()?;
 
-        let item_path = self.item_path(&item.id);
+        let item_path = self.item_path(&item.id)?;
         if item_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::InvalidData,
@@ -202,7 +203,7 @@ impl InboxStore {
 
     /// Get an inbox item by ID.
     pub fn get_inbox_item(&self, id: &str) -> Result<InboxItem, MemoError> {
-        let item_path = self.item_path(id);
+        let item_path = self.item_path(id)?;
         if !item_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -291,7 +292,7 @@ impl InboxStore {
         item.touch();
 
         // Save updated item
-        let item_path = self.item_path(id);
+        let item_path = self.item_path(id)?;
         let json = serde_json::to_string_pretty(&item).map_err(|e| MemoError {
             code: ErrorCode::InvalidData,
             message: format!("Failed to serialize inbox item: {}", e),
@@ -323,7 +324,7 @@ impl InboxStore {
     pub fn update_inbox_item(&self, mut item: InboxItem) -> Result<InboxItem, MemoError> {
         self.ensure_dir()?;
 
-        let item_path = self.item_path(&item.id);
+        let item_path = self.item_path(&item.id)?;
         if !item_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -360,7 +361,7 @@ impl InboxStore {
 
     /// Delete an inbox item.
     pub fn delete_inbox_item(&self, id: &str) -> Result<(), MemoError> {
-        let item_path = self.item_path(id);
+        let item_path = self.item_path(id)?;
         if !item_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -415,7 +416,7 @@ mod tests {
         assert_eq!(created.status, InboxStatus::New);
 
         // Verify file exists
-        assert!(store.item_path(&item.id).exists());
+        assert!(store.item_path(&item.id).unwrap().exists());
 
         // Verify index exists
         assert!(store.index_path().exists());
@@ -578,10 +579,10 @@ mod tests {
         let item = InboxItem::new(InboxSourceType::Agent, "Delete Test".to_string());
         let created = store.create_inbox_item(item).unwrap();
 
-        assert!(store.item_path(&created.id).exists());
+        assert!(store.item_path(&created.id).unwrap().exists());
 
         store.delete_inbox_item(&created.id).unwrap();
-        assert!(!store.item_path(&created.id).exists());
+        assert!(!store.item_path(&created.id).unwrap().exists());
 
         // Should also be removed from index
         let items = store.list_inbox_items(None, None).unwrap();

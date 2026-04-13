@@ -65,7 +65,7 @@ def build_binary(env: dict[str, str]) -> Path:
 
 class McpClient:
     def __init__(self, binary: Path, kb_path: str, env: dict[str, str], readonly: bool) -> None:
-        cmd = [str(binary), "serve", "--knowledge-path", kb_path]
+        cmd = [str(binary), "serve", "--knowledge-path", kb_path, "--profile", "legacy-full"]
         if readonly:
             cmd.append("--readonly")
         self.process = subprocess.Popen(

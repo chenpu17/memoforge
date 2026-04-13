@@ -371,8 +371,13 @@ def run_frontend_e2e(paths: dict[str, str], web_port: int) -> None:
         expect(main_header.get_by_text(note_title)).to_be_visible()
         mark("new-knowledge")
 
-        page.get_by_role("button", name="Markdown").click()
+        # Click Markdown mode and wait for CodeMirror to load (lazy component)
+        markdown_btn = page.get_by_role("button", name="Markdown")
+        expect(markdown_btn).to_be_visible()
+        markdown_btn.click()
+        page.wait_for_timeout(2000)
         editor = page.locator(".cm-content").first
+        editor.wait_for(state="visible", timeout=15000)
         editor.click()
         page.keyboard.press("Meta+A")
         page.keyboard.insert_text(f"# {note_title}\n\ncontent updated for e2e")

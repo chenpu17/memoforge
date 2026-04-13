@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import type { Category, Knowledge, GrepMatch } from '../types'
+import type { Category, Knowledge, GrepMatch, WorkflowTemplate, ReviewItem, KnowledgeGovernance } from '../types'
 import type { WorkspaceOverview } from '../services/tauri'
 
 export type EditorMode = 'read' | 'markdown' | 'rich'
-export type AgentPanel = 'inbox' | 'sessions' | 'review' | 'reliability' | 'packs' | null
+export type AgentPanel = 'inbox' | 'sessions' | 'review' | 'reliability' | 'packs' | 'templates' | null
 
 interface TagWithCount {
   tag: string
@@ -36,6 +36,12 @@ interface AppState {
   workspaceOverview: WorkspaceOverview | null
   // Agent panel state
   activeAgentPanel: AgentPanel
+  // Workflow templates state
+  workflowTemplates: WorkflowTemplate[] | null
+  // Unified review queue state
+  reviewItems: ReviewItem[] | null
+  // Knowledge governance state
+  knowledgeGovernance: KnowledgeGovernance | null
 
   setKnowledgeList: (list: Knowledge[]) => void
   appendKnowledgeList: (items: Knowledge[]) => void
@@ -55,6 +61,9 @@ interface AppState {
   toggleTag: (tag: string) => void
   setWorkspaceOverview: (overview: WorkspaceOverview) => void
   setActiveAgentPanel: (panel: AgentPanel) => void
+  setWorkflowTemplates: (templates: WorkflowTemplate[]) => void
+  setReviewItems: (items: ReviewItem[]) => void
+  setKnowledgeGovernance: (g: KnowledgeGovernance | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -74,6 +83,9 @@ export const useAppStore = create<AppState>((set) => ({
   offset: 0,
   workspaceOverview: null,
   activeAgentPanel: null,
+  workflowTemplates: null,
+  reviewItems: null,
+  knowledgeGovernance: null,
 
   setKnowledgeList: (list) => set({ knowledgeList: list }),
   appendKnowledgeList: (items) => set((state) => ({
@@ -86,6 +98,7 @@ export const useAppStore = create<AppState>((set) => ({
     currentKnowledgeBaseline: knowledge ? { ...knowledge } : null,
     currentKnowledgeContent: knowledge?.content ?? '',
     editorSelection: null,
+    knowledgeGovernance: null,
   }),
   patchCurrentKnowledge: (patch) => set((state) => (
     state.currentKnowledge
@@ -113,4 +126,7 @@ export const useAppStore = create<AppState>((set) => ({
   })),
   setWorkspaceOverview: (overview) => set({ workspaceOverview: overview }),
   setActiveAgentPanel: (panel) => set({ activeAgentPanel: panel }),
+  setWorkflowTemplates: (templates) => set({ workflowTemplates: templates }),
+  setReviewItems: (items) => set({ reviewItems: items }),
+  setKnowledgeGovernance: (g) => set({ knowledgeGovernance: g }),
 }))

@@ -16,6 +16,8 @@ pub mod events;
 pub mod frontmatter;
 pub mod fs;
 pub mod git;
+pub mod governance;
+pub mod governance_api;
 pub mod import;
 pub mod inbox;
 pub mod inbox_store;
@@ -28,11 +30,15 @@ pub mod registry;
 pub mod reliability;
 pub mod reliability_rules;
 pub mod reliability_store;
+pub mod review;
+pub mod review_projection;
 pub mod session;
 pub mod session_store;
 pub mod store;
 pub mod template;
 pub mod watcher;
+pub mod workflow_template;
+pub mod workflow_template_store;
 
 pub use agent::{
     cleanup_dead_agents, get_active_agents, get_agent_count, infer_agent_name, register_agent,
@@ -62,7 +68,7 @@ pub use editor_state::{
     DesktopState, EditorMode, EditorState, Selection, SELECTED_TEXT_MAX_LENGTH,
     SELECTION_THROTTLE_MS,
 };
-pub use error::{ErrorCode, MemoError};
+pub use error::{validate_storage_id, ErrorCode, MemoError};
 pub use events::{
     log_create, log_delete, log_event, log_git_commit, log_update, read_recent_events, Event,
     EventAction, EventSource,
@@ -82,6 +88,13 @@ pub use links::{
     LinkInfo, RelatedKnowledge, RelatedResult, RelationType, UpdateReferencesResult,
 };
 pub use lock::{FileLock, GlobalWriteLock, LockManager};
+pub use governance::{
+    effective_sla_days, EvidenceMeta, FreshnessPolicy, FreshnessReviewStatus, DEFAULT_SLA_DAYS,
+};
+pub use governance_api::{
+    effective_freshness, list_due_for_review, read_evidence, read_freshness, verify_knowledge,
+    write_evidence, write_freshness,
+};
 pub use models::{Category, Frontmatter, Knowledge, KnowledgeWithStale, LoadLevel};
 pub use registry::{
     get_current_kb, get_last_kb, get_recent_kbs, list_knowledge_bases, register_kb, switch_kb,
@@ -90,9 +103,15 @@ pub use registry::{
 pub use reliability::{IssueSeverity, IssueStatus, ReliabilityIssue, RuleKey};
 pub use reliability_rules::{scan_file, scan_kb, scan_kb_with_options, ScanOptions};
 pub use reliability_store::{ListFilter, ReliabilityStats, ReliabilityStore};
+pub use review::{ReviewDecision, ReviewItem, ReviewSourceType, ReviewStatus};
+pub use review_projection::{
+    apply_review_decision, get_review_item, list_review_items, start_review, ReviewListFilter,
+};
 pub use session::{AgentSession, ContextItem, ContextRefType, SessionStatus};
 pub use session_store::SessionStore;
 pub use store::{close_store, get_store, init_store, KnowledgeStore, StoreGuard};
+pub use workflow_template::{ContextRef, WorkflowTemplate, WorkflowRun, StartWorkflowRunParams, start_workflow_run};
+pub use workflow_template_store::WorkflowTemplateStore;
 
 /// MemoForge 版本
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

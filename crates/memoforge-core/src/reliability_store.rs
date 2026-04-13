@@ -94,8 +94,9 @@ impl ReliabilityStore {
         self.reliability_dir().join("index.json")
     }
 
-    fn issue_path(&self, id: &str) -> std::path::PathBuf {
-        self.reliability_dir().join(format!("{}.json", id))
+    fn issue_path(&self, id: &str) -> Result<std::path::PathBuf, MemoError> {
+        crate::error::validate_storage_id(id, "issue ID")?;
+        Ok(self.reliability_dir().join(format!("{}.json", id)))
     }
 
     /// Ensure the reliability directory exists.
@@ -217,7 +218,7 @@ impl ReliabilityStore {
         // Save new issues
         let mut index = ReliabilityIndex::new();
         for issue in &issues {
-            let issue_path = self.issue_path(&issue.id);
+            let issue_path = self.issue_path(&issue.id)?;
             let json = serde_json::to_string_pretty(issue).map_err(|e| MemoError {
                 code: ErrorCode::InvalidData,
                 message: format!("Failed to serialize reliability issue: {}", e),
@@ -242,7 +243,7 @@ impl ReliabilityStore {
 
     /// Get a reliability issue by ID.
     pub fn get_issue(&self, id: &str) -> Result<ReliabilityIssue, MemoError> {
-        let issue_path = self.issue_path(id);
+        let issue_path = self.issue_path(id)?;
         if !issue_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -357,7 +358,7 @@ impl ReliabilityStore {
         })?;
 
         // Save updated issue
-        let issue_path = self.issue_path(id);
+        let issue_path = self.issue_path(id)?;
         let json = serde_json::to_string_pretty(&issue).map_err(|e| MemoError {
             code: ErrorCode::InvalidData,
             message: format!("Failed to serialize reliability issue: {}", e),
@@ -390,7 +391,7 @@ impl ReliabilityStore {
         issue.link_draft(draft_id);
 
         // Save updated issue
-        let issue_path = self.issue_path(issue_id);
+        let issue_path = self.issue_path(issue_id)?;
         let json = serde_json::to_string_pretty(&issue).map_err(|e| MemoError {
             code: ErrorCode::InvalidData,
             message: format!("Failed to serialize reliability issue: {}", e),
@@ -419,7 +420,7 @@ impl ReliabilityStore {
         issue.unlink_draft();
 
         // Save updated issue
-        let issue_path = self.issue_path(issue_id);
+        let issue_path = self.issue_path(issue_id)?;
         let json = serde_json::to_string_pretty(&issue).map_err(|e| MemoError {
             code: ErrorCode::InvalidData,
             message: format!("Failed to serialize reliability issue: {}", e),
@@ -444,7 +445,7 @@ impl ReliabilityStore {
 
     /// Delete a reliability issue.
     pub fn delete_issue(&self, id: &str) -> Result<(), MemoError> {
-        let issue_path = self.issue_path(id);
+        let issue_path = self.issue_path(id)?;
         if !issue_path.exists() {
             return Err(MemoError {
                 code: ErrorCode::NotFoundKnowledge,
@@ -804,10 +805,10 @@ mod tests {
         );
         store.save_issues(vec![issue.clone()]).unwrap();
 
-        assert!(store.issue_path(&issue.id).exists());
+        assert!(store.issue_path(&issue.id).unwrap().exists());
 
         store.delete_issue(&issue.id).unwrap();
-        assert!(!store.issue_path(&issue.id).exists());
+        assert!(!store.issue_path(&issue.id).unwrap().exists());
 
         // Should also be removed from index
         let issues = store.list_issues(ListFilter::default()).unwrap();

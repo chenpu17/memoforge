@@ -15,8 +15,8 @@
 
 适用场景：
 
-1. 新加入的 Lead 需要快速建立全局认知
-2. Claude Code Agent Teams 需要明确阅读顺序
+1. 新加入的主 agent 需要快速建立全局认知
+2. Claude Code subagent 协作需要明确阅读顺序
 3. Sprint 1 开工前需要逐项核对前置条件
 4. 评审者需要快速判断哪些文档已经齐备
 
@@ -54,19 +54,19 @@
    - 冻结范围、边界、契约
    - 用于避免 Sprint 中途频繁改口
 
-7. [ForgeNerve-v0.3.0数据模型与状态机](./ForgeNerve-v0.3.0-%E6%95%B0%E6%8D%AE%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%8A%B6%E6%80%81%E6%9C%BA.md)
+7. [ForgeNerve-v0.3.0数据模型与状态机](./ForgeNerve-v0.3.0-数据模型与状态机.md)
    - 模型字段、关系、状态流转冻结
    - 用于支撑 Core / MCP / Desktop 并行
 
-8. [ForgeNerve-v0.3.0 MCP契约矩阵](./ForgeNerve-v0.3.0-MCP%E5%A5%91%E7%BA%A6%E7%9F%A9%E9%98%B5.md)
+8. [ForgeNerve-v0.3.0 MCP契约矩阵](./ForgeNerve-v0.3.0-MCP契约矩阵.md)
    - MCP tools 单一事实源
    - 用于冻结工具名、profile 与最小输入输出
 
-9. [ForgeNerve-v0.3.0依赖矩阵](./ForgeNerve-v0.3.0-%E4%BE%9D%E8%B5%96%E7%9F%A9%E9%98%B5.md)
+9. [ForgeNerve-v0.3.0依赖矩阵](./ForgeNerve-v0.3.0-依赖矩阵.md)
     - 并行顺序与阻塞关系
-    - 用于分配 Team Lead / Worker 节奏
+    - 用于分配主 agent / subagent 节奏
 
-10. [ForgeNerve-v0.3.0桌面接口冻结表](./ForgeNerve-v0.3.0-%E6%A1%8C%E9%9D%A2%E6%8E%A5%E5%8F%A3%E5%86%BB%E7%BB%93%E8%A1%A8.md)
+10. [ForgeNerve-v0.3.0桌面接口冻结表](./ForgeNerve-v0.3.0-桌面接口冻结表.md)
     - Tauri command 与 frontend service 冻结表
     - 用于支撑 Desktop / Frontend 并行
 
@@ -80,7 +80,7 @@
    - Sprint 1 的 issue 级拆解
    - 用于直接派工
 
-13. [ForgeNerve-v0.3.0 Sprint1验收矩阵](./ForgeNerve-v0.3.0-Sprint1%E9%AA%8C%E6%94%B6%E7%9F%A9%E9%98%B5.md)
+13. [ForgeNerve-v0.3.0 Sprint1验收矩阵](./ForgeNerve-v0.3.0-Sprint1验收矩阵.md)
     - Sprint 1 的完成定义
     - 用于防止验收越界
 
@@ -88,9 +88,9 @@
    - 测试矩阵与发布门槛
    - 用于同步 QA 与回归节奏
 
-15. [ForgeNerve-v0.3.0 Agent Teams提示词](./ForgeNerve-v0.3.0-Agent%20Teams提示词.md)
-    - 多 Agent 协作执行模板
-    - 用于 Lead 拉起团队并行开发
+15. [ForgeNerve-v0.3.0 Subagent协作提示词](./ForgeNerve-v0.3.0-Subagent协作提示词.md)
+    - 主 agent + subagent 协作执行模板
+    - 用于按需拉起并行审查或专项实现
 
 ---
 
@@ -111,7 +111,7 @@
 11. `ForgeNerve-v0.3.0-Sprint1任务拆解.md`
 12. `ForgeNerve-v0.3.0-Sprint1验收矩阵.md`
 13. `ForgeNerve-v0.3.0-测试与验收计划.md`
-14. `ForgeNerve-v0.3.0-Agent Teams提示词.md`
+14. `ForgeNerve-v0.3.0-Subagent协作提示词.md`
 15. `ForgeNerve-v0.3.0-开发前准备清单.md`
 
 原则：
@@ -143,7 +143,7 @@
 ### 4.3 执行项
 
 - [ ] 把 Sprint 1 拆解写入任务系统
-- [ ] 建立 Lead / Worker 分工
+- [ ] 建立主 agent / subagent 分工
 - [ ] 明确文件级独占范围
 - [ ] 明确跨线依赖与合并顺序
 
@@ -158,7 +158,9 @@
 
 ## 5. 开工判定标准
 
-满足以下条件后，视为“可正式开工”：
+本节描述的是“进入开发”的前置门槛，不等同于“当前文档已经全部冻结完成”。
+
+满足以下条件后，才可视为“具备正式开工条件”：
 
 1. 决策冻结清单完成评审
 2. 数据模型与状态机确认通过
@@ -166,7 +168,7 @@
 4. 桌面接口冻结表确认通过
 5. Sprint 1 任务拆解进入 issue 状态
 6. Sprint 1 验收矩阵确认通过
-7. Agent Teams 分工明确
+7. subagent 协作方式明确
 8. 测试与验收计划确认通过
 9. README 和产品内帮助可指向这套文档
 
@@ -200,7 +202,7 @@
 2. `ForgeNerve-v0.3.0-测试与验收计划.md`
 3. `ForgeNerve-v0.3.0-开发前准备清单.md`
 
-### 6.4 Claude Code Team Lead
+### 6.4 Claude Code 主 agent
 
 优先阅读：
 
@@ -214,7 +216,7 @@
 
 ## 7. 当前结论
 
-截至当前，ForgeNerve v0.3.0 的开发前文档已经形成完整闭环，但仍需完成冻结后才能正式开工：
+截至当前，ForgeNerve v0.3.0 的开发前文档已经形成当前权威评审集，但仍处于“待冻结 / 待确认 / 待派工”状态，不能直接视为已经批准开工：
 
 - 有战略
 - 有需求
@@ -229,11 +231,11 @@
 - 有 Sprint 1 拆解
 - 有 Sprint 1 验收矩阵
 - 有测试与验收计划
-- 有 Agent Teams 执行模板
+- 有 subagent 协作模板
 
 下一步建议进入：
 
 1. 评审冻结
 2. 确认开工门槛
 3. 建立 issue
-4. 拉起 Agent Teams 开发
+4. 满足门槛后再按需拉起 subagent 协作

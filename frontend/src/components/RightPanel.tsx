@@ -1,5 +1,7 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { Info, GitBranch, Link2, Bot, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Info, GitBranch, Link2, Bot, ChevronsLeft, ChevronsRight, Shield, ExternalLink, FileText } from 'lucide-react'
+import { useAppStore } from '../stores/appStore'
+import type { DraftSummary } from '../types'
 
 const GitPanel = lazy(async () => {
   const module = await import('./GitPanel')
@@ -26,7 +28,17 @@ const DraftPreviewModal = lazy(async () => {
   return { default: module.DraftPreviewModal }
 })
 
-type TabType = 'metadata' | 'git' | 'backlinks' | 'agent'
+const EvidenceMetaPanel = lazy(async () => {
+  const module = await import('./EvidenceMetaPanel')
+  return { default: module.EvidenceMetaPanel }
+})
+
+const FreshnessActions = lazy(async () => {
+  const module = await import('./FreshnessActions')
+  return { default: module.FreshnessActions }
+})
+
+type TabType = 'metadata' | 'git' | 'backlinks' | 'agent' | 'evidence'
 
 interface RightPanelProps {
   readonly: boolean
@@ -60,14 +72,14 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, (value: T) => 
     return defaultValue
   })
 
-  const setValue = (value: T) => {
+  const setValue = useCallback((value: T) => {
     setState(value)
     try {
       localStorage.setItem(key, JSON.stringify(value))
     } catch (e) {
       console.error('Failed to save state to localStorage:', e)
     }
-  }
+  }, [key])
 
   return [state, setValue]
 }
@@ -83,12 +95,19 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
 }) => {
   const [isOpen, setIsOpen] = usePersistentState('rightPanel.isOpen', false)
   const [activeTab, setActiveTab] = usePersistentState<TabType>('rightPanel.activeTab', 'metadata')
-  const [lastKnowledgeTab, setLastKnowledgeTab] = usePersistentState<'metadata' | 'backlinks'>('rightPanel.lastKnowledgeTab', 'metadata')
+  const [lastKnowledgeTab, setLastKnowledgeTab] = usePersistentState<'metadata' | 'backlinks' | 'evidence'>('rightPanel.lastKnowledgeTab', 'metadata')
   const [railTooltip, setRailTooltip] = useState<{ label: string; top: number; left: number } | null>(null)
   const previousFolderModeRef = useRef(folderMode)
   const [draftCount, setDraftCount] = useState(0)
   const [previewDraftId, setPreviewDraftId] = useState<string | null>(null)
   const [draftRefreshToken, setDraftRefreshToken] = useState(0)
+  const [selectedDraft, setSelectedDraft] = useState<DraftSummary | null>(null)
+
+  const { currentKnowledgeId, currentKnowledgeTitle, setActiveAgentPanel } = useAppStore((state) => ({
+    currentKnowledgeId: state.currentKnowledge?.id ?? null,
+    currentKnowledgeTitle: state.currentKnowledge?.title ?? null,
+    setActiveAgentPanel: state.setActiveAgentPanel,
+  }))
 
   const handleIconClick = (tab: TabType) => {
     if (isOpen && activeTab === tab) {
@@ -120,7 +139,7 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
   }
 
   useEffect(() => {
-    if (activeTab === 'metadata' || activeTab === 'backlinks') {
+    if (activeTab === 'metadata' || activeTab === 'backlinks' || activeTab === 'evidence') {
       setLastKnowledgeTab(activeTab)
     }
   }, [activeTab, setLastKnowledgeTab])
@@ -196,6 +215,20 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
         disabled={folderMode || !hasKnowledge}
       >
         <Link2 className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => handleIconClick('evidence')}
+        className={`right-panel-rail-button ${activeTab === 'evidence' && isOpen ? 'right-panel-rail-button--active' : ''}`}
+        title="证据与治理"
+        aria-label="证据与治理"
+        data-label="证据与治理"
+        onMouseEnter={(event) => showRailTooltip('证据与治理', event.currentTarget)}
+        onMouseLeave={hideRailTooltip}
+        onFocus={(event) => showRailTooltip('证据与治理', event.currentTarget)}
+        onBlur={hideRailTooltip}
+        disabled={folderMode || !hasKnowledge}
+      >
+        <Shield className="h-4 w-4" />
       </button>
       <button
         onClick={() => handleIconClick('agent')}
@@ -294,6 +327,13 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
             反向链接
           </button>
           <button
+            onClick={() => setActiveTab('evidence')}
+            className={`right-panel-tab ${activeTab === 'evidence' ? 'right-panel-tab--active' : ''}`}
+            disabled={folderMode || !hasKnowledge}
+          >
+            证据
+          </button>
+          <button
             onClick={() => setActiveTab('agent')}
             className={`right-panel-tab ${activeTab === 'agent' ? 'right-panel-tab--active' : ''}`}
           >
@@ -325,9 +365,18 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
             {activeTab === 'backlinks' && !folderMode && hasKnowledge && (
               <BacklinksPanel />
             )}
+            {activeTab === 'evidence' && !folderMode && hasKnowledge && (
+              <div className="flex flex-col h-full overflow-y-auto">
+                <EvidenceMetaPanel readonly={readonly} />
+                <FreshnessActions readonly={readonly} />
+              </div>
+            )}
             {activeTab === 'agent' && (
               <AgentDraftPanel
-                onSelectDraft={(draftId) => setPreviewDraftId(draftId)}
+                onSelectDraft={(draftId, draftSummary) => {
+                  setPreviewDraftId(draftId)
+                  setSelectedDraft(draftSummary ?? null)
+                }}
                 onCountChange={setDraftCount}
                 refreshToken={draftRefreshToken}
               />
@@ -336,6 +385,43 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
               <div className="side-panel-body">
                 <div className="side-panel-empty">
                   目录浏览时仅保留 Git 面板，打开文档后会自动恢复元数据与反向链接。
+                </div>
+              </div>
+            )}
+
+            {/* Related Items Navigation */}
+            {activeTab === 'agent' && selectedDraft && (
+              <div className="border-t px-3 py-2.5 space-y-1.5" style={{ borderColor: '#F0F0F0' }}>
+                <div className="text-[10px] font-medium" style={{ color: '#A3A3A3' }}>关联项目</div>
+                {selectedDraft.source_session_id && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAgentPanel('sessions')}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-gray-50"
+                  >
+                    <ExternalLink className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--brand-primary)' }} />
+                    <span className="truncate" style={{ color: '#525252' }}>Session {selectedDraft.source_session_id.slice(0, 8)}</span>
+                  </button>
+                )}
+                {selectedDraft.target_path && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-gray-50"
+                    disabled
+                  >
+                    <FileText className="h-3 w-3 flex-shrink-0" style={{ color: '#737373' }} />
+                    <span className="truncate" style={{ color: '#737373' }}>{selectedDraft.target_path}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'evidence' && currentKnowledgeId && (
+              <div className="border-t px-3 py-2.5 space-y-1.5" style={{ borderColor: '#F0F0F0' }}>
+                <div className="text-[10px] font-medium" style={{ color: '#A3A3A3' }}>关联项目</div>
+                <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs">
+                  <FileText className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--brand-primary)' }} />
+                  <span className="truncate font-medium" style={{ color: '#525252' }}>{currentKnowledgeTitle || currentKnowledgeId}</span>
                 </div>
               </div>
             )}

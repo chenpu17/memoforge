@@ -717,6 +717,8 @@ pub fn create_knowledge(
         summary_hash,
         created_at: now,
         updated_at: now,
+        evidence: None,
+        freshness: None,
     };
 
     let fm_yaml = serde_yaml::to_string(&frontmatter).map_err(|e| MemoError {
@@ -1387,6 +1389,7 @@ Content 2"#;
                         path: "programming".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                     crate::config::CategoryConfig {
                         id: "tools".to_string(),
@@ -1394,9 +1397,11 @@ Content 2"#;
                         path: "tools".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                 ],
                 metadata: None,
+                knowledge_policy: None,
             },
         )
         .unwrap();
@@ -1446,8 +1451,10 @@ Content 2"#;
                     path: "programming".to_string(),
                     parent_id: None,
                     description: None,
+                    default_sla_days: None,
                 }],
                 metadata: None,
+                knowledge_policy: None,
             },
         )
         .unwrap();
@@ -1497,6 +1504,7 @@ Content 2"#;
                         path: "programming".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                     crate::config::CategoryConfig {
                         id: "tools".to_string(),
@@ -1504,9 +1512,11 @@ Content 2"#;
                         path: "tools".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                 ],
                 metadata: None,
+                knowledge_policy: None,
             },
         )
         .unwrap();
@@ -1588,6 +1598,7 @@ See [[programming/source.md]] and [[source]]."#,
                         path: "programming/rust".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                     crate::config::CategoryConfig {
                         id: "notes".to_string(),
@@ -1595,9 +1606,11 @@ See [[programming/source.md]] and [[source]]."#,
                         path: "notes".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                 ],
                 metadata: None,
+                knowledge_policy: None,
             },
         )
         .unwrap();
@@ -1648,8 +1661,10 @@ See [[programming/source.md]] and [[source]]."#,
                     path: "programming".to_string(),
                     parent_id: None,
                     description: None,
+                    default_sla_days: None,
                 }],
                 metadata: None,
+                knowledge_policy: None,
             },
         )
         .unwrap();
@@ -1687,6 +1702,7 @@ See [[programming/source.md]] and [[source]]."#,
                         path: "programming".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                     crate::config::CategoryConfig {
                         id: "tools".to_string(),
@@ -1694,9 +1710,11 @@ See [[programming/source.md]] and [[source]]."#,
                         path: "tools".to_string(),
                         parent_id: None,
                         description: None,
+                    default_sla_days: None,
                     },
                 ],
                 metadata: None,
+                knowledge_policy: None,
             },
         )
         .unwrap();

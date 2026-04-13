@@ -4,6 +4,7 @@
 
 use crate::config::load_config;
 use crate::frontmatter::parse_frontmatter;
+use crate::governance::effective_sla_days;
 use crate::links::{
     collect_markdown_files, get_backlinks, parse_wiki_links, resolve_link_to_knowledge_id,
 };
@@ -169,6 +170,83 @@ pub fn scan_kb_with_options(
                 format!("Knowledge '{}' has no incoming links", fm.title),
             ));
         }
+
+        // --- Governance rules (v0.3.0 Sprint 4) ---
+
+        // Rule: NoEvidence — no evidence metadata at all (no owner AND no verified_at)
+        let has_evidence = fm.evidence.as_ref().map_or(false, |e| {
+            e.owner.is_some() || e.verified_at.is_some()
+        });
+        if !has_evidence {
+            issues.push(ReliabilityIssue::new(
+                RuleKey::NoEvidence,
+                relative.clone(),
+                format!(
+                    "Knowledge '{}' lacks evidence metadata (no owner, no verified_at)",
+                    fm.title
+                ),
+            ));
+        }
+
+        // Rule: NoOwner — evidence exists but has no owner
+        if let Some(ref evidence) = fm.evidence {
+            if evidence.owner.is_none() || evidence.owner.as_ref().map_or(true, |s| s.trim().is_empty()) {
+                issues.push(ReliabilityIssue::new(
+                    RuleKey::NoOwner,
+                    relative.clone(),
+                    format!("Knowledge '{}' has evidence metadata but no owner", fm.title),
+                ));
+            }
+        }
+
+        // Rule: StaleVerification — exceeds effective_sla_days since last verification
+        {
+            let knowledge_sla = fm.freshness.as_ref().map(|f| f.sla_days);
+            let category_sla = fm.category.as_ref().and_then(|cat| {
+                config
+                    .categories
+                    .iter()
+                    .find(|c| c.id == *cat || c.path == *cat)
+                    .and_then(|c| c.default_sla_days)
+            });
+            let global_sla = config
+                .knowledge_policy
+                .as_ref()
+                .map(|p| p.default_sla_days);
+            let sla = effective_sla_days(knowledge_sla, category_sla, global_sla);
+
+            let last_verified = fm
+                .evidence
+                .as_ref()
+                .and_then(|e| e.verified_at.as_deref());
+
+            if let Some(verified_str) = last_verified {
+                if let Ok(verified_time) = verified_str.parse::<chrono::DateTime<chrono::Utc>>() {
+                    let threshold = chrono::Utc::now() - chrono::Duration::days(sla as i64);
+                    if verified_time < threshold {
+                        issues.push(ReliabilityIssue::new(
+                            RuleKey::StaleVerification,
+                            relative.clone(),
+                            format!(
+                                "Knowledge '{}' not verified for >{} days (last: {})",
+                                fm.title,
+                                sla,
+                                verified_time.format("%Y-%m-%d")
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Rule: NoFreshness — knowledge entry lacks a freshness policy
+        if fm.freshness.is_none() {
+            issues.push(ReliabilityIssue::new(
+                RuleKey::NoFreshness,
+                relative.clone(),
+                format!("Knowledge '{}' lacks a freshness policy", fm.title),
+            ));
+        }
     }
 
     Ok(issues)
@@ -280,6 +358,83 @@ pub fn scan_file(
         ));
     }
 
+    // --- Governance rules (v0.3.0 Sprint 4) ---
+
+    // Rule: NoEvidence
+    let has_evidence = fm.evidence.as_ref().map_or(false, |e| {
+        e.owner.is_some() || e.verified_at.is_some()
+    });
+    if !has_evidence {
+        issues.push(ReliabilityIssue::new(
+            RuleKey::NoEvidence,
+            relative.clone(),
+            format!(
+                "Knowledge '{}' lacks evidence metadata (no owner, no verified_at)",
+                fm.title
+            ),
+        ));
+    }
+
+    // Rule: NoOwner
+    if let Some(ref evidence) = fm.evidence {
+        if evidence.owner.is_none() || evidence.owner.as_ref().map_or(true, |s| s.trim().is_empty()) {
+            issues.push(ReliabilityIssue::new(
+                RuleKey::NoOwner,
+                relative.clone(),
+                format!("Knowledge '{}' has evidence metadata but no owner", fm.title),
+            ));
+        }
+    }
+
+    // Rule: StaleVerification
+    {
+        let knowledge_sla = fm.freshness.as_ref().map(|f| f.sla_days);
+        let category_sla = fm.category.as_ref().and_then(|cat| {
+            config
+                .categories
+                .iter()
+                .find(|c| c.id == *cat || c.path == *cat)
+                .and_then(|c| c.default_sla_days)
+        });
+        let global_sla = config
+            .knowledge_policy
+            .as_ref()
+            .map(|p| p.default_sla_days);
+        let sla = effective_sla_days(knowledge_sla, category_sla, global_sla);
+
+        let last_verified = fm
+            .evidence
+            .as_ref()
+            .and_then(|e| e.verified_at.as_deref());
+
+        if let Some(verified_str) = last_verified {
+            if let Ok(verified_time) = verified_str.parse::<chrono::DateTime<chrono::Utc>>() {
+                let threshold = chrono::Utc::now() - chrono::Duration::days(sla as i64);
+                if verified_time < threshold {
+                    issues.push(ReliabilityIssue::new(
+                        RuleKey::StaleVerification,
+                        relative.clone(),
+                        format!(
+                            "Knowledge '{}' not verified for >{} days (last: {})",
+                            fm.title,
+                            sla,
+                            verified_time.format("%Y-%m-%d")
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
+    // Rule: NoFreshness
+    if fm.freshness.is_none() {
+        issues.push(ReliabilityIssue::new(
+            RuleKey::NoFreshness,
+            relative.clone(),
+            format!("Knowledge '{}' lacks a freshness policy", fm.title),
+        ));
+    }
+
     Ok(issues)
 }
 
@@ -308,6 +463,7 @@ mod tests {
                     path: "tech".to_string(),
                     parent_id: None,
                     description: None,
+                default_sla_days: None,
                 },
                 crate::config::CategoryConfig {
                     id: "notes".to_string(),
@@ -315,9 +471,11 @@ mod tests {
                     path: "notes".to_string(),
                     parent_id: None,
                     description: None,
+                default_sla_days: None,
                 },
             ],
             metadata: None,
+            knowledge_policy: None,
         };
 
         let config_yaml = serde_yaml::to_string(&config).unwrap();
@@ -701,12 +859,15 @@ updated_at: {}
 
         let issues = scan_file(&kb_path, &file_path).unwrap();
 
-        // Should have issues for no tags, no summary, and orphaned knowledge
-        assert_eq!(issues.len(), 3);
+        // Should have issues for: no tags, no summary, orphaned knowledge,
+        // no evidence, no freshness (governance rules)
+        assert_eq!(issues.len(), 5);
         assert!(issues.iter().any(|i| i.rule_key == RuleKey::NoTags));
         assert!(issues.iter().any(|i| i.rule_key == RuleKey::NoSummary));
         assert!(issues
             .iter()
             .any(|i| i.rule_key == RuleKey::OrphanedKnowledge));
+        assert!(issues.iter().any(|i| i.rule_key == RuleKey::NoEvidence));
+        assert!(issues.iter().any(|i| i.rule_key == RuleKey::NoFreshness));
     }
 }

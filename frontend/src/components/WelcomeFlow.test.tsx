@@ -83,7 +83,7 @@ describe('WelcomeFlow clone path behavior', () => {
     expect(screen.getByText('MCP-ready')).toBeInTheDocument()
     expect(screen.getByText('完成启动后，可在设置页一键复制 MCP 配置，连接 Claude Code 或 OpenCode。')).toBeInTheDocument()
     expect(screen.getByText('下载与发布入口')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /下载 v0.1.2/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /下载 v0.3.0-beta.1/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Release Notes/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /安装与配置说明/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Windows · Setup \.exe/ })).toBeInTheDocument()

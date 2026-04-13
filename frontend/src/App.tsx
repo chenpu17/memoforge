@@ -59,6 +59,16 @@ const ContextPackPanel = lazy(async () => {
   return { default: module.ContextPackPanel }
 })
 
+const WorkflowTemplateLauncher = lazy(async () => {
+  const module = await import('./components/WorkflowTemplateLauncher')
+  return { default: module.WorkflowTemplateLauncher }
+})
+
+const UnifiedReviewQueue = lazy(async () => {
+  const module = await import('./components/UnifiedReviewQueue')
+  return { default: module.UnifiedReviewQueue }
+})
+
 const isMacOS = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')
 const LIST_WIDTH_KEY = 'memoforge.knowledge-list.width'
 const LIST_COLLAPSED_KEY = 'memoforge.knowledge-list.collapsed'
@@ -1085,7 +1095,7 @@ function App() {
                       <span className="text-[13px]" style={{ color: '#A3A3A3' }}>Agent 工作台</span>
                       <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#D4D4D4' }} />
                       <span className="text-[13px] font-medium truncate" style={{ color: '#0A0A0A' }}>
-                        {activeAgentPanel === 'inbox' ? 'Inbox 收件箱' : activeAgentPanel === 'sessions' ? 'Sessions 会话' : activeAgentPanel === 'review' ? 'Review 审阅' : activeAgentPanel === 'reliability' ? 'Reliability 可靠性' : 'Packs 打包'}
+                        {activeAgentPanel === 'inbox' ? 'Inbox 收件箱' : activeAgentPanel === 'sessions' ? 'Sessions 会话' : activeAgentPanel === 'review' ? 'Review 审阅' : activeAgentPanel === 'reliability' ? 'Reliability 可靠性' : activeAgentPanel === 'packs' ? 'Packs 打包' : 'Workflow 工作流'}
                       </span>
                     </>
                   ) : treeSelection.type === 'folder' ? (
@@ -1293,13 +1303,10 @@ function App() {
                     )}>
                       {activeAgentPanel === 'inbox' && <InboxPanel />}
                       {activeAgentPanel === 'sessions' && <AgentSessionPanel />}
-                      {activeAgentPanel === 'review' && (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="text-xs" style={{ color: '#737373' }}>Review 面板由 Worker 2 负责</div>
-                        </div>
-                      )}
+                      {activeAgentPanel === 'review' && <UnifiedReviewQueue />}
                       {activeAgentPanel === 'reliability' && <ReliabilityDashboardPanel />}
                       {activeAgentPanel === 'packs' && <ContextPackPanel />}
+                      {activeAgentPanel === 'templates' && <WorkflowTemplateLauncher />}
                     </Suspense>
                   </div>
                 ) : treeSelection.type === 'folder' ? (

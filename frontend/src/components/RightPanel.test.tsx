@@ -14,6 +14,22 @@ vi.mock('./BacklinksPanel', () => ({
   BacklinksPanel: () => <div>backlinks-panel-content</div>,
 }))
 
+vi.mock('./EvidenceMetaPanel', () => ({
+  EvidenceMetaPanel: () => <div>evidence-panel-content</div>,
+}))
+
+vi.mock('./FreshnessActions', () => ({
+  FreshnessActions: () => <div>freshness-actions-content</div>,
+}))
+
+vi.mock('../stores/appStore', () => ({
+  useAppStore: () => ({
+    currentKnowledgeId: 'test-id',
+    currentKnowledgeTitle: 'Test Knowledge',
+    setActiveAgentPanel: vi.fn(),
+  }),
+}))
+
 describe('RightPanel', () => {
   beforeEach(() => {
     window.localStorage.clear()

@@ -1,13 +1,13 @@
 # ForgeNerve v0.3.0 测试与验收计划
 
 > 目标版本: v0.3.0
-> 日期: 2026-04-09
+> 日期: 2026-04-12
 > 文档类型: 测试与验收计划
 > 状态: 草案
 > 关联文档:
 > - [ForgeNerve-v0.3.0产品需求文档](./ForgeNerve-v0.3.0-产品需求文档.md)
 > - [ForgeNerve-v0.3.0开发计划](./ForgeNerve-v0.3.0-开发计划.md)
-> - [ForgeNerve-v0.3.0 Sprint1验收矩阵](./ForgeNerve-v0.3.0-Sprint1%E9%AA%8C%E6%94%B6%E7%9F%A9%E9%98%B5.md)
+> - [ForgeNerve-v0.3.0 Sprint1验收矩阵](./ForgeNerve-v0.3.0-Sprint1验收矩阵.md)
 
 ---
 
@@ -15,10 +15,10 @@
 
 v0.3.0 的测试重点不是“页面有没有渲染”，而是：
 
-1. Agent 协作链路是否稳定
-2. 变更是否可审、可回退、可确认
-3. 知识运营能力是否可信
-4. 桌面端主流程是否真的可用
+1. 高频工作流能否稳定起跑
+2. 变更是否真正进入统一审阅队列
+3. 新知识是否带最小证据层
+4. 知识治理是否形成可持续闭环
 
 ---
 
@@ -28,43 +28,40 @@ v0.3.0 的测试重点不是“页面有没有渲染”，而是：
 
 覆盖：
 
-- Inbox store
-- Session store
-- Reliability rules
-- Context Pack 生成逻辑
-- Draft / Inbox / Session 状态流转
+- Workflow Template 模型
+- Review Item 投影
+- Evidence Meta 读写
+- Reliability / Freshness 规则
+- Draft / Inbox / Session / Review 关联
 
 ### 2.2 MCP E2E
 
 覆盖：
 
-- 创建 Inbox item
-- Inbox 转 Draft
-- 创建 Session
-- Session 关联上下文
-- Draft 预览 / 提交
-- Reliability issue 转修复 Draft
-- Context Pack 被 Session 引用
+- 启动 Workflow Template
+- 创建 Session / Inbox / Draft
+- 统一 Review 决策
+- Evidence Meta 回写
+- Reliability 问题转复查 / 修复 Draft
 
 ### 2.3 前端组件测试
 
 覆盖：
 
-- Inbox 面板
-- Session 面板
-- Review
-- Reliability Dashboard
-- Context Pack 管理器
+- 模板启动入口
+- Unified Review Queue
+- Evidence Meta 展示与编辑
+- Reliability / Freshness 入口
+- 现有 Inbox / Session / Review / Packs 面板回归
 
 ### 2.4 Tauri E2E
 
 覆盖：
 
-- 桌面端查看 Inbox
-- 桌面端查看 Session
-- 桌面端确认 / 丢弃 Draft
-- 桌面端处理 Reliability issue
-- 桌面端消费 Context Pack
+- 桌面端启动工作流模板
+- 桌面端统一审阅并确认变更
+- 桌面端查看证据与验证信息
+- 桌面端处理 freshness / reliability 问题
 
 ---
 
@@ -72,71 +69,66 @@ v0.3.0 的测试重点不是“页面有没有渲染”，而是：
 
 Sprint 1 只覆盖：
 
-- Inbox store
-- Session store
-- Draft / Inbox / Session 关联
-- MCP 最小闭环
-- Desktop 最小可见与 Review 占位
+- 当前主干基线盘点与不回退
+- 新增模型与契约冻结后的最小读写检查
+- 现有 Inbox / Session / Review / Reliability / Packs 回归
+- README / help / 文档口径同步
 
 Sprint 1 不覆盖：
 
-- Reliability Dashboard 完整能力
-- Reliability issue 转修复 Draft
-- Context Pack 创建 / 导出
-- Team Publish
+- 完整 Workflow Template 用户体验
+- Unified Review Queue 完整交互
+- Evidence Meta 完整编辑能力
+- Freshness SLA 完整闭环
+- Pack Recommendation
 
 ---
 
 ## 4. 版本级必测主链路
 
-### 场景 A：Agent 写入闭环
+### 场景 A：模板启动闭环
 
-1. 启动桌面应用
-2. Agent 创建 session
-3. Agent 创建 inbox item
-4. Agent 将 inbox item 转为 draft
-5. 用户在桌面端预览并确认
-6. 结果写入知识库
+1. 用户选择一个 Workflow Template
+2. 系统带入默认上下文与建议输出位置
+3. Agent 创建 Session / Inbox / Draft
+4. 结果进入 Review Queue
+5. 用户确认提交
 
-### 场景 B：导入整理闭环
+### 场景 B：统一审阅闭环
 
-1. 导入外部 Markdown
-2. 内容进入 Inbox
-3. 用户转正式知识或转 Draft
-4. 结果进入知识库
+1. Agent Draft、Inbox 转 Draft、Reliability 修复 Draft 同时产生
+2. 用户在 Review 中看到统一列表
+3. 用户按来源查看风险与 diff
+4. 用户确认、退回或丢弃
 
-### 场景 C：Reliability 修复闭环
+### 场景 C：证据化沉淀闭环
 
-1. 系统识别问题知识
-2. 用户打开 Reliability Dashboard
-3. 用户从问题生成修复 Draft
-4. 用户确认提交
+1. 新知识进入待确认状态
+2. 用户补充或校验证据元信息
+3. 提交后知识条目带 `owner / verified_at / version` 等信息
 
-### 场景 D：Context Pack 复用闭环
+### 场景 D：Freshness 治理闭环
 
-1. 创建 Context Pack
-2. 新建 Session
-3. Session 引用 Context Pack
-4. Agent 基于 Pack 生成输出
+1. 系统识别超过 SLA 或缺少验证信息的知识
+2. 用户进入 Reliability 视图
+3. 用户发起复查 / 修复动作
+4. 处理结果再次进入 Review Queue
 
 ---
 
 ## 5. Sprint 1 必测链路
 
-### 场景 S1-A：最小 Agent 写入闭环
+### 场景 S1-A：现状基线回归
 
 1. 启动桌面应用
-2. Agent 创建 session
-3. Agent 创建 inbox item
-4. Agent 将 inbox item 转为 draft
-5. Session 关联上下文与结果
-6. 桌面端看到最小结果
+2. 确认现有 Inbox / Session / Review / Reliability / Packs 入口仍可打开
+3. 确认现有 Draft 主流程未退化
+4. 确认帮助与 README 叙事同步
 
-### 场景 S1-B：最小 Review 可见化
+### 场景 S1-B：冻结契约最小检查
 
-1. 系统已有 Draft
-2. 桌面端进入 Review 入口
-3. 用户能看到 Draft 预览入口
+1. 验证新增模型字段可被前后端类型容纳
+2. 验证现有工具与接口不因新口径冻结而破坏兼容
 
 ---
 
@@ -151,7 +143,7 @@ Sprint 1 不覆盖：
 ### 6.2 稳定性验收
 
 - 不出现明显状态错乱
-- 不出现 Draft / Inbox / Session 错绑
+- 不出现 Draft / Inbox / Session / Review 错绑
 - 不出现桌面端刷新后状态丢失
 
 ### 6.3 回归验收
@@ -166,9 +158,9 @@ Sprint 1 不覆盖：
 
 | 层 | 关键对象 | 建议 |
 |---|---|---|
-| Rust | store / rules / model | 单测覆盖主状态机 |
-| MCP | tool contract | E2E 覆盖主工具链 |
-| Frontend | panel / queue / modal | 组件测试覆盖交互 |
+| Rust | template / review / evidence / freshness | 单测覆盖主状态机与兼容性 |
+| MCP | workflow / review / evidence | E2E 覆盖主工具链 |
+| Frontend | launcher / queue / evidence panel | 组件测试覆盖交互 |
 | Tauri | end-to-end flow | 覆盖真实桌面链路 |
 
 ---
@@ -177,20 +169,20 @@ Sprint 1 不覆盖：
 
 ### 8.1 性能基线
 
-- `list_inbox_items` 在 `100` 条以内列表读取应无明显卡顿
+- Review Queue 在 `100` 条以内应无明显卡顿
 - Session 列表在 `100` 条以内应保持秒级内返回
-- 桌面端从 Inbox / Session 进入 Review 预览应保持流畅
+- 从模板结果进入 Review 预览应保持流畅
 
 ### 8.2 并发场景
 
-- 多个 Agent Session 同时写入不同 Inbox item
-- Session append 与 Inbox promote 并行发生
+- 多个 Agent Session 同时写入不同工作流产物
+- Review Queue 同时收敛多个 source type
 - 索引文件重建时不应破坏实体文件读取
 
 说明：
 
-- Sprint 1 并发测试以 store / MCP 层为主
-- 复用现有文件锁策略，并对新增 inbox / session store 做回归验证
+- Sprint 1 并发测试以兼容性回归为主
+- 后续 Sprint 再扩大到模板和治理链路
 
 ---
 

@@ -15,6 +15,22 @@ pub struct Config {
     pub categories: Vec<CategoryConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<KnowledgeBaseMetadata>,
+    /// Knowledge governance policy (v0.3.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub knowledge_policy: Option<KnowledgePolicy>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgePolicy {
+    /// Default SLA days for freshness
+    #[serde(default)]
+    pub default_sla_days: u32,
+}
+
+impl Default for KnowledgePolicy {
+    fn default() -> Self {
+        Self { default_sla_days: 90 }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +44,9 @@ pub struct CategoryConfig {
     pub parent_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Default SLA days for this category (v0.3.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_sla_days: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +61,7 @@ impl Default for Config {
             version: "1.0".to_string(),
             categories: Vec::new(),
             metadata: None,
+            knowledge_policy: None,
         }
     }
 }
@@ -106,6 +126,7 @@ pub fn register_category(kb_path: &Path, category: &Category, path: &str) -> Res
         path: path.to_string(),
         parent_id: category.parent_id.clone(),
         description: category.description.clone(),
+        default_sla_days: None,
     };
 
     config.categories.push(category_config);

@@ -1,6 +1,6 @@
 {
   "name": "memoforge-frontend",
-  "version": "0.1.2",
+  "version": "0.3.0-beta.1",
   "private": true,
   "type": "module",
   "scripts": {

@@ -15,32 +15,56 @@ ForgeNerve 是一个面向开发者和 AI Agent 的知识操作系统：它把 `
 
 ## 项目状态
 
-当前规划主线：**v0.3.0** (2026-04-12，处于设计整理与评审冻结阶段)
+当前版本主线：**v0.3.0-beta.1** (2026-04-13，预发布版；正式稳定版仍以 stable release tag 为准)
 
 最新正式版：[`ForgeNerve v0.1.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2)
 
+最新预发布版：[`ForgeNerve v0.3.0-beta.1`](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1)
+
+说明：
+
+- `v0.1.2` 是当前正式发布版
+- `v0.3.0-beta.1` 是当前预发布版，用于验证 v0.3.0 主线能力
+- 本仓库中的 `v0.3.0` 文档表示“当前权威规划与收口口径”，正式稳定版仍以后续 release tag 为准
+
+当前仓库主干现状：
+
 - ✅ Core Engine (Rust)
-- ✅ MCP Server (SSE + stdio transport, 47+ 个工具)
+- ✅ MCP Server (SSE + stdio transport, 55+ 个工具)
 - ✅ Draft 草稿流 (section 级写入、预览、冲突检测)
 - ✅ Tauri 桌面应用
 - ✅ React Frontend UI (3 列布局)
 - ✅ Git 集成
 - ✅ 知识图谱可视化
 - ✅ 实时刷新 (MCP 创建自动同步到 GUI)
+- ✅ Workflow Templates / Playbooks (4 个内置模板)
+- ✅ Unified Review Queue (多来源统一审阅)
+- ✅ Evidence-backed Knowledge (来源追溯与验证)
+- ✅ Freshness SLA 治理 (知识有效期与复查提醒)
+- ✅ Profile Gate (generic-stdio / desktop-assisted / legacy-full)
 - ✅ 前端单元测试 + E2E 测试
 - ✅ Tauri 桌面端到端测试（CI 覆盖）
 
-### v0.3.0 规划范围
+### v0.3.0 用户承诺与基线
 
-`v0.3.0` 当前仍处于设计与冻结阶段，规划聚焦以下核心概念：
+`v0.3.0` 是当前主干收口与评审主线，重点不是继续罗列模块，而是把产品收束成几个用户可感知的承诺：
 
-- **Inbox** — 待审阅的知识候选池，支持状态流转（new → triaged → drafted → promoted）
-- **Session** — Agent 工作会话追踪，记录上下文、草稿和生成的 Inbox items
-- **Review** — 桌面审阅面板，支持预览 diff、确认提交、退回修改、丢弃变更
-- **Reliability Dashboard** — 知识质量规则扫描（6 条规则），支持生成修复 Draft
-- **Context Pack** — 知识切片打包（按 tag/folder/topic/manual），可被 Session 引用
+- **高频工作流可直接起跑** — 通过 `Workflow Templates / Playbooks` 降低首次使用门槛
+- **AI 改知识可放心审** — 通过 `Unified Review Queue` 把多来源变更统一收口
+- **知识有证据、可追溯、可信** — 通过 `Evidence-backed Knowledge` 增强工程信任
+- **知识过期可持续修** — 通过 `Reliability & Freshness` 形成治理闭环
 
-相关 MCP 工具：
+当前主干已经存在的基础模块：
+
+- **Inbox** — 待审阅的知识候选池
+- **Session** — Agent 工作会话追踪
+- **Review** — 桌面审阅入口
+- **Reliability Dashboard** — 知识质量规则扫描入口
+- **Context Pack** — 知识切片打包与复用能力
+
+这些模块是 `v0.3.0` 的基线，不再单独作为版本 headline；版本价值在于把它们升级成工作流、审阅和治理体验。
+
+当前基线相关 MCP 工具：
 
 | 类别 | 工具 |
 |------|------|
@@ -48,26 +72,30 @@ ForgeNerve 是一个面向开发者和 AI Agent 的知识操作系统：它把 `
 | Session | `start_agent_session`, `append_agent_session_context`, `list_agent_sessions`, `get_agent_session`, `complete_agent_session` |
 | Reliability | `list_reliability_issues`, `get_reliability_issue_detail`, `create_fix_draft_from_issue` |
 | Context Pack | `list_context_packs`, `create_context_pack`, `get_context_pack`, `export_context_pack` |
+| Workflow Template | `list_workflow_templates`, `start_workflow_run` |
+| Review | `list_review_items`, `get_review_item`, `apply_review_decision` |
+| Governance | `get_knowledge_governance`, `update_knowledge_governance` |
 
 ## 下载与发布说明
 
 如果你是第一次接触 ForgeNerve，最直接的入口就是 GitHub Release：
 
 - 正式版下载页：[`ForgeNerve v0.1.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2)
+- 预发布版下载页：[`ForgeNerve v0.3.0-beta.1`](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1)
 - 发布说明：[`RELEASE_NOTES.md`](RELEASE_NOTES.md)
 
-常用下载入口：
+预发布版常用下载入口：
 
 | 平台 / 用途 | 推荐产物 | 链接 |
 |------|------|------|
-| Windows 安装版 | `ForgeNerve_0.1.2_x64-setup.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_x64-setup.exe) |
-| Windows MSI | `ForgeNerve_0.1.2_x64_en-US.msi` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_x64_en-US.msi) |
-| Windows 便携版 | `ForgeNerve_x64_portable.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_x64_portable.exe) |
-| macOS Apple Silicon | `ForgeNerve_0.1.2_aarch64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_aarch64.dmg) |
-| macOS Intel | `ForgeNerve_0.1.2_x64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_x64.dmg) |
-| Linux x64 | `ForgeNerve_0.1.2_amd64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_amd64.AppImage) |
-| Linux arm64 | `ForgeNerve_0.1.2_aarch64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.1.2/ForgeNerve_0.1.2_aarch64.AppImage) |
-| MCP / CLI 二进制 | `memoforge-*` 系列 | [查看全部 release 资产](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2) |
+| Windows 安装版 | `ForgeNerve_0.3.0-beta.1_x64-setup.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_x64-setup.exe) |
+| Windows MSI | `ForgeNerve_0.3.0-beta.1_x64_en-US.msi` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_x64_en-US.msi) |
+| Windows 便携版 | `ForgeNerve_x64_portable.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_x64_portable.exe) |
+| macOS Apple Silicon | `ForgeNerve_0.3.0-beta.1_aarch64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_aarch64.dmg) |
+| macOS Intel | `ForgeNerve_0.3.0-beta.1_x64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_x64.dmg) |
+| Linux x64 | `ForgeNerve_0.3.0-beta.1_amd64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_amd64.AppImage) |
+| Linux arm64 | `ForgeNerve_0.3.0-beta.1_aarch64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_aarch64.AppImage) |
+| MCP / CLI 二进制 | `memoforge-*` 系列 | [查看全部 release 资产](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1) |
 
 如果你想在首页或 release 页面快速找到二进制，可以直接按下面口径理解：
 
@@ -209,6 +237,11 @@ cargo build -p memoforge-http -p memoforge-mcp
 python3 tests/frontend_e2e.py
 python3 tests/frontend_ops_e2e.py
 python3 tests/mcp_e2e.py
+python3 tests/sprint1_user_e2e.py
+python3 tests/sprint2_user_e2e.py
+python3 tests/sprint3_user_e2e.py
+python3 tests/sprint3_reliability_e2e.py
+python3 tests/sprint4_context_pack_e2e.py
 ```
 
 桌面态 E2E 会实际启动 Tauri 应用，覆盖 `tauri.ts` 的桌面命令分支与内嵌 SSE：
@@ -236,6 +269,11 @@ xvfb-run -a python3 tests/tauri_desktop_e2e.py
 4. 触发后只会跑 `desktop-e2e-linux` 和 `desktop-e2e-windows` 两个 job。
 
 ## MCP 工具列表
+
+以下列表反映当前仓库主干中的 MCP 能力概览。
+
+- 是否属于正式发布版，以对应 release tag 与 release note 为准
+- `Inbox / Session / Reliability / Context Pack` 同时也是 `v0.3.0` 文档主线的一部分
 
 ### 读取操作
 | 工具 | 说明 |
@@ -265,6 +303,13 @@ xvfb-run -a python3 tests/tauri_desktop_e2e.py
 | `create_context_pack` | 创建 Context Pack |
 | `get_context_pack` | 获取 Context Pack 详情 |
 | `export_context_pack` | 导出 Context Pack |
+| `list_workflow_templates` | 列出工作流模板 |
+| `start_workflow_run` | 启动工作流 |
+| `list_review_items` | 列出待审阅项 |
+| `get_review_item` | 获取审阅项详情 |
+| `apply_review_decision` | 对审阅项执行决策 |
+| `get_knowledge_governance` | 获取知识治理信息 (Evidence + Freshness) |
+| `update_knowledge_governance` | 更新知识治理信息 |
 
 ### 写入操作
 | 工具 | 说明 |
@@ -334,8 +379,9 @@ Agent 也可以先创建候选项进入 Inbox：
 
 ```
 crates/
-├── memoforge-core/     # 核心引擎 (知识管理、Git、链接)
+├── memoforge-core/     # 核心引擎 (知识管理、Git、链接、治理)
 ├── memoforge-mcp/      # MCP Server (SSE + stdio)
+├── memoforge-http/     # REST API Server (Axum)
 └── memoforge-tauri/    # Tauri 桌面应用
 
 frontend/src/
@@ -348,6 +394,10 @@ frontend/src/
 │   ├── InboxPanel.tsx      # Inbox 面板
 │   ├── AgentSessionPanel.tsx  # 会话面板
 │   ├── ReviewPanel.tsx     # 审阅面板
+│   ├── UnifiedReviewQueue.tsx  # v0.3.0 统一审阅队列
+│   ├── WorkflowTemplateLauncher.tsx  # v0.3.0 工作流模板启动器
+│   ├── EvidenceMetaPanel.tsx  # v0.3.0 证据元数据面板
+│   ├── FreshnessActions.tsx   # v0.3.0 知识时效操作
 │   ├── ReliabilityDashboardPanel.tsx  # 可靠性面板
 │   ├── ContextPackPanel.tsx  # Context Pack 面板
 │   └── ToastNotifications.tsx   # 实时通知
@@ -357,19 +407,27 @@ frontend/src/
 
 ## 核心功能
 
-- 📝 **Markdown 编辑** - CodeMirror + 实时预览
-- 🤖 **MCP 协议集成** - SSE 实时状态同步
-- 🔄 **Git 版本控制** - commit/pull/push
-- 🏷️ **分类与标签** - 多维度组织
-- 🔍 **全文搜索** - 高亮匹配
-- 📊 **知识图谱** - ReactFlow 可视化
-- 🔗 **双向链接** - `[[wiki-style]]` 链接
-- ⚡ **实时刷新** - MCP 创建自动同步到 GUI
-- 📥 **Inbox 收件箱** - Agent 创建的候选项审阅
-- 💬 **Sessions 会话** - Agent 工作会话追踪
-- ✅ **Review 审阅** - Draft 变更预览与确认
-- 🔍 **Reliability Dashboard** — 知识质量规则扫描与修复
-- 📦 **Context Packs** — 知识切片打包与 Agent 会话复用
+- **Markdown 编辑** - CodeMirror + 实时预览
+- **MCP 协议集成** - SSE 实时状态同步
+- **Git 版本控制** - commit/pull/push
+- **分类与标签** - 多维度组织
+- **全文搜索** - 高亮匹配
+- **知识图谱** - ReactFlow 可视化
+- **双向链接** - `[[wiki-style]]` 链接
+- **实时刷新** - MCP 创建自动同步到 GUI
+- **Inbox 收件箱** - Agent 创建的候选项审阅
+- **Sessions 会话** - Agent 工作会话追踪
+- **Review 审阅** - Draft 变更预览与确认
+- **Reliability Dashboard** - 知识质量规则扫描与修复
+- **Context Packs** - 知识切片打包与 Agent 会话复用
+
+### v0.3.0 新增能力
+
+- **Workflow Templates** - 4 个内置模板 (PR/Issue 沉淀、Runbook 校验、会议纪要、版本复盘)，支持自定义模板
+- **Unified Review Queue** - 多来源 (Agent Draft / Inbox / Reliability / Import) 统一审阅队列，支持批量操作
+- **Evidence-backed Knowledge** - 知识条目关联 owner、source URL、Issue/PR/Commit、验证时间
+- **Freshness SLA 治理** - 知识有效期继承链 (Knowledge > Category > Global > 90d)，到期/过期自动检测
+- **Profile Gate** - MCP 工具按 profile 分级暴露 (generic-stdio <=14, desktop-assisted <=20, legacy-full all)
 
 ## 技术栈
 
@@ -386,13 +444,13 @@ frontend/src/
 - [MCP Server README](crates/memoforge-mcp/README.md) - MCP 详细文档
 - [规划文档目录](docs/planning/README.md) - 当前版本、历史归档、品牌文案的总导航
 
-### 当前权威版本：v0.3.0
+### 当前权威规划版本：v0.3.0
 
 - [ForgeNerve v0.3.0 文档索引](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-文档索引.md) - 当前版本开发前文档总导航
 - [ForgeNerve v0.3.0 差异化战略](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-差异化战略.md) - 新版本竞争力与品类战略
 - [ForgeNerve v0.3.0 产品需求文档](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-产品需求文档.md) - 新版本核心功能范围与验收目标
 - [ForgeNerve v0.3.0 技术方案](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-技术方案.md) - Inbox / Session / Reliability / Context Pack 技术落地
-- [ForgeNerve v0.3.0 开发计划](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-开发计划.md) - Sprint 规划与 Claude Code Agent Teams 分工
+- [ForgeNerve v0.3.0 开发计划](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-开发计划.md) - Sprint 规划与主 agent + subagent 协作方式
 - [ForgeNerve v0.3.0 任务清单](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-任务清单.md) - 可直接进入 issue / 任务系统的待办清单
 - [ForgeNerve v0.3.0 开发前准备清单](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-开发前准备清单.md) - 开工前总入口与 TODO List
 - [ForgeNerve v0.3.0 决策冻结清单](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-决策冻结清单.md) - 范围、模型边界、MCP 契约冻结项
@@ -403,7 +461,7 @@ frontend/src/
 - [ForgeNerve v0.3.0 Sprint 1 任务拆解](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-Sprint1任务拆解.md) - 第一阶段 issue 级任务拆解
 - [ForgeNerve v0.3.0 Sprint 1 验收矩阵](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-Sprint1验收矩阵.md) - Sprint 1 最小闭环的完成定义
 - [ForgeNerve v0.3.0 测试与验收计划](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-测试与验收计划.md) - 测试矩阵与发布前验收标准
-- [ForgeNerve v0.3.0 Agent Teams 提示词](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-Agent%20Teams提示词.md) - Claude Code 多 Agent 执行提示词
+- [ForgeNerve v0.3.0 Subagent 协作提示词](docs/planning/releases/v0.3.0/ForgeNerve-v0.3.0-Subagent协作提示词.md) - Claude Code 主 agent + subagent 执行提示词
 
 ### 历史归档
 

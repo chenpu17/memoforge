@@ -2,7 +2,7 @@
 //! 参考: 技术实现文档 §2.5
 
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     response::{sse::Event, IntoResponse, Sse},
     routing::{get, post},
@@ -29,6 +29,10 @@ pub struct McpServerConfig {
     pub port: u16,
     pub host: String,
     pub readonly: bool,
+    /// Default profile for SSE connections without explicit query param.
+    /// Tauri-embedded SSE defaults to `desktop-assisted`;
+    /// standalone SSE defaults to `generic-stdio`.
+    pub default_profile: String,
 }
 
 impl Default for McpServerConfig {
@@ -52,6 +56,12 @@ impl Default for McpServerConfig {
                         || normalized == "on"
                 })
                 .unwrap_or(false),
+            // Standalone SSE defaults to generic-stdio.
+            // Tauri integration should override this to "desktop-assisted".
+            default_profile: std::env::var("MEMOFORGE_PROFILE")
+                .ok()
+                .filter(|p| !p.is_empty())
+                .unwrap_or_else(|| "generic-stdio".to_string()),
         }
     }
 }
@@ -224,6 +234,14 @@ struct JsonRpcRequest {
     params: Option<Value>,
 }
 
+/// Query parameters for MCP endpoints.
+#[derive(Debug, Deserialize, Default)]
+#[serde(default)]
+struct McpQueryParams {
+    /// Tool exposure profile override.
+    profile: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 struct JsonRpcResponse {
     jsonrpc: String,
@@ -307,6 +325,7 @@ async fn handle_health() -> impl IntoResponse {
 /// 处理 MCP JSON-RPC 请求
 async fn handle_mcp_request(
     State(state): State<Arc<McpServerState>>,
+    Query(query): Query<McpQueryParams>,
     body: String,
 ) -> Result<Json<JsonRpcResponse>, StatusCode> {
     let request: JsonRpcRequest = match serde_json::from_str(&body) {
@@ -316,6 +335,14 @@ async fn handle_mcp_request(
             return Err(StatusCode::BAD_REQUEST);
         }
     };
+
+    // Apply profile from query param or fall back to server default.
+    let profile_str = query
+        .profile
+        .as_deref()
+        .unwrap_or(&state.config.default_profile);
+    let profile = crate::tools::Profile::from_str(profile_str);
+    crate::tools::set_profile(profile.clone());
 
     let response = match request.method.as_str() {
         "initialize" => Some(handle_initialize(request.id)),
@@ -435,6 +462,20 @@ fn handle_tools_call(
 
     // 获取工具名称
     let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
+
+    // Profile Gate: check visibility before any tool-specific handling
+    let current_profile = crate::tools::get_profile();
+    if !crate::tools::is_tool_visible_for_review(tool_name, &current_profile) {
+        return json_rpc_error(
+            id,
+            -32601,
+            &format!(
+                "Tool '{}' not found or not available in profile '{}'",
+                tool_name,
+                current_profile.as_str()
+            ),
+        );
+    }
 
     // SSE 模式下，get_editor_state 直接返回内存状态（不读文件）
     if tool_name == "get_editor_state" {
