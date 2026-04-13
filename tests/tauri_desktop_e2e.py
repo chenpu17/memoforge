@@ -29,7 +29,8 @@ from frontend_e2e import REPO_ROOT, make_test_env, seed_knowledge_base, terminat
 
 try:
     from selenium import webdriver
-    from selenium.common.exceptions import TimeoutException
+    from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
+    from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.common.options import ArgOptions
@@ -333,6 +334,26 @@ def click_browser_card(driver: webdriver.Remote, label: str) -> None:
         EC.element_to_be_clickable((By.XPATH, xpath))
     )
     element.click()
+
+
+def activate_element(driver: webdriver.Remote, element) -> None:
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center', inline: 'center'});",
+        element,
+    )
+    try:
+        element.click()
+        return
+    except ElementClickInterceptedException:
+        pass
+
+    try:
+        driver.execute_script("arguments[0].click();", element)
+        return
+    except Exception:
+        pass
+
+    ActionChains(driver).move_to_element(element).click().perform()
 
 
 def open_note_from_landing(
@@ -794,7 +815,7 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
         f"//div[contains(@class,'react-flow__node')][contains(., {xpath_literal('Beta Async Notes')})]",
         timeout=25.0,
     )
-    beta_node.click()
+    activate_element(driver, beta_node)
     assert_editor_state(
         mcp_port,
         expected_kb_path=Path(paths["kb1"]),
