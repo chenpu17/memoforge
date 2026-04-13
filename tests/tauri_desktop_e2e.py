@@ -848,7 +848,7 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
 
     wait_for_css(driver, 'button[title="设置"]').click()
     assert_settings_release_section(driver)
-    wait_for_body_text(driver, f"http://127.0.0.1:{mcp_port}/mcp")
+    wait_for_body_text(driver, "http://127.0.0.1:31415/mcp")
     wait_for_xpath(driver, "//h2[normalize-space(.)='设置']/following::button[1]").click()
     mark("settings-modal")
 
