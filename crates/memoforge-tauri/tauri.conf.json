@@ -1,6 +1,6 @@
 {
   "productName": "ForgeNerve",
-  "version": "0.3.0-beta.1",
+  "version": "0.3.0-beta.2",
   "identifier": "com.memoforge.app",
   "build": {
     "beforeDevCommand": "",

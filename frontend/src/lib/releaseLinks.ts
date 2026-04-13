@@ -1,5 +1,5 @@
 export const MCP_ENDPOINT = 'http://127.0.0.1:31415/mcp'
-export const RELEASE_VERSION = '0.3.0-beta.1'
+export const RELEASE_VERSION = '0.3.0-beta.2'
 export const RELEASE_TAG = `v${RELEASE_VERSION}`
 const releaseAssetUrl = (assetName: string) => `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/${assetName}`
 export const RELEASE_URL = `https://github.com/chenpu17/memoforge/releases/tag/${RELEASE_TAG}`
@@ -26,10 +26,9 @@ export type QuickDownloadLink = {
 export const DOWNLOAD_GROUPS: DownloadGroup[] = [
   {
     title: 'Windows',
-    description: '安装版、MSI 和便携版都在当前 release 中。',
+    description: '当前预发布版提供安装版和便携版；MSI 仅保留在稳定版发布线。',
     assets: [
       { label: 'Setup .exe', url: releaseAssetUrl(`ForgeNerve_${RELEASE_VERSION}_x64-setup.exe`) },
-      { label: 'MSI', url: releaseAssetUrl(`ForgeNerve_${RELEASE_VERSION}_x64_en-US.msi`) },
       { label: 'Portable', url: releaseAssetUrl('ForgeNerve_x64_portable.exe') },
     ],
   },

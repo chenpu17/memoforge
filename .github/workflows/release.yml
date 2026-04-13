@@ -140,6 +140,11 @@ jobs:
           cd frontend
           npm run build
 
+      - name: Prepare Windows prerelease bundle config
+        if: matrix.platform == 'windows-latest' && needs.prepare-release.outputs.prerelease == 'true'
+        run: |
+          node -e "const fs=require('fs'); const path='crates/memoforge-tauri/tauri.conf.json'; const config=JSON.parse(fs.readFileSync(path,'utf8')); config.bundle={...(config.bundle||{}),targets:['nsis']}; fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');"
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:

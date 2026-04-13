@@ -1,12 +1,12 @@
-# ForgeNerve v0.3.0-beta.1 Release Notes
+# ForgeNerve v0.3.0-beta.2 Release Notes
 
 Release Date: 2026-04-13
 
-ForgeNerve v0.3.0-beta.1 is the first v0.3.0 prerelease for validating the Agent Knowledge OS direction before the next stable release.
+ForgeNerve v0.3.0-beta.2 is the current v0.3.0 prerelease for validating the Agent Knowledge OS direction before the next stable release.
 
 GitHub Release:
 
-- https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1
+- https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.2
 
 ## Beta highlights
 
@@ -32,7 +32,7 @@ This prerelease builds on the already available ForgeNerve desktop and agent wor
 
 ## MCP capabilities
 
-Important v0.3.0-beta.1 MCP capability groups:
+Important v0.3.0-beta.2 MCP capability groups:
 
 - Inbox: `list_inbox_items`, `create_inbox_item`, `promote_inbox_item_to_draft`, `dismiss_inbox_item`
 - Session: `start_agent_session`, `append_agent_session_context`, `list_agent_sessions`, `get_agent_session`, `complete_agent_session`
@@ -65,13 +65,12 @@ Runtime directories may appear automatically on first use:
 
 Desktop users:
 
-- Windows installer: `ForgeNerve_0.3.0-beta.1_x64-setup.exe`
-- Windows MSI: `ForgeNerve_0.3.0-beta.1_x64_en-US.msi`
+- Windows installer: `ForgeNerve_0.3.0-beta.2_x64-setup.exe`
 - Windows portable: `ForgeNerve_x64_portable.exe`
-- macOS Apple Silicon: `ForgeNerve_0.3.0-beta.1_aarch64.dmg`
-- macOS Intel: `ForgeNerve_0.3.0-beta.1_x64.dmg`
-- Linux x64: `ForgeNerve_0.3.0-beta.1_amd64.AppImage`
-- Linux arm64: `ForgeNerve_0.3.0-beta.1_aarch64.AppImage`
+- macOS Apple Silicon: `ForgeNerve_0.3.0-beta.2_aarch64.dmg`
+- macOS Intel: `ForgeNerve_0.3.0-beta.2_x64.dmg`
+- Linux x64: `ForgeNerve_0.3.0-beta.2_amd64.AppImage`
+- Linux arm64: `ForgeNerve_0.3.0-beta.2_aarch64.AppImage`
 
 CLI / MCP users:
 
@@ -83,7 +82,7 @@ CLI / MCP users:
 
 All official assets are published on the same release page:
 
-- https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1
+- https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.2
 
 ## Validation status
 
@@ -98,4 +97,4 @@ This prerelease line is backed by:
 
 ## Beta status
 
-`v0.3.0-beta.1` is intended for validation. Use `v0.1.2` if you need the previous stable release line.
+`v0.3.0-beta.2` is intended for validation. On Windows, the prerelease line ships NSIS setup + portable executable; MSI remains part of the stable release line. Use `v0.1.2` if you need the previous stable release line.

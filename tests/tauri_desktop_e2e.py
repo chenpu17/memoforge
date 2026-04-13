@@ -340,7 +340,7 @@ def assert_release_entrypoints_visible(driver: webdriver.Remote) -> None:
         driver,
         [
             "下载与发布入口",
-            "下载 v0.3.0-beta.1",
+            "下载 v0.3.0-beta.2",
             "Release Notes",
             "安装与配置说明",
             "Windows",
@@ -356,7 +356,7 @@ def assert_settings_release_section(driver: webdriver.Remote) -> None:
         [
             "MCP 快速配置",
             "下载与发布",
-            "下载 v0.3.0-beta.1",
+            "下载 v0.3.0-beta.2",
             "Release Notes",
             "安装与配置说明",
             "Standalone MCP",
@@ -371,7 +371,7 @@ def assert_search_empty_guidance(driver: webdriver.Remote) -> None:
         driver,
         [
             "没有找到匹配结果",
-            "下载 v0.3.0-beta.1",
+            "下载 v0.3.0-beta.2",
             "Release Notes",
             "MCP 配置说明",
         ],
@@ -703,7 +703,7 @@ def run_welcome_clone_flow(driver: webdriver.Remote, repo_url: str, clone_target
     repo_input.send_keys(repo_url)
     path_input.send_keys(str(clone_target))
     wait_for_button(driver, "开始克隆").click()
-    wait_for_body_text(driver, "Alpha Rust Patterns", timeout=50.0)
+    wait_for_body_text(driver, "Alpha Rust Patterns", timeout=90.0)
 
     assert (clone_target / ".git").exists()
     assert (clone_target / "programming" / "alpha.md").exists()

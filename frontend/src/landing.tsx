@@ -50,10 +50,9 @@ const problemCards = [
 const downloadCards: DownloadCard[] = [
   {
     title: 'Windows',
-    description: `Recommended for most users. Choose the installer, MSI, or portable build directly from the official ${RELEASE_TAG} release.`,
+    description: `Recommended for most users. The current prerelease ships a setup installer and portable build from the official ${RELEASE_TAG} release.`,
     assets: [
       { name: `ForgeNerve_${RELEASE_VERSION}_x64-setup.exe`, url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_${RELEASE_VERSION}_x64-setup.exe` },
-      { name: `ForgeNerve_${RELEASE_VERSION}_x64_en-US.msi`, url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_${RELEASE_VERSION}_x64_en-US.msi` },
       { name: 'ForgeNerve_x64_portable.exe', url: `https://github.com/chenpu17/memoforge/releases/download/${RELEASE_TAG}/ForgeNerve_x64_portable.exe` },
     ],
   },

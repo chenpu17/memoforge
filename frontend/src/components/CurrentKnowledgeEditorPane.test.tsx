@@ -39,6 +39,6 @@ describe('CurrentKnowledgeEditorPane empty state', () => {
     expect(screen.getByText('选择一篇知识，或从这里开始创建')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /新建第一篇知识/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /打开设置/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /下载 v0.3.0-beta.1/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /下载 v0.3.0-beta.2/ })).toBeInTheDocument()
   })
 })

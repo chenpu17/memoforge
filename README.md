@@ -15,16 +15,16 @@ ForgeNerve 是一个面向开发者和 AI Agent 的知识操作系统：它把 `
 
 ## 项目状态
 
-当前版本主线：**v0.3.0-beta.1** (2026-04-13，预发布版；正式稳定版仍以 stable release tag 为准)
+当前版本主线：**v0.3.0-beta.2** (2026-04-13，预发布版；正式稳定版仍以 stable release tag 为准)
 
 最新正式版：[`ForgeNerve v0.1.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2)
 
-最新预发布版：[`ForgeNerve v0.3.0-beta.1`](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1)
+最新预发布版：[`ForgeNerve v0.3.0-beta.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.2)
 
 说明：
 
 - `v0.1.2` 是当前正式发布版
-- `v0.3.0-beta.1` 是当前预发布版，用于验证 v0.3.0 主线能力
+- `v0.3.0-beta.2` 是当前预发布版，用于验证 v0.3.0 主线能力
 - 本仓库中的 `v0.3.0` 文档表示“当前权威规划与收口口径”，正式稳定版仍以后续 release tag 为准
 
 当前仓库主干现状：
@@ -81,26 +81,26 @@ ForgeNerve 是一个面向开发者和 AI Agent 的知识操作系统：它把 `
 如果你是第一次接触 ForgeNerve，最直接的入口就是 GitHub Release：
 
 - 正式版下载页：[`ForgeNerve v0.1.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.1.2)
-- 预发布版下载页：[`ForgeNerve v0.3.0-beta.1`](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1)
+- 预发布版下载页：[`ForgeNerve v0.3.0-beta.2`](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.2)
 - 发布说明：[`RELEASE_NOTES.md`](RELEASE_NOTES.md)
 
 预发布版常用下载入口：
 
 | 平台 / 用途 | 推荐产物 | 链接 |
 |------|------|------|
-| Windows 安装版 | `ForgeNerve_0.3.0-beta.1_x64-setup.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_x64-setup.exe) |
-| Windows MSI | `ForgeNerve_0.3.0-beta.1_x64_en-US.msi` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_x64_en-US.msi) |
-| Windows 便携版 | `ForgeNerve_x64_portable.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_x64_portable.exe) |
-| macOS Apple Silicon | `ForgeNerve_0.3.0-beta.1_aarch64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_aarch64.dmg) |
-| macOS Intel | `ForgeNerve_0.3.0-beta.1_x64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_x64.dmg) |
-| Linux x64 | `ForgeNerve_0.3.0-beta.1_amd64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_amd64.AppImage) |
-| Linux arm64 | `ForgeNerve_0.3.0-beta.1_aarch64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.1/ForgeNerve_0.3.0-beta.1_aarch64.AppImage) |
-| MCP / CLI 二进制 | `memoforge-*` 系列 | [查看全部 release 资产](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.1) |
+| Windows 安装版 | `ForgeNerve_0.3.0-beta.2_x64-setup.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.2/ForgeNerve_0.3.0-beta.2_x64-setup.exe) |
+| Windows 便携版 | `ForgeNerve_x64_portable.exe` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.2/ForgeNerve_x64_portable.exe) |
+| macOS Apple Silicon | `ForgeNerve_0.3.0-beta.2_aarch64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.2/ForgeNerve_0.3.0-beta.2_aarch64.dmg) |
+| macOS Intel | `ForgeNerve_0.3.0-beta.2_x64.dmg` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.2/ForgeNerve_0.3.0-beta.2_x64.dmg) |
+| Linux x64 | `ForgeNerve_0.3.0-beta.2_amd64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.2/ForgeNerve_0.3.0-beta.2_amd64.AppImage) |
+| Linux arm64 | `ForgeNerve_0.3.0-beta.2_aarch64.AppImage` | [下载](https://github.com/chenpu17/memoforge/releases/download/v0.3.0-beta.2/ForgeNerve_0.3.0-beta.2_aarch64.AppImage) |
+| MCP / CLI 二进制 | `memoforge-*` 系列 | [查看全部 release 资产](https://github.com/chenpu17/memoforge/releases/tag/v0.3.0-beta.2) |
 
 如果你想在首页或 release 页面快速找到二进制，可以直接按下面口径理解：
 
 - 桌面用户：优先下载 `ForgeNerve_*` 资产
 - Windows 用户：优先下载 `setup.exe`，不想安装则下载 `portable.exe`
+- 预发布版说明：Windows `MSI` 仍保留在稳定版发布线，beta 线默认只提供 `setup.exe` 与 `portable.exe`
 - Agent / MCP 用户：优先下载 `memoforge-*` 单文件二进制
 - 想看全部产物：直接进入 release 页面右侧资产列表
 
