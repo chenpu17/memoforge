@@ -1041,6 +1041,10 @@ def run_readonly_workspace_flow(driver: webdriver.Remote, paths: dict[str, str],
 
     wait_for_body_text(driver, "当前为只读模式", timeout=20.0)
     assert_editor_state(mcp_port, expected_kb_path=Path(paths["kb1"]))
+    tools_list = call_embedded_mcp_jsonrpc(mcp_port, "tools/list")
+    tool_names = [tool["name"] for tool in tools_list.get("result", {}).get("tools", [])]
+    assert "start_draft" in tool_names
+    assert "create_knowledge" not in tool_names
 
     click_tree_button(driver, "programming")
     click_browser_card(driver, "Alpha Rust Patterns")
@@ -1068,7 +1072,7 @@ def run_readonly_workspace_flow(driver: webdriver.Remote, paths: dict[str, str],
             "content": "# blocked",
             "tags": [],
         },
-        "Write operations not allowed in readonly mode",
+        "Tool 'create_knowledge' not found or not available in profile 'desktop-assisted'",
     )
     mark("readonly-mcp")
 
