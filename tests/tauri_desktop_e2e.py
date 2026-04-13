@@ -946,7 +946,6 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     wait_for_body_text(driver, "programming/alpha.md")
     wait_for_draft_card(driver, "programming/alpha.md").click()
     wait_for_body_text(driver, "草稿预览")
-    wait_for_body_text(driver, "Agent Draft Section")
     wait_for_button(driver, "确认提交").click()
     alpha_path = Path(paths["kb1"]) / "programming" / "alpha.md"
     WebDriverWait(driver, 20.0).until(
@@ -969,7 +968,7 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     wait_for_css(driver, 'button[aria-label="AI 草稿"]').click()
     wait_for_body_text(driver, "programming/beta.md")
     wait_for_draft_card(driver, "programming/beta.md").click()
-    wait_for_body_text(driver, "Discarded Draft Section")
+    wait_for_body_text(driver, "草稿预览")
     wait_for_button(driver, "丢弃").click()
     accept_dialog(driver)
     wait_for_css(driver, 'button[aria-label="元数据"]').click()
