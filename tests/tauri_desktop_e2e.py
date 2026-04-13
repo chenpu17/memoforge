@@ -335,6 +335,20 @@ def click_browser_card(driver: webdriver.Remote, label: str) -> None:
     element.click()
 
 
+def open_note_from_landing(
+    driver: webdriver.Remote,
+    *,
+    category_label: str,
+    note_title: str,
+    timeout: float = 40.0,
+) -> None:
+    landing_text = wait_for_any_body_text(driver, [note_title, "全部文档"], timeout=timeout)
+    if landing_text != note_title:
+        click_tree_button(driver, category_label)
+        click_browser_card(driver, note_title)
+        wait_for_body_text(driver, note_title, timeout=40.0)
+
+
 def assert_release_entrypoints_visible(driver: webdriver.Remote) -> None:
     assert_body_contains_all(
         driver,
@@ -720,7 +734,12 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     note_body = f"# {note_title}\n\nsaved through tauri desktop e2e"
     commit_message = f"tauri desktop e2e commit {int(time.time())}"
 
-    wait_for_body_text(driver, "Alpha Rust Patterns", timeout=40.0)
+    open_note_from_landing(
+        driver,
+        category_label="programming",
+        note_title="Alpha Rust Patterns",
+        timeout=40.0,
+    )
     assert_tauri_runtime(driver)
     mark("tauri-runtime")
 
@@ -893,14 +912,24 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     path_input.clear()
     path_input.send_keys(str(Path(paths["kb2"]).resolve()))
     wait_for_button(driver, "打开").click()
-    wait_for_body_text(driver, "Gamma Python Tips", timeout=25.0)
+    open_note_from_landing(
+        driver,
+        category_label="programming",
+        note_title="Gamma Python Tips",
+        timeout=25.0,
+    )
     assert_editor_state(mcp_port, expected_kb_path=Path(paths["kb2"]))
     mark("embedded-state-switch-kb")
     mark("switch-kb")
 
 
 def run_readonly_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port: int) -> None:
-    wait_for_body_text(driver, "Alpha Rust Patterns", timeout=40.0)
+    open_note_from_landing(
+        driver,
+        category_label="programming",
+        note_title="Alpha Rust Patterns",
+        timeout=40.0,
+    )
     assert_tauri_runtime(driver)
     wait_for_http(f"http://127.0.0.1:{mcp_port}/health", timeout=20.0)
 
