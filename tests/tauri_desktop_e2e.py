@@ -392,6 +392,13 @@ def wait_clickable_xpath(driver: webdriver.Remote, xpath: str, timeout: float = 
     )
 
 
+def wait_for_draft_card(driver: webdriver.Remote, knowledge_path: str, timeout: float = 20.0):
+    xpath = (
+        f"//button[.//span[contains(normalize-space(.), {xpath_literal(knowledge_path)})]]"
+    )
+    return wait_clickable_xpath(driver, xpath, timeout=timeout)
+
+
 def accept_dialog(driver: webdriver.Remote, timeout: float = 10.0) -> None:
     alert = WebDriverWait(driver, timeout).until(EC.alert_is_present())
     alert.accept()
@@ -936,9 +943,8 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
 
     draft_id = create_agent_draft_for_existing_note(mcp_port, "programming/alpha.md")
     wait_for_css(driver, 'button[aria-label="AI 草稿"]').click()
-    wait_for_body_text(driver, draft_id)
     wait_for_body_text(driver, "programming/alpha.md")
-    wait_for_xpath(driver, f"//button[contains(., {xpath_literal(draft_id)})]").click()
+    wait_for_draft_card(driver, "programming/alpha.md").click()
     wait_for_body_text(driver, "草稿预览")
     wait_for_body_text(driver, "Agent Draft Section")
     wait_for_button(driver, "确认提交").click()
@@ -961,8 +967,8 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     )
     wait_for_css(driver, 'button[aria-label="元数据"]').click()
     wait_for_css(driver, 'button[aria-label="AI 草稿"]').click()
-    wait_for_body_text(driver, discard_draft_id)
-    wait_for_xpath(driver, f"//button[contains(., {xpath_literal(discard_draft_id)})]").click()
+    wait_for_body_text(driver, "programming/beta.md")
+    wait_for_draft_card(driver, "programming/beta.md").click()
     wait_for_body_text(driver, "Discarded Draft Section")
     wait_for_button(driver, "丢弃").click()
     accept_dialog(driver)
