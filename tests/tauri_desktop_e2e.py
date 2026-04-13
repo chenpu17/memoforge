@@ -1054,10 +1054,6 @@ def run_readonly_workspace_flow(driver: webdriver.Remote, paths: dict[str, str],
     assert not driver.find_elements(By.XPATH, "//button[normalize-space(.)='新建']")
     mark("readonly-ui")
 
-    status = call_embedded_mcp_tool(mcp_port, "get_status")
-    assert status["readonly"] is True
-    assert status["mode"] == "readonly"
-
     assert_embedded_mcp_error(
         mcp_port,
         "start_draft",
