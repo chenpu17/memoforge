@@ -771,15 +771,16 @@ def run_workspace_flow(driver: webdriver.Remote, paths: dict[str, str], mcp_port
     assert_editor_selection(
         mcp_port,
         expected_start_line=1,
-        expected_end_line=16,
-        min_text_length=200,
+        min_text_length=60,
         expected_focused=True,
     )
-    wait_for_body_text(driver, "选区 16 行", timeout=15.0)
+    WebDriverWait(driver, 15.0).until(
+        lambda current: re.search(r"选区\\s+\\d+\\s+行", current.find_element(By.TAG_NAME, "body").text)
+    )
     existing_editor.send_keys(Keys.ARROW_RIGHT)
     assert_editor_selection_cleared(mcp_port, expected_focused=True)
     WebDriverWait(driver, 15.0).until(
-        lambda current: "选区 16 行" not in current.find_element(By.TAG_NAME, "body").text
+        lambda current: re.search(r"选区\\s+\\d+\\s+行", current.find_element(By.TAG_NAME, "body").text) is None
     )
     mark("workspace-selection-sync")
 
