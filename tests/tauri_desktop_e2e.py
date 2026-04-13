@@ -310,25 +310,7 @@ def set_markdown_editor_text(driver: webdriver.Remote, text: str, attempts: int 
         updated = driver.execute_script(
             """
             const expected = arguments[0];
-            const content = document.querySelector('.cm-content');
-            const editor = content?.closest('.cm-editor');
-            const candidates = [
-              content?.cmView?.rootView?.view,
-              content?.cmView?.view,
-              editor?.cmView?.rootView?.view,
-              editor?.cmView?.view,
-            ];
-            const view = candidates.find(
-              (candidate) => candidate && typeof candidate.dispatch === 'function' && candidate.state?.doc
-            );
-            if (!view) return null;
-            view.dispatch({
-              changes: { from: 0, to: view.state.doc.length, insert: expected },
-              selection: { anchor: expected.length, head: expected.length },
-              scrollIntoView: true,
-            });
-            view.focus();
-            return view.state.doc.toString();
+            return window.__MEMOFORGE_EDITOR_TEST_HOOKS__?.setMarkdownDocument?.(expected) ?? null;
             """,
             text,
         )

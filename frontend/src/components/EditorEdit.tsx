@@ -172,6 +172,42 @@ export const EditorEdit: React.FC<EditorProps> = ({
     }
   }, [])
 
+  const registerEditorTestHooks = useCallback(() => {
+    if (typeof window === 'undefined') return () => {}
+
+    const target = window as Window & {
+      __MEMOFORGE_EDITOR_TEST_HOOKS__?: {
+        setMarkdownDocument: (nextValue: string) => string | null
+        getMarkdownDocument: () => string | null
+      }
+    }
+
+    const hooks = {
+      setMarkdownDocument: (nextValue: string) => {
+        const view = editorViewRef.current
+        if (!view) return null
+
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: nextValue },
+          selection: { anchor: nextValue.length, head: nextValue.length },
+          scrollIntoView: true,
+        })
+        view.focus()
+        flushPendingDocValue()
+        return view.state.doc.toString()
+      },
+      getMarkdownDocument: () => editorViewRef.current?.state.doc.toString() ?? null,
+    }
+
+    target.__MEMOFORGE_EDITOR_TEST_HOOKS__ = hooks
+
+    return () => {
+      if (target.__MEMOFORGE_EDITOR_TEST_HOOKS__ == hooks) {
+        delete target.__MEMOFORGE_EDITOR_TEST_HOOKS__
+      }
+    }
+  }, [flushPendingDocValue])
+
   useEffect(() => () => {
     flushPendingDocValue()
   }, [flushPendingDocValue])
@@ -1140,14 +1176,16 @@ export const EditorEdit: React.FC<EditorProps> = ({
     })
 
     editorViewRef.current = view
+    const unregisterEditorTestHooks = registerEditorTestHooks()
 
     return () => {
+      unregisterEditorTestHooks()
       clearEditorSelection()
       clearSelection()
       view.destroy()
       editorViewRef.current = null
     }
-  }, [applyLinePrefix, applyWrap, closeDocumentSearch, clearEditorSelection, clearSelection, flushPendingDocValue, handleSelectionChange, insertCurrentDate, insertLink, insertTableSnippet, insertWikiLink, moveDocumentSearch, openCommandPalette, openDocumentSearch, openFilePicker, runToolbarAction, syncDocumentSearchState, tryOpenSlashCommandPalette, value, wikiLinkCompletion])
+  }, [applyLinePrefix, applyWrap, clearEditorSelection, clearSelection, closeDocumentSearch, flushPendingDocValue, handleSelectionChange, insertCurrentDate, insertLink, insertTableSnippet, insertWikiLink, moveDocumentSearch, openCommandPalette, openDocumentSearch, openFilePicker, registerEditorTestHooks, runToolbarAction, syncDocumentSearchState, tryOpenSlashCommandPalette, value, wikiLinkCompletion])
 
   useEffect(() => {
     const root = editorRootRef.current
