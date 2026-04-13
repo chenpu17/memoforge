@@ -20,6 +20,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 import urllib.request
@@ -237,10 +238,27 @@ def run_app_session(
         raise
     finally:
         if driver is not None:
-            try:
-                driver.quit()
-            except Exception:
-                pass
+            quit_error: list[Exception] = []
+
+            def quit_driver() -> None:
+                try:
+                    driver.quit()
+                except Exception as error:
+                    quit_error.append(error)
+
+            quit_thread = threading.Thread(target=quit_driver, daemon=True)
+            quit_thread.start()
+            quit_thread.join(timeout=8.0)
+            if quit_thread.is_alive():
+                print(
+                    f"WARN driver.quit timeout for scenario {resolved_scenario_name}; continuing cleanup",
+                    flush=True,
+                )
+            elif quit_error:
+                print(
+                    f"WARN driver.quit error for scenario {resolved_scenario_name}: {quit_error[0]}",
+                    flush=True,
+                )
         terminate_process(driver_process)
 
 
@@ -523,7 +541,7 @@ def poll_note_file(root: str, note_title: str, expected_snippet: str, timeout: f
 
 
 def mark(step: str) -> None:
-    print(f"OK {step}")
+    print(f"OK {step}", flush=True)
 
 
 def capture_failure_artifacts(
@@ -1104,7 +1122,7 @@ def main() -> None:
         print(
             "SKIP tauri-desktop-e2e: official Tauri WebDriver desktop support currently covers "
             "Linux and Windows only; macOS has no WKWebView driver."
-        )
+        , flush=True)
         return
 
     temp_dir = Path(tempfile.mkdtemp(prefix="memoforge-tauri-e2e-"))
@@ -1197,7 +1215,7 @@ def main() -> None:
                 "workspace-flow",
                 "readonly-workspace-flow",
             ],
-        }, ensure_ascii=False))
+        }, ensure_ascii=False), flush=True)
     except TimeoutException as error:
         raise SystemExit(f"Tauri desktop E2E timed out: {error}") from error
     finally:
