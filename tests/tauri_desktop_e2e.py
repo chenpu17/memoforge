@@ -432,6 +432,31 @@ def wait_clickable_xpath(driver: webdriver.Remote, xpath: str, timeout: float = 
     )
 
 
+def click_via_js(driver: webdriver.Remote, element) -> None:
+    driver.execute_script(
+        """
+        arguments[0].scrollIntoView({ block: 'center', inline: 'center' });
+        arguments[0].click();
+        """,
+        element,
+    )
+
+
+def set_input_value_via_js(driver: webdriver.Remote, element, value: str) -> None:
+    driver.execute_script(
+        """
+        const input = arguments[0];
+        const nextValue = arguments[1];
+        input.focus();
+        input.value = nextValue;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        """,
+        element,
+        value,
+    )
+
+
 def wait_for_draft_card(driver: webdriver.Remote, knowledge_path: str, timeout: float = 20.0):
     xpath = (
         f"//button[.//span[contains(normalize-space(.), {xpath_literal(knowledge_path)})]]"
@@ -846,12 +871,15 @@ def run_welcome_clone_flow(driver: webdriver.Remote, repo_url: str, clone_target
     assert_release_entrypoints_visible(driver)
     mark("welcome-release-entrypoints")
 
-    wait_for_button(driver, "Clone Git 仓库").click()
+    click_via_js(driver, wait_for_button(driver, "Clone Git 仓库"))
+    mark("welcome-clone-open")
     repo_input = wait_for_css(driver, 'input[placeholder="https://github.com/user/repo.git"]')
     path_input = wait_for_css(driver, 'input[placeholder="选择本地存储路径"]')
-    repo_input.send_keys(repo_url)
-    path_input.send_keys(str(clone_target))
-    wait_for_button(driver, "开始克隆").click()
+    set_input_value_via_js(driver, repo_input, repo_url)
+    set_input_value_via_js(driver, path_input, str(clone_target))
+    mark("welcome-clone-form")
+    click_via_js(driver, wait_for_button(driver, "开始克隆"))
+    mark("welcome-clone-submit")
     landing_text = wait_for_any_body_text(driver, ["Alpha Rust Patterns", "全部文档"], timeout=90.0)
     if landing_text != "Alpha Rust Patterns":
         click_tree_button(driver, "programming")
