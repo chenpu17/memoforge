@@ -448,7 +448,13 @@ def set_input_value_via_js(driver: webdriver.Remote, element, value: str) -> Non
         const input = arguments[0];
         const nextValue = arguments[1];
         input.focus();
-        input.value = nextValue;
+        const prototype = Object.getPrototypeOf(input);
+        const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+        if (valueSetter) {
+          valueSetter.call(input, nextValue);
+        } else {
+          input.value = nextValue;
+        }
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         """,
